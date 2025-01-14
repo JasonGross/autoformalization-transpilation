@@ -45,6 +45,7 @@ def process_coq_files(folder_path: str) -> pd.DataFrame:
     
     return pd.DataFrame(data)
 
+
 if __name__ == "__main__":
     folder_path = r'C:\Users\User\Downloads\lf\lf'
     output_path = r'C:\Users\User\Downloads\coq_proofs_dataset.json'
