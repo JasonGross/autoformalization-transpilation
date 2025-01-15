@@ -34,7 +34,14 @@ To stop the container, you can run `docker compose down`.
 ### Adding Python dependencies
 
 1. Run `uv add <package-name>`
-1. Make sure you 
+1. Make sure you commit the changed `uv.lock` and `pyproject.toml` files to Git.
+
+## Running Pre-Commit
+
+This will lint and format your code.
+
+1. To manually run pre-commit, simply run `pre-commit`.
+1. To avoid having to manually run, you can set it to automatically run every time you run `git commit` by running `pre-commit install`.
 
 ### About UV
 
