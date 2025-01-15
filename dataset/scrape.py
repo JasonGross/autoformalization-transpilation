@@ -5,17 +5,20 @@ from typing import List, Tuple, Dict
 
 def extract_coq_blocks_with_hierarchy(coq_text: str) -> List[Dict]:
     comment_pattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
-    block_pattern = re.compile(r'((?:Fixpoint|Definition|Lemma|Theorem|Inductive).*?(?:Qed\.|Admitted\.|end\.))', re.DOTALL)
+    block_start_keywords = [
+        "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive",
+        "Corollary", "Proposition", "Example", "Record", "CoFixpoint",
+        "Fact", "Module", "Section", "Variable", "Hypothesis", "Axiom",
+        "Parameter", "Goal", "Remark", "Notation", "Ltac"
+    ]
+    block_pattern = re.compile(r'^(?:' + '|'.join(block_start_keywords) + r')\b', re.MULTILINE)
     module_pattern = re.compile(r'\b(Module|Section)\s+(\w+)\b')
     end_pattern = re.compile(r'\bEnd\b')
 
     coq_text_no_comments = re.sub(comment_pattern, '', coq_text)
-    blocks = block_pattern.findall(coq_text_no_comments)
-
     hierarchy = []
     results = []
 
-    # Split the text into lines for processing
     lines = coq_text_no_comments.splitlines()
     current_block = ""
     inside_block = False
@@ -29,20 +32,29 @@ def extract_coq_blocks_with_hierarchy(coq_text: str) -> List[Dict]:
         elif end_match and hierarchy:
             hierarchy.pop()
 
-        # Check if the line starts a new block
-        if any(keyword in line for keyword in ["Fixpoint", "Definition", "Lemma", "Theorem", "Inductive"]):
-            inside_block = True
+        if block_pattern.match(line):
+            if inside_block:
+                results.append({
+                    "proof": current_block.strip(),
+                    "path": list(hierarchy) if hierarchy else ["__global__"]
+                })
             current_block = line
+            inside_block = True
         elif inside_block:
             current_block += "\n" + line
-            # Check if the block ends
-            if any(end in line for end in ["Qed.", "Admitted.", "end."]):
+            if line.strip() == "":
                 results.append({
                     "proof": current_block.strip(),
                     "path": list(hierarchy) if hierarchy else ["__global__"]
                 })
                 inside_block = False
                 current_block = ""
+
+    if inside_block:
+        results.append({
+            "proof": current_block.strip(),
+            "path": list(hierarchy) if hierarchy else ["__global__"]
+        })
 
     return results
 
