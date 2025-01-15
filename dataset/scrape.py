@@ -1,116 +1,82 @@
 import os
 import re
-import json
-from typing import List, Tuple, Dict, Any
+import pandas as pd
+from typing import List, Tuple, Dict
 
-def extract_coq_blocks_without_comments(coq_text: str) -> List[str]:
-    # Remove comments first
+def extract_coq_blocks_with_hierarchy(coq_text: str) -> List[Dict]:
     comment_pattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
+    block_pattern = re.compile(r'((?:Fixpoint|Definition|Lemma|Theorem|Inductive).*?(?:Qed\.|Admitted\.|end\.))', re.DOTALL)
+    module_pattern = re.compile(r'\b(Module|Section)\s+(\w+)\b')
+    end_pattern = re.compile(r'\bEnd\b')
+
     coq_text_no_comments = re.sub(comment_pattern, '', coq_text)
-    
-    # Extract proof blocks with comprehensive pattern
-    block_pattern = re.compile(
-        r'((?:Fixpoint|Function|Definition|Inductive|CoInductive|'
-        r'Instance|Class|Record|Notation|Theorem|Lemma|Example|'
-        r'Fact|Proposition|Corollary|Remark|Axiom|Parameter|'
-        r'Variable|Variables|Hypothesis|Hypotheses|Scheme)'
-        r'.*?(?:Qed\.|Admitted\.|end\.|}\.|defined\.|\.)\s*)',
-        re.DOTALL
-    )
-    return block_pattern.findall(coq_text_no_comments)
+    blocks = block_pattern.findall(coq_text_no_comments)
 
-def separate_proofs(blocks: List[str]) -> Tuple[List[str], List[str]]:
-    filtered_blocks, incomplete_proofs = [], []
-    for block in blocks:
-        (incomplete_proofs if 'Admitted.' in block else filtered_blocks).append(block)
-    return filtered_blocks, incomplete_proofs
-
-def process_coq_file(file_path: str) -> Dict[str, Any]:
-    with open(file_path, 'r', encoding='utf-8') as file:
-        coq_text = file.read()
-    
-    proof_blocks = extract_coq_blocks_without_comments(coq_text)
-    filtered_proofs, incomplete_proofs = separate_proofs(proof_blocks)
-    
-    # Track module/section hierarchy with proper prefixes
-    current_path = []
-    lines = coq_text.split('\n')
-    path_map = {0: ["__global__"]}
-    current_pos = 0
-    
-    for line in lines:
-        line = line.strip()
-        
-        # Handle module start
-        if line.startswith('Module ') and not line.startswith('Module Type'):
-            name = line.split()[1].rstrip('.')
-            current_path.append(f"Module:{name}")
-            
-        # Handle section start    
-        elif line.startswith('Section '):
-            name = line.split()[1].rstrip('.')
-            current_path.append(f"Section:{name}")
-            
-        # Handle end of module/section    
-        elif line.startswith('End '):
-            name = line.split()[1].rstrip('.')
-            # Look for matching module/section name with prefix
-            if current_path:
-                if f"Module:{name}" in current_path or f"Section:{name}" in current_path:
-                    current_path.pop()
-        
-        # Store current path at this position
-        path_map[current_pos] = list(current_path) if current_path else ["__global__"]
-        current_pos += len(line) + 1
-
-    result = {
-        "filename": os.path.basename(file_path),
-        "proofs": [],
-        "incomplete_proofs": []
-    }
-    
-    # Associate proofs with their paths
-    for proof in filtered_proofs + incomplete_proofs:
-        proof_pos = coq_text.find(proof)
-        valid_positions = [k for k in path_map.keys() if k <= proof_pos]
-        path = path_map[max(valid_positions)] if valid_positions else ["__global__"]
-        
-        proof_info = {
-            "proof": proof,
-            "path": path
-        }
-        
-        if proof in filtered_proofs:
-            result["proofs"].append(proof_info)
-        else:
-            result["incomplete_proofs"].append(proof_info)
-    
-    return result
-
-def process_coq_files(folder_path: str) -> List[Dict[str, Any]]:
+    hierarchy = []
     results = []
-    v_files = [f for f in os.listdir(folder_path) if f.endswith('.v')]
-    total_files = len(v_files)
+
+    # Split the text into lines for processing
+    lines = coq_text_no_comments.splitlines()
+    current_block = ""
+    inside_block = False
+
+    for line in lines:
+        module_match = module_pattern.match(line)
+        end_match = end_pattern.match(line)
+
+        if module_match:
+            hierarchy.append(f"{module_match.group(1)}:{module_match.group(2)}")
+        elif end_match and hierarchy:
+            hierarchy.pop()
+
+        # Check if the line starts a new block
+        if any(keyword in line for keyword in ["Fixpoint", "Definition", "Lemma", "Theorem", "Inductive"]):
+            inside_block = True
+            current_block = line
+        elif inside_block:
+            current_block += "\n" + line
+            # Check if the block ends
+            if any(end in line for end in ["Qed.", "Admitted.", "end."]):
+                results.append({
+                    "proof": current_block.strip(),
+                    "path": list(hierarchy) if hierarchy else ["__global__"]
+                })
+                inside_block = False
+                current_block = ""
+
+    return results
+
+def process_coq_files_with_hierarchy(folder_path: str) -> pd.DataFrame:
+    data = []
     
-    for i, filename in enumerate(v_files):
+    coq_files = [f for f in os.listdir(folder_path) if f.endswith('.v')]
+    total_files = len(coq_files)
+    
+    for i, filename in enumerate(coq_files):
         file_path = os.path.join(folder_path, filename)
         try:
-            result = process_coq_file(file_path)
-            results.append(result)
-        except Exception as e:
-            print(f"Error processing {filename}: {e}")
+            with open(file_path, 'r', encoding='utf-8') as file:
+                coq_text = file.read()
+        except (IOError, UnicodeDecodeError) as e:
+            print(f"Error reading {filename}: {e}")
             continue
+        
+        proofs_with_hierarchy = extract_coq_blocks_with_hierarchy(coq_text)
+        data.append({
+            'filename': filename,
+            'proofs': proofs_with_hierarchy,
+            'incomplete_proofs': []  # Assuming no incomplete proofs for simplicity
+        })
         
         if (i + 1) % 10 == 0 or i == total_files - 1:
             print(f"Processed {i + 1}/{total_files} files...")
     
-    return results
+    return pd.DataFrame(data)
 
 if __name__ == "__main__":
     folder_path = r'dataset\raw_data\lf'
     output_path = r'dataset\processed_data\coq_proofs_dataset.json'
     
-    results = process_coq_files(folder_path)
+    df = process_coq_files_with_hierarchy(folder_path)
     
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+    df.to_json(output_path, orient='records', indent=4, force_ascii=False)
