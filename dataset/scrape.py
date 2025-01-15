@@ -35,7 +35,7 @@ def extract_coq_blocks_with_hierarchy(coq_text: str) -> List[Dict]:
         if block_pattern.match(line):
             if inside_block:
                 results.append({
-                    "proof": current_block.strip(),
+                    "block": current_block.strip(),
                     "path": list(hierarchy) if hierarchy else ["__global__"]
                 })
             current_block = line
@@ -44,7 +44,7 @@ def extract_coq_blocks_with_hierarchy(coq_text: str) -> List[Dict]:
             current_block += "\n" + line
             if line.strip() == "":
                 results.append({
-                    "proof": current_block.strip(),
+                    "block": current_block.strip(),
                     "path": list(hierarchy) if hierarchy else ["__global__"]
                 })
                 inside_block = False
@@ -52,7 +52,7 @@ def extract_coq_blocks_with_hierarchy(coq_text: str) -> List[Dict]:
 
     if inside_block:
         results.append({
-            "proof": current_block.strip(),
+            "block": current_block.strip(),
             "path": list(hierarchy) if hierarchy else ["__global__"]
         })
 
