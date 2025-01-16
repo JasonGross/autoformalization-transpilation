@@ -6,4 +6,4 @@ services:
     volumes:
       # Mount the working directory to the container so that changes in the 
       # host are reflected in the container and vice versa.
-      - ./:/autoformalization
+      - ./:/root/autoformalization
