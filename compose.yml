@@ -1,0 +1,9 @@
+services:
+  autoformalization:
+    container_name: autoformalization
+    build: .
+    entrypoint: ["tail", "-f", "/dev/null"]
+    volumes:
+      # Mount the working directory to the container so that changes in the 
+      # host are reflected in the container and vice versa.
+      - ./:/root/autoformalization
