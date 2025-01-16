@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Place executables in the environment at the front of the path
 ENV PATH="/root/autoformalization/.venv/bin:$PATH"
 
-RUN cd git config --global --add safe.directory /autoformalization
+RUN git config --global --add safe.directory /root/autoformalization
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT ["tail", "-f", "/dev/null"]
