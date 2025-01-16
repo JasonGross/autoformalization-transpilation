@@ -9,9 +9,5 @@ dependencies = []
 [tool.uv]
 dev-dependencies = [
     "ruff>=0.6.2",
-]
-
-[dependency-groups]
-dev = [
     "pre-commit>=4.0.1",
 ]

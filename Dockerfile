@@ -7,8 +7,9 @@ RUN apt-get update && apt-get install -y \
     make \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the project into `/app`
-WORKDIR /root/autoformalization
+# Keep the venv separate from the project directory to stop overwriting the venv when
+# the project directory is mounted as a volume
+WORKDIR /uv
 
 # Copy from the cache instead of linking since it's a mounted volume
 ENV UV_LINK_MODE=copy
@@ -20,9 +21,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project
 
 # Place executables in the environment at the front of the path
-ENV PATH="/root/autoformalization/.venv/bin:$PATH"
+ENV PATH="/uv/.venv/bin:$PATH"
+
+# Tell uv where the environment is
+ENV VIRTUAL_ENV=/uv/.venv
+ENV UV_PROJECT_ENVIRONMENT=/uv/.venv
 
 RUN git config --global --add safe.directory /root/autoformalization
 
-# Reset the entrypoint, don't invoke `uv`
+WORKDIR /root/autoformalization
+
+# Infinite loop to keep the container running
 ENTRYPOINT ["tail", "-f", "/dev/null"]
