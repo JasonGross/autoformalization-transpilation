@@ -1,7 +1,7 @@
 [project]
 name = "autoformalization"
 version = "0.1.0"
-description = "Add your description here"
+description = "For the AlphaProof for Software Verification MARS project"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
