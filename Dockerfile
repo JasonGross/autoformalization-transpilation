@@ -14,15 +14,25 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libgmp-dev \
     linux-libc-dev \
+    rsync \
     && rm -rf /var/lib/apt/lists/*
+# N.B. rsync is required for opam pin to a directory
 
 # Install Coq and Lean as early as possible to minimize rebuild frequency
-COPY coq_install.sh /root/coq_install.sh
-COPY lean_install.sh /root/lean_install.sh
+# Install OCaml separately from Coq to allow changing the version of Coq without reinstalling OCaml
+# Install the coq-lean-importer late to allow rebuilding it without rebuilding everything else
+COPY coq_install/coq_01_opam_install.sh /root/opam_install.sh
+RUN chmod +x /root/opam_install.sh \
+    && /root/opam_install.sh
+COPY coq_install/coq_02_coq_install.sh /root/coq_install.sh
 RUN chmod +x /root/coq_install.sh \
-    && /root/coq_install.sh \
-    && chmod +x /root/lean_install.sh \
-&& /root/lean_install.sh
+    && /root/coq_install.sh
+COPY lean_install.sh /root/lean_install.sh
+RUN chmod +x /root/lean_install.sh \
+    && /root/lean_install.sh
+COPY coq_install/coq_03_lean_import_install.sh /root/coq_lean_import_install.sh
+RUN chmod +x /root/coq_lean_import_install.sh \
+    && /root/coq_lean_import_install.sh
 
 # Keep the venv separate from the project directory to stop overwriting the venv when
 # the project directory is mounted as a volume

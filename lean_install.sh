@@ -1,3 +1,5 @@
+#!/bin/bash
+set -e
 # Install Lean 4
 curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf > script.sh && chmod +x script.sh && ./script.sh -y
 
