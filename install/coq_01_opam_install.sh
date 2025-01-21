@@ -11,8 +11,8 @@ export OPAMSANDBOX=none
 opam init -y --disable-sandboxing --auto-setup --comp=4.14.2
 opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev
 opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
-# handled by --auto-setup
-# echo 'eval $(opam env)' >> ~/.bashrc
+
+echo 'eval $(opam env)' >> ~/.bashrc
 
 # Create Coq development switch with required repositories and OCaml version
 # opam switch create coq-dev \

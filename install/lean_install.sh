@@ -9,4 +9,5 @@ git clone https://github.com/leanprover/lean4export.git
 cd lean4export
 git checkout d7978498
 . $HOME/.elan/env
+echo ". $HOME/.elan/env" >> ~/.bashrc
 lake build
