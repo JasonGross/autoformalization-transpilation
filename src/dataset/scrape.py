@@ -77,7 +77,7 @@ def process_coq_files_with_hierarchy(folder_path: str) -> pd.DataFrame:
         data.append({
             'filename': filename,
             'proofs': proofs_with_hierarchy,
-            'incomplete_proofs': []  # Assuming no incomplete proofs for simplicity
+            'incomplete_proofs': []  
         })
         
         if (i + 1) % 10 == 0 or i == total_files - 1:
@@ -86,8 +86,8 @@ def process_coq_files_with_hierarchy(folder_path: str) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 if __name__ == "__main__":
-    folder_path = r'dataset\raw_data\lf'
-    output_path = r'dataset\processed_data\coq_proofs_dataset.json'
+    folder_path = r'src\dataset\raw_data\lf'
+    output_path = r'src\dataset\processed_data\coq_proofs_dataset.json'
     
     df = process_coq_files_with_hierarchy(folder_path)
     

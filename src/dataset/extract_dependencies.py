@@ -1,6 +1,5 @@
 import json
 
-# Specify the path to your JSON file
 json_file_path = 'data/processed/coq_proofs_dataset.json'
 
 # Load JSON content from the file
@@ -12,7 +11,7 @@ keywords = {"Inductive", "Definition", "Fixpoint", "CoFixpoint", "Theorem", "Lem
 
 # Process each file block
 for file_entry in data:
-    filename = file_entry["filename"].replace(".v", "")  # Remove file extension
+    filename = file_entry["filename"].replace(".v", "")
     result_list = []
     
     for block_entry in file_entry["blocks"]:
@@ -20,12 +19,12 @@ for file_entry in data:
         first_line = block_lines[0].strip() if block_lines else ""
         first_word = first_line.split()[0] if first_line else ""
         
-        # Check if the first word of the block is in the keywords
+
         if first_word in keywords:
             path = ".".join(block_entry["path"])
-            construct_name = first_line.split()[1].rstrip(':')  # Extract construct name and remove trailing colon
+            construct_name = first_line.split()[1].rstrip(':') 
             
-            # Remove '__global__' from path if present
+
             if path == "__global__":
                 full_name = f"{filename}.{construct_name}"
             elif path:
@@ -35,7 +34,7 @@ for file_entry in data:
             
             result_list.append(full_name)
 
-    # Construct the Coq output for each file
+
     coq_output = (
         "Require dpdgraph.dpdgraph.\n"
         f"From LF Require {filename}.\n"
