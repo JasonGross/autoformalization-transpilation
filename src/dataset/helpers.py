@@ -4,8 +4,8 @@ BLOCK_STARTERS = [
     "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive", "Corollary",
     "Proposition", "Example", "Record", "CoFixpoint", "Fact", "Module",
     "Section", "Variable", "Hypothesis", "Axiom", "Parameter", "Goal", 
-    "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import", "Export", "From"
-    "Check","Hint","Create"
+    "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import", 
+    "Export", "From", "Check", "Hint", "Create"
 ]
 
 PROOF_ENDINGS = ["Qed.", "Defined.", "Admitted.", "Abort."]
@@ -74,3 +74,47 @@ def format_coq_file(input_path: str, output_path: str) -> None:
 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(final_content)
+
+def classify_block(block_text: str) -> str:
+    lines = block_text.strip().split('\n')
+    if not lines:
+        return "misc"
+    first_line = lines[0].strip()
+    if first_line.startswith("Set") or first_line.startswith("Unset"):
+        return "global_directive"
+    if first_line.startswith("From") or first_line.startswith("Require"):
+        return "require"
+    if first_line.startswith("Fixpoint"):
+        return "fixpoint"
+    if first_line.startswith("Lemma"):
+        return "lemma"
+    if first_line.startswith("Theorem"):
+        return "theorem"
+    if first_line.startswith("Definition"):
+        return "definition"
+    if first_line.startswith("Ltac"):
+        return "ltac"
+    if first_line.startswith("Inductive"):
+        return "inductive"
+    if first_line.startswith("Check"):
+        return "check"
+    if first_line.startswith("Hint"):
+        return "hint"
+    if first_line.startswith("Create HintDb"):
+        return "create_hint_db"
+    if first_line.startswith("Import") or first_line.startswith("Export"):
+        return "import"
+    if first_line.startswith("Example"):
+        return "example"
+    return "misc"
+
+def extract_blocks_from_preprocessed(file_content: str):
+    raw_blocks = file_content.strip().split("\n\n")
+    items = []
+    for block_text in raw_blocks:
+        btype = classify_block(block_text)
+        items.append({
+            "type": btype,
+            "raw": block_text.strip()
+        })
+    return items

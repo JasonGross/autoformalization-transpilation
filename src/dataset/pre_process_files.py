@@ -21,3 +21,5 @@ if __name__ == "__main__":
     folder_path = r"src\dataset\raw_data\lf"
     out_folder = r"src\dataset\pre_processed_data"
     preprocess_coq_files(folder_path, out_folder)
+
+## "idtac" might not be handled correctly
