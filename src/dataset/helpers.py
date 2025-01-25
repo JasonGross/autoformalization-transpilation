@@ -1,4 +1,3 @@
-import os
 import re
 
 BLOCK_STARTERS = [
@@ -19,7 +18,7 @@ def is_block_starter(line: str) -> bool:
             return True
     return False
 
-def preprocess_coq_file(input_path: str, output_path: str) -> None:
+def format_coq_file(input_path: str, output_path: str) -> None:
     with open(input_path, 'r', encoding='utf-8') as f:
         content = f.read()
     

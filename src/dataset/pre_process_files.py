@@ -1,5 +1,5 @@
 import os
-from helpers import preprocess_coq_file
+from helpers import format_coq_file
 
 def preprocess_coq_files(folder_path: str, out_folder: str) -> None:
     if not os.path.exists(out_folder):
@@ -12,7 +12,7 @@ def preprocess_coq_files(folder_path: str, out_folder: str) -> None:
         input_path = os.path.join(folder_path, filename)
         output_path = os.path.join(out_folder, filename)
         try:
-            preprocess_coq_file(input_path, output_path)
+            format_coq_file(input_path, output_path)
             print(f"[{i}/{total_files}] Preprocessed {filename} -> {output_path}")
         except Exception as e:
             print(f"Error processing {filename}: {e}")
