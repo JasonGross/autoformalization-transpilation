@@ -1,5 +1,7 @@
 Set Warnings "-notation-overridden,-parsing".
+
 From Coq Require Export String.
+
 From LF Require Import Maps.
 
 Parameter MISSING: Type.

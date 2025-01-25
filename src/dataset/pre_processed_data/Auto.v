@@ -1,7 +1,11 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From Coq Require Import Lia.
+
 From Coq Require Import Strings.String.
+
 From LF Require Import Maps.
+
 From LF Require Import Imp.
 
 Theorem ceval_deterministic: forall c st st1 st2,

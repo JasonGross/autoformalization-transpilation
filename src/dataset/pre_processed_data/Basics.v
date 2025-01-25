@@ -34,11 +34,6 @@ Example test_next_working_day:
 
 Proof. simpl. reflexivity.  Qed.
 
-
-
-
-
-
 From Coq Require Export String.
 
 Inductive bool : Type :=
@@ -137,23 +132,13 @@ Example test_andb33:                 (andb3 true false true) = false.
 Example test_andb34:                 (andb3 true true false) = false.
  Admitted.
 
-
-
-
-
-
-
 Check true.
-
-
-
 
 Check true
   : bool.
+
 Check (negb true)
   : bool.
-
-
 
 Check negb
   : bool -> bool.
@@ -186,11 +171,13 @@ Definition isred (c : color) : bool :=
 Module Playground.
 
   Definition foo : rgb := blue.
+
 End Playground.
 
 Definition foo : bool := true.
 
 Check Playground.foo : rgb.
+
 Check foo : bool.
 
 Module TuplePlayground.
@@ -215,7 +202,6 @@ Compute (all_zero (bits B1 B0 B1 B0)).
 
 Compute (all_zero (bits B0 B0 B0 B0)).
 
-
 End TuplePlayground.
 
 Module NatPlayground.
@@ -234,13 +220,7 @@ Definition pred (n : nat) : nat :=
   | S n' => n'
   end.
 
-
-
-
-
 End NatPlayground.
-
-
 
 Check (S (S (S (S O)))).
 
@@ -253,11 +233,10 @@ Definition minustwo (n : nat) : nat :=
 
 Compute (minustwo 4).
 
-
-
-
 Check S        : nat -> nat.
+
 Check pred     : nat -> nat.
+
 Check minustwo : nat -> nat.
 
 Fixpoint even (n:nat) : bool :=
@@ -448,7 +427,6 @@ Proof.
    Admitted.
 
 Check mult_n_O.
-
 
 Check mult_n_Sm.
 

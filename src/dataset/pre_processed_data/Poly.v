@@ -1,4 +1,5 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From LF Require Export Lists.
 
 Inductive boollist : Type :=
@@ -9,29 +10,15 @@ Inductive list (X:Type) : Type :=
   | nil
   | cons (x : X) (l : list X).
 
-
-
 Check list : Type -> Type.
-
-
 
 Check (nil nat) : list nat.
 
-
-
 Check (cons nat 3 (nil nat)) : list nat.
-
-
 
 Check nil : forall X : Type, list X.
 
-
-
 Check cons : forall X : Type, X -> list X -> list X.
-
-
-
-
 
 Check (cons nat 2 (cons nat 1 (nil nat)))
       : list nat.
@@ -61,8 +48,6 @@ Inductive grumble (X:Type) : Type :=
   | d (m : mumble)
   | e (x : X).
 
-
-
 End MumbleGrumble.
 
 Fixpoint repeat' X x count : list X :=
@@ -71,10 +56,9 @@ Fixpoint repeat' X x count : list X :=
   | S count' => cons X x (repeat' X x count')
   end.
 
-
-
 Check repeat'
   : forall X : Type, X -> nat -> list X.
+
 Check repeat
   : forall X : Type, X -> nat -> list X.
 
@@ -148,8 +132,6 @@ Proof. reflexivity. Qed.
 Fail Definition mynil := nil.
 
 Definition mynil : list nat := nil.
-
-
 
 Check @nil : forall X : Type, list X.
 
@@ -260,8 +242,6 @@ Proof. reflexivity. Qed.
 Definition hd_error {X : Type} (l : list X) : option X
   . Admitted.
 
-
-
 Check @hd_error : forall X : Type, list X -> option X.
 
 Example test_hd_error1 : hd_error [1;2] = Some 1.
@@ -272,8 +252,6 @@ Example test_hd_error2 : hd_error  [[1];[2]]  = Some [1].
 
 Definition doit3times {X : Type} (f : X->X) (n : X) : X :=
   f (f (f n)).
-
-
 
 Check @doit3times : forall X : Type, (X -> X) -> X -> X.
 
@@ -394,8 +372,6 @@ Fixpoint fold {X Y: Type} (f : X->Y->Y) (l : list X) (b : Y)
   | h :: t => f h (fold f t b)
   end.
 
-
-
 Check (fold andb) : list bool -> bool -> bool.
 
 Example fold_example1 :
@@ -421,11 +397,10 @@ Proof. reflexivity. Qed.
 Example constfun_example2 : (constfun 5) 99 = 5.
 Proof. reflexivity. Qed.
 
-
-
 Check plus : nat -> nat -> nat.
 
 Definition plus3 := plus 3.
+
 Check plus3 : nat -> nat.
 
 Example test_plus3 :    plus3 4 = 7.
@@ -465,9 +440,8 @@ Definition prod_uncurry {X Y Z : Type}
 Example test_map1': map (plus 3) [2;0;2] = [5;3;5].
 Proof. reflexivity. Qed.
 
-
-
 Check @prod_curry.
+
 Check @prod_uncurry.
 
 Theorem uncurry_curry : forall (X Y Z : Type)
@@ -567,7 +541,6 @@ Proof.  Admitted.
 Example exp_3 : exp three two = plus (mult two (mult two two)) one.
 Proof.  Admitted.
 
-
-
 End Church.
+
 End Exercises.

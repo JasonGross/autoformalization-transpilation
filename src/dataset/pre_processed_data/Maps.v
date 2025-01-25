@@ -1,7 +1,11 @@
 From Coq Require Import Arith.
+
 From Coq Require Import Bool.
+
 From Coq Require Export Strings.String.
+
 From Coq Require Import FunctionalExtensionality.
+
 From Coq Require Import List.
 
 Import ListNotations.
@@ -18,23 +22,15 @@ Locate "+".
 
 Print Init.Nat.add.
 
-
-
-
-
-
-
-
-
-
 Check String.eqb_refl :
   forall x : string, (x =? x)%string = true.
 
-
 Check String.eqb_eq :
   forall n m : string, (n =? m)%string = true <-> n = m.
+
 Check String.eqb_neq :
   forall n m : string, (n =? m)%string = false <-> n <> m.
+
 Check String.eqb_spec :
   forall x y : string, reflect (x = y) (String.eqb x y).
 

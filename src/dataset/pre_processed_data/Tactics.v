@@ -1,4 +1,5 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From LF Require Export Poly.
 
 Theorem silly1 : forall (n m : nat),

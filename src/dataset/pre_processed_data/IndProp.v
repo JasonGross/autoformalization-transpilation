@@ -1,4 +1,5 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From LF Require Export Logic.
 
 Fixpoint div2 (n : nat) : nat :=
@@ -1104,6 +1105,7 @@ Module RecallIn.
      | [] => False
      | x' :: l' => x' = x \/ In A x l'
      end.
+
 End RecallIn.
 
 Definition manual_grade_for_NoDup_disjoint_etc : option (nat*string) := None.

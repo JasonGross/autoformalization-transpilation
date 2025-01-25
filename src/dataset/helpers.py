@@ -5,7 +5,7 @@ BLOCK_STARTERS = [
     "Proposition", "Example", "Record", "CoFixpoint", "Fact", "Module",
     "Section", "Variable", "Hypothesis", "Axiom", "Parameter", "Goal", 
     "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import", 
-    "Export", "From", "Check", "Hint", "Create"
+    "Export", "From", "Check", "Hint", "Create", "End"
 ]
 
 PROOF_ENDINGS = ["Qed.", "Defined.", "Admitted.", "Abort."]
@@ -82,7 +82,7 @@ def classify_block(block_text: str) -> str:
     first_line = lines[0].strip()
     if first_line.startswith("Set") or first_line.startswith("Unset"):
         return "global_directive"
-    if first_line.startswith("From") or first_line.startswith("Require"):
+    if first_line.startswith("Require"): ## Check this
         return "require"
     if first_line.startswith("Fixpoint"):
         return "fixpoint"
@@ -100,13 +100,22 @@ def classify_block(block_text: str) -> str:
         return "check"
     if first_line.startswith("Hint"):
         return "hint"
-    if first_line.startswith("Create HintDb"):
+    if first_line.startswith("Create HintDb"): ## Check this
         return "create_hint_db"
-    if first_line.startswith("Import") or first_line.startswith("Export"):
+    if first_line.startswith("Import") or first_line.startswith("Export") or first_line.startswith("From"):
         return "import"
     if first_line.startswith("Example"):
         return "example"
+    if first_line.startswith("Module"):
+        return "module"
+    if first_line.startswith("Section"):
+        return "section"
+    if first_line.startswith("End"):
+        return "end"
     return "misc"
+
+## "idtac" might not be handled correctly
+## Require better logic for module/section End statements
 
 def extract_blocks_from_preprocessed(file_content: str):
     raw_blocks = file_content.strip().split("\n\n")

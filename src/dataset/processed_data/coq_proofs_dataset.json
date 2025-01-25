@@ -5,7 +5,15 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality,-deprecated-syntactic-definition,-deprecated]\".\nFrom Coq Require Import Arith List.\nFrom LF Require Import IndProp."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality,-deprecated-syntactic-definition,-deprecated]\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Arith List."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import IndProp."
       },
       {
         "type": "fixpoint",
@@ -165,14 +173,18 @@
       },
       {
         "type": "check",
-        "raw": "Check ev_0 : ev 0.\nCheck ev_SS : forall n : nat, ev n -> ev (S (S n))."
+        "raw": "Check ev_0 : ev 0."
+      },
+      {
+        "type": "check",
+        "raw": "Check ev_SS : forall n : nat, ev n -> ev (S (S n))."
       },
       {
         "type": "example",
         "raw": "Example constructor_example: forall (n:nat),\n    ev (n + n).\nProof.\n  induction n; simpl.\n  - constructor.\n  - rewrite add_comm. simpl. constructor.\n    assumption.\nQed."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From Coq Require Import Lia."
       },
       {
@@ -571,14 +583,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import AltAuto."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import AltAuto."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -590,11 +610,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import AltAuto."
       },
       {
@@ -765,7 +785,23 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom Coq Require Import Lia.\nFrom Coq Require Import Strings.String.\nFrom LF Require Import Maps.\nFrom LF Require Import Imp."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Lia."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Strings.String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Maps."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Imp."
       },
       {
         "type": "theorem",
@@ -786,14 +822,6 @@
       {
         "type": "misc",
         "raw": "-\n    rewrite H in H4. discriminate.\n  -\n    rewrite (IHE1_1 st'0 H3) in *.\n    apply IHE1_2. assumption.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "example",
@@ -884,43 +912,23 @@
         "raw": "Theorem ceval_deterministic'': forall c st st1 st2,\n  st =[ c ]=> st1  ->\n  st =[ c ]=> st2 ->\n  st1 = st2.\nProof.\n  intros c st st1 st2 E1 E2.\n  generalize dependent st2;\n  induction E1; intros st2 E2; inversion E2; subst; auto.\n  -\n    rewrite (IHE1_1 st'0 H1) in *.\n    auto.\n  -\n      rwd H H5.\n  -\n      rwd H H5.\n  -\n      rwd H H2.\n  -\n    rwd H H4.\n  -\n    rewrite (IHE1_1 st'0 H3) in *.\n    auto. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "ltac",
         "raw": "Ltac find_rwd :=\n  match goal with\n    H1: ?E = true,\n    H2: ?E = false\n    |- _ => rwd H1 H2\n  end."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
         "raw": "Theorem ceval_deterministic''': forall c st st1 st2,\n  st =[ c ]=> st1  ->\n  st =[ c ]=> st2 ->\n  st1 = st2.\nProof.\n  intros c st st1 st2 E1 E2.\n  generalize dependent st2;\n  induction E1; intros st2 E2; inversion E2; subst; try find_rwd; auto.\n  -\n    rewrite (IHE1_1 st'0 H1) in *.\n    auto.\n  -\n    rewrite (IHE1_1 st'0 H3) in *.\n    auto. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "ltac",
         "raw": "Ltac find_eqn :=\n  match goal with\n    H1: forall x, ?P x -> ?L = ?R,\n    H2: ?P ?X\n    |- _ => rewrite (H1 X H2) in *\n  end."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
         "raw": "Theorem ceval_deterministic'''': forall c st st1 st2,\n  st =[ c ]=> st1  ->\n  st =[ c ]=> st2 ->\n  st1 = st2.\nProof.\n  intros c st st1 st2 E1 E2.\n  generalize dependent st2;\n  induction E1; intros st2 E2; inversion E2; subst; try find_rwd;\n    try find_eqn; auto.\nQed."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Repeat."
       },
       {
@@ -976,7 +984,7 @@
         "raw": "Theorem ceval_deterministic': forall c st st1 st2,\n  st =[ c ]=> st1  ->\n  st =[ c ]=> st2 ->\n  st1 = st2.\nProof.\n  intros c st st1 st2 E1 E2.\n  generalize dependent st2;\n  induction E1;\n    intros st2 E2; inversion E2; subst; try find_eqn; try find_rwd; auto.\nQed."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Repeat."
       },
       {
@@ -1039,14 +1047,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Auto."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Auto."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -1058,11 +1074,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Auto."
       },
       {
@@ -1097,14 +1113,6 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Compute (next_working_day friday)."
       },
       {
@@ -1117,22 +1125,10 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Proof. simpl. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "require",
+        "type": "import",
         "raw": "From Coq Require Export String."
       },
       {
@@ -1248,32 +1244,16 @@
         "raw": "Example test_andb34:                 (andb3 true true false) = false.\n Admitted."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check true."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "check",
+        "raw": "Check true\n  : bool."
       },
       {
         "type": "check",
-        "raw": "Check true\n  : bool.\nCheck (negb true)\n  : bool."
-      },
-      {
-        "type": "misc",
-        "raw": ""
+        "raw": "Check (negb true)\n  : bool."
       },
       {
         "type": "check",
@@ -1296,12 +1276,16 @@
         "raw": "Definition isred (c : color) : bool :=\n  match c with\n  | black => false\n  | white => false\n  | primary red => true\n  | primary _ => false\n  end."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Playground."
       },
       {
         "type": "definition",
-        "raw": "Definition foo : rgb := blue.\nEnd Playground."
+        "raw": "Definition foo : rgb := blue."
+      },
+      {
+        "type": "end",
+        "raw": "End Playground."
       },
       {
         "type": "definition",
@@ -1309,10 +1293,14 @@
       },
       {
         "type": "check",
-        "raw": "Check Playground.foo : rgb.\nCheck foo : bool."
+        "raw": "Check Playground.foo : rgb."
       },
       {
-        "type": "misc",
+        "type": "check",
+        "raw": "Check foo : bool."
+      },
+      {
+        "type": "module",
         "raw": "Module TuplePlayground."
       },
       {
@@ -1340,11 +1328,11 @@
         "raw": "Compute (all_zero (bits B0 B0 B0 B0))."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End TuplePlayground."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module NatPlayground."
       },
       {
@@ -1360,20 +1348,8 @@
         "raw": "Definition pred (n : nat) : nat :=\n  match n with\n  | O => O\n  | S n' => n'\n  end."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
+        "type": "end",
         "raw": "End NatPlayground."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -1388,12 +1364,16 @@
         "raw": "Compute (minustwo 4)."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "check",
+        "raw": "Check S        : nat -> nat."
       },
       {
         "type": "check",
-        "raw": "Check S        : nat -> nat.\nCheck pred     : nat -> nat.\nCheck minustwo : nat -> nat."
+        "raw": "Check pred     : nat -> nat."
+      },
+      {
+        "type": "check",
+        "raw": "Check minustwo : nat -> nat."
       },
       {
         "type": "fixpoint",
@@ -1412,16 +1392,12 @@
         "raw": "Example test_odd2:    odd 4 = false.\nProof. simpl. reflexivity.  Qed."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module NatPlayground2."
       },
       {
         "type": "fixpoint",
         "raw": "Fixpoint plus (n : nat) (m : nat) : nat :=\n  match n with\n  | O => m\n  | S n' => S (plus n' m)\n  end."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -1440,7 +1416,7 @@
         "raw": "Fixpoint minus (n m:nat) : nat :=\n  match n, m with\n  | O   , _    => O\n  | S _ , O    => n\n  | S n', S m' => minus n' m'\n  end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End NatPlayground2."
       },
       {
@@ -1532,28 +1508,12 @@
         "raw": "Theorem plus_O_n : forall n : nat, 0 + n = n.\nProof.\n  intros n. simpl. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem plus_O_n' : forall n : nat, 0 + n = n.\nProof.\n  intros n. reflexivity. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem plus_O_n'' : forall n : nat, 0 + n = n.\nProof.\n  intros m. reflexivity. Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -1564,28 +1524,8 @@
         "raw": "Theorem mult_0_l : forall n:nat, 0 * n = 0.\nProof.\n  intros n. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem plus_id_example : forall n m:nat,\n  n = m ->\n  n + n = m + m."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -1604,10 +1544,6 @@
         "raw": "rewrite -> H.\n  reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem plus_id_exercise : forall n m o : nat,\n  n = m -> m = o -> n + m = m + o.\nProof.\n   Admitted."
       },
@@ -1624,10 +1560,6 @@
         "raw": "Theorem mult_n_0_m_0 : forall p q : nat,\n  (p * 0) + (q * 0) = 0.\nProof.\n  intros p q.\n  rewrite <- mult_n_O.\n  rewrite <- mult_n_O.\n  reflexivity. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem mult_n_1 : forall p : nat,\n  p * 1 = p.\nProof.\n   Admitted."
       },
@@ -1640,16 +1572,8 @@
         "raw": "Theorem plus_1_neq_0 : forall n : nat,\n  (n + 1) =? 0 = false.\nProof.\n  intros n. destruct n as [| n'] eqn:E.\n  - reflexivity.\n  - reflexivity.   Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem negb_involutive : forall b : bool,\n  negb (negb b) = b.\nProof.\n  intros b. destruct b eqn:E.\n  - reflexivity.\n  - reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -1670,10 +1594,6 @@
       {
         "type": "theorem",
         "raw": "Theorem plus_1_neq_0' : forall n : nat,\n  (n + 1) =? 0 = false.\nProof.\n  intros [|n].\n  - reflexivity.\n  - reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -1708,7 +1628,7 @@
         "raw": "Theorem andb_eq_orb :\n  forall (b c : bool),\n  (andb b c = orb b c) ->\n  b = c.\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module LateDays."
       },
       {
@@ -1844,7 +1764,7 @@
         "raw": "Theorem grade_lowered_once :\n  forall (late_days : nat) (g : grade),\n    (late_days <? 9 = false) ->\n    (late_days <? 17 = true) ->\n    (apply_late_policy late_days g) = (lower_grade g).\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End LateDays."
       },
       {
@@ -1891,14 +1811,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Basics."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Basics."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -1910,11 +1838,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Basics."
       },
       {
@@ -2270,12 +2198,7 @@
   {
     "fileName": "Bib.v",
     "type": "coq_file",
-    "items": [
-      {
-        "type": "misc",
-        "raw": ""
-      }
-    ]
+    "items": []
   },
   {
     "fileName": "BibTest.v",
@@ -2283,14 +2206,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Bib."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Bib."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -2302,11 +2233,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Bib."
       },
       {
@@ -2332,20 +2263,24 @@
     "type": "coq_file",
     "items": [
       {
-        "type": "require",
+        "type": "import",
         "raw": "From Coq Require Extraction.\nExtraction Language OCaml."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "import",
+        "raw": "From Coq Require Import Arith."
       },
       {
-        "type": "require",
-        "raw": "From Coq Require Import Arith.\nFrom Coq Require Import Init.Nat.\nFrom Coq Require Import EqNat.\nFrom LF Require Import ImpCEvalFun."
+        "type": "import",
+        "raw": "From Coq Require Import Init.Nat."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "import",
+        "raw": "From Coq Require Import EqNat."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import ImpCEvalFun."
       },
       {
         "type": "misc",
@@ -2353,23 +2288,7 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Extract Inductive bool => \"bool\" [ \"true\" \"false\" ]."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -2377,15 +2296,7 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Extract Constant plus => \"( + )\".\nExtract Constant mult => \"( * )\".\nExtract Constant eqb => \"( = )\"."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -2401,22 +2312,18 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Extract Inductive sumbool => \"bool\" [\"true\" \"false\"]."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "import",
+        "raw": "From LF Require Import Imp."
       },
       {
-        "type": "require",
-        "raw": "From LF Require Import Imp.\nFrom LF Require Import ImpParser."
+        "type": "import",
+        "raw": "From LF Require Import ImpParser."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Maps.\nExtraction \"imp.ml\" empty_st ceval_step parse."
       }
     ]
@@ -2427,14 +2334,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Extraction."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Extraction."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -2446,11 +2361,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Extraction."
       },
       {
@@ -2477,14 +2392,46 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom Coq Require Import Bool.\nFrom Coq Require Import Init.Nat.\nFrom Coq Require Import Arith.\nFrom Coq Require Import EqNat. Import Nat.\nFrom Coq Require Import Lia.\nFrom Coq Require Import List. Import ListNotations.\nFrom Coq Require Import Strings.String.\nFrom LF Require Import Maps."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Bool."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Init.Nat."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Arith."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import EqNat. Import Nat."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Lia."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import List. Import ListNotations."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Strings.String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Maps."
       },
       {
         "type": "global_directive",
         "raw": "Set Default Goal Selector \"!\"."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module AExp."
       },
       {
@@ -2518,34 +2465,6 @@
       {
         "type": "theorem",
         "raw": "Theorem optimize_0plus_sound: forall a,\n  aeval (optimize_0plus a) = aeval a.\nProof.\n  intros a. induction a.\n  -  reflexivity.\n  -  destruct a1 eqn:Ea1.\n    +  destruct n eqn:En.\n      *   simpl. apply IHa2.\n      *  simpl. rewrite IHa2. reflexivity.\n    +\n      simpl. simpl in IHa1. rewrite IHa1.\n      rewrite IHa2. reflexivity.\n    +\n      simpl. simpl in IHa1. rewrite IHa1.\n      rewrite IHa2. reflexivity.\n    +\n      simpl. simpl in IHa1. rewrite IHa1.\n      rewrite IHa2. reflexivity.\n  -\n    simpl. rewrite IHa1. rewrite IHa2. reflexivity.\n  -\n    simpl. rewrite IHa1. rewrite IHa2. reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -2600,14 +2519,6 @@
         "raw": "+  destruct n eqn:En;\n      simpl; rewrite IHa2; reflexivity.   Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem optimize_0plus_sound'': forall a,\n  aeval (optimize_0plus a) = aeval a.\nProof.\n  intros a.\n  induction a;"
       },
@@ -2622,26 +2533,6 @@
       {
         "type": "misc",
         "raw": "-\n    destruct a1; try (simpl; simpl in IHa1; rewrite IHa1;\n                      rewrite IHa2; reflexivity).\n    +  destruct n;\n      simpl; rewrite IHa2; reflexivity. Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -2696,7 +2587,7 @@
         "raw": "Example add_assoc__lia : forall m n p,\n    m + (n + p) = m + n + p.\nProof.\n  intros. lia.\nQed."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module aevalR_first_try."
       },
       {
@@ -2704,7 +2595,7 @@
         "raw": "Inductive aevalR : aexp -> nat -> Prop :=\n  | E_ANum (n : nat) :\n      aevalR (ANum n) n\n  | E_APlus (e1 e2 : aexp) (n1 n2 : nat) :\n      aevalR e1 n1 ->\n      aevalR e2 n2 ->\n      aevalR (APlus e1 e2) (n1 + n2)\n  | E_AMinus (e1 e2 : aexp) (n1 n2 : nat) :\n      aevalR e1 n1 ->\n      aevalR e2 n2 ->\n      aevalR (AMinus e1 e2) (n1 - n2)\n  | E_AMult (e1 e2 : aexp) (n1 n2 : nat) :\n      aevalR e1 n1 ->\n      aevalR e2 n2 ->\n      aevalR (AMult e1 e2) (n1 * n2)."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module HypothesisNames."
       },
       {
@@ -2712,11 +2603,7 @@
         "raw": "Inductive aevalR : aexp -> nat -> Prop :=\n  | E_ANum (n : nat) :\n      aevalR (ANum n) n\n  | E_APlus (e1 e2 : aexp) (n1 n2 : nat)\n      (H1 : aevalR e1 n1)\n      (H2 : aevalR e2 n2) :\n      aevalR (APlus e1 e2) (n1 + n2)\n  | E_AMinus (e1 e2 : aexp) (n1 n2 : nat)\n      (H1 : aevalR e1 n1)\n      (H2 : aevalR e2 n2) :\n      aevalR (AMinus e1 e2) (n1 - n2)\n  | E_AMult (e1 e2 : aexp) (n1 n2 : nat)\n      (H1 : aevalR e1 n1)\n      (H2 : aevalR e2 n2) :\n      aevalR (AMult e1 e2) (n1 * n2)."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
+        "type": "end",
         "raw": "End HypothesisNames."
       },
       {
@@ -2724,12 +2611,8 @@
         "raw": "Notation \"e '==>' n\"\n         := (aevalR e n)\n            (at level 90, left associativity)\n         : type_scope."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End aevalR_first_try."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -2776,20 +2659,16 @@
         "raw": "Lemma bevalR_iff_beval : forall b bv,\n  b ==>b bv <-> beval b = bv.\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End AExp."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module aevalR_division."
       },
       {
         "type": "inductive",
         "raw": "Inductive aexp : Type :=\n  | ANum (n : nat)\n  | APlus (a1 a2 : aexp)\n  | AMinus (a1 a2 : aexp)\n  | AMult (a1 a2 : aexp)\n  | ADiv (a1 a2 : aexp)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -2804,20 +2683,12 @@
         "raw": "where \"a '==>' n\" := (aevalR a n) : type_scope."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
+        "type": "end",
         "raw": "End aevalR_division."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module aevalR_extended."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -2836,7 +2707,7 @@
         "raw": "where \"a '==>' n\" := (aevalR a n) : type_scope."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End aevalR_extended."
       },
       {
@@ -2866,18 +2737,6 @@
       {
         "type": "inductive",
         "raw": "Inductive bexp : Type :=\n  | BTrue\n  | BFalse\n  | BEq (a1 a2 : aexp)\n  | BNeq (a1 a2 : aexp)\n  | BLe (a1 a2 : aexp)\n  | BGt (a1 a2 : aexp)\n  | BNot (b : bexp)\n  | BAnd (b1 b2 : bexp)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -3057,27 +2916,7 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Locate aexp."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -3121,42 +2960,6 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Reserved Notation\n         \"st '=[' c ']=>' st'\"\n         (at level 40, c custom com at level 99,\n          st constr, st' constr at next level)."
       },
       {
@@ -3181,7 +2984,11 @@
       },
       {
         "type": "global_directive",
-        "raw": "Set Printing Implicit.\nCheck @ceval_example2."
+        "raw": "Set Printing Implicit."
+      },
+      {
+        "type": "check",
+        "raw": "Check @ceval_example2."
       },
       {
         "type": "definition",
@@ -3196,48 +3003,20 @@
         "raw": "Theorem ceval_deterministic: forall c st st1 st2,\n     st =[ c ]=> st1  ->\n     st =[ c ]=> st2 ->\n     st1 = st2.\nProof.\n  intros c st st1 st2 E1 E2.\n  generalize dependent st2.\n  induction E1; intros st2 E2; inversion E2; subst.\n  -  reflexivity.\n  -  reflexivity.\n  -\n    rewrite (IHE1_1 st'0 H1) in *.\n    apply IHE1_2. assumption.\n  -\n      apply IHE1. assumption.\n  -\n      rewrite H in H5. discriminate.\n  -\n      rewrite H in H5. discriminate.\n  -\n      apply IHE1. assumption.\n  -\n    reflexivity.\n  -\n    rewrite H in H2. discriminate.\n  -\n    rewrite H in H4. discriminate.\n  -\n    rewrite (IHE1_1 st'0 H3) in *.\n    apply IHE1_2. assumption.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem plus2_spec : forall st n st',\n  st X = n ->\n  st =[ plus2 ]=> st' ->\n  st' X = n + 2.\nProof.\n  intros st n st' HX Heval."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
         "raw": "inversion Heval. subst. clear Heval. simpl.\n  apply t_update_eq.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition manual_grade_for_XtimesYinZ_spec : option (nat*string) := None."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem loop_never_stops : forall st st',\n  ~(st =[ loop ]=> st').\nProof.\n  intros st st' contra. unfold loop in contra.\n  remember <{ while true do skip end }> as loopdef\n           eqn:Heqloopdef."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -3304,7 +3083,7 @@
         "raw": "Theorem s_compile_correct : forall (st : state) (e : aexp),\n  s_execute st [] (s_compile e) = [ aeval st e ].\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module BreakImp."
       },
       {
@@ -3380,7 +3159,7 @@
         "raw": "Theorem ceval_deterministic: forall (c:com) st st1 st2 s1 s2,\n     st =[ c ]=> st1 / s1 ->\n     st =[ c ]=> st2 / s2 ->\n     st1 = st2 /\\ s1 = s2.\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End BreakImp."
       }
     ]
@@ -3390,12 +3169,28 @@
     "type": "coq_file",
     "items": [
       {
-        "type": "require",
-        "raw": "From Coq Require Import Lia.\nFrom Coq Require Import Arith.\nFrom Coq Require Import PeanoNat."
+        "type": "import",
+        "raw": "From Coq Require Import Lia."
       },
       {
         "type": "import",
-        "raw": "Import Nat.\nFrom Coq Require Import EqNat.\nFrom LF Require Import Imp Maps."
+        "raw": "From Coq Require Import Arith."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import PeanoNat."
+      },
+      {
+        "type": "import",
+        "raw": "Import Nat."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import EqNat."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Imp Maps."
       },
       {
         "type": "fixpoint",
@@ -3466,14 +3261,6 @@
         "raw": "+  destruct (beval st b) eqn :Heqr.\n        *\n         destruct (ceval_step st c i') eqn:Heqr1.\n         {\n           apply E_WhileTrue with s. rewrite Heqr.\n           reflexivity.\n           apply IHi'. rewrite Heqr1. reflexivity.\n           apply IHi'. assumption. }\n         {  discriminate H1. }\n        *\n          injection H1 as H2. rewrite <- H2.\n          apply E_WhileFalse. apply Heqr. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition manual_grade_for_ceval_step__ceval_inf : option (nat*string) := None."
       },
@@ -3488,10 +3275,6 @@
       {
         "type": "misc",
         "raw": "+\n      simpl in Hceval. simpl.\n      destruct (beval st b); try assumption.\n      destruct (ceval_step st c i1') eqn: Heqst1'o.\n      *\n        apply (IHi1' i2') in Heqst1'o; try assumption.\n        rewrite -> Heqst1'o. simpl. simpl in Hceval.\n        apply (IHi1' i2') in Hceval; try assumption.\n      *\n        simpl in Hceval. discriminate Hceval.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -3513,14 +3296,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import ImpCEvalFun."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import ImpCEvalFun."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -3532,11 +3323,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import ImpCEvalFun."
       },
       {
@@ -3583,7 +3374,35 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom Coq Require Import Strings.String.\nFrom Coq Require Import Strings.Ascii.\nFrom Coq Require Import Arith.\nFrom Coq Require Import Init.Nat.\nFrom Coq Require Import EqNat.\nFrom Coq Require Import List. Import ListNotations.\nFrom LF Require Import Maps Imp."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Strings.String."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Strings.Ascii."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Arith."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Init.Nat."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import EqNat."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import List. Import ListNotations."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Maps Imp."
       },
       {
         "type": "definition",
@@ -3652,10 +3471,6 @@
       {
         "type": "misc",
         "raw": "Notation \"'TRY' e1 'OR' e2\"\n   := (\n    let result := e1 in\n    match result with\n       | SomeE _  => result\n       | NoneE _ => e2\n       end)\n   (right associativity,\n    at level 60, e1 at next level, e2 at next level)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -3757,14 +3572,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import ImpParser."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import ImpParser."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -3776,11 +3599,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import ImpParser."
       },
       {
@@ -3807,14 +3630,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Imp."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Imp."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -3826,11 +3657,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Imp."
       },
       {
@@ -4045,15 +3876,11 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom LF Require Export ProofObjects."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
+        "type": "import",
+        "raw": "From LF Require Export ProofObjects."
       },
       {
         "type": "check",
@@ -4062,14 +3889,6 @@
       {
         "type": "theorem",
         "raw": "Theorem mul_0_r' : forall n:nat,\n  n * 0 = 0.\nProof.\n  apply nat_ind.\n  -  reflexivity.\n  -  simpl. intros n' IHn'. rewrite -> IHn'.\n    reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -4085,7 +3904,11 @@
       },
       {
         "type": "inductive",
-        "raw": "Inductive rgb : Type :=\n  | red\n  | green\n  | blue.\nCheck rgb_ind."
+        "raw": "Inductive rgb : Type :=\n  | red\n  | green\n  | blue."
+      },
+      {
+        "type": "check",
+        "raw": "Check rgb_ind."
       },
       {
         "type": "inductive",
@@ -4098,10 +3921,6 @@
       {
         "type": "inductive",
         "raw": "Inductive natlist' : Type :=\n  | nnil'\n  | nsnoc (l : natlist') (n : nat)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -4149,7 +3968,11 @@
       },
       {
         "type": "inductive",
-        "raw": "Inductive tree (X:Type) : Type :=\n  | leaf (x : X)\n  | node (t1 t2 : tree X).\nCheck tree_ind."
+        "raw": "Inductive tree (X:Type) : Type :=\n  | leaf (x : X)\n  | node (t1 t2 : tree X)."
+      },
+      {
+        "type": "check",
+        "raw": "Check tree_ind."
       },
       {
         "type": "inductive",
@@ -4172,22 +3995,6 @@
         "raw": "intros n IHn.\n    unfold P_m0r in IHn. unfold P_m0r. simpl. apply IHn. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem add_assoc' : forall n m p : nat,\n  n + (m + p) = (n + m) + p.\nProof."
       },
@@ -4200,16 +4007,8 @@
         "raw": "induction n as [| n'].\n  -  reflexivity.\n  -\n    simpl. rewrite -> IHn'. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem add_comm' : forall n m : nat,\n  n + m = m + n.\nProof.\n  induction n as [| n'].\n  -  intros m. rewrite -> add_0_r. reflexivity.\n  -  intros m. simpl. rewrite -> IHn'.\n    rewrite <- plus_n_Sm. reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -4221,39 +4020,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Print ev."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
         "raw": "Check ev_ind :\n  forall P : nat -> Prop,\n    P 0 ->\n    (forall n : nat, ev n -> P n -> P (S (S n))) ->\n    forall n : nat, ev n -> P n."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "inductive",
@@ -4280,10 +4051,6 @@
         "raw": "Notation \"m <=2 n\" := (le2 m n) (at level 70)."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check le1_ind :\n  forall P : nat -> nat -> Prop,\n    (forall n : nat, P n n) ->\n    (forall n m : nat, n <=1 m -> P n m -> P n (S m)) ->\n    forall n n0 : nat, n <=1 n0 -> P n n0."
       },
@@ -4292,68 +4059,8 @@
         "raw": "Check le2_ind :\n  forall (n : nat) (P : nat -> Prop),\n    P n ->\n    (forall m : nat, n <=2 m -> P m -> P (S m)) ->\n    forall n0 : nat, n <=2 n0 -> P n0."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check nat_ind :\n  forall P : nat -> Prop,\n    P 0 ->\n    (forall n : nat, P n -> P (S n)) ->\n    forall n : nat, P n."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -4392,10 +4099,6 @@
         "raw": "Arguments t_leaf {X}.\nArguments t_branch {X}."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check t_tree_ind."
       },
@@ -4408,24 +4111,12 @@
         "raw": "Theorem reflect_involution : forall (X : Type) (t : t_tree X),\n    reflect (reflect t) = t.\nProof.\n  intros X t. induction t.\n  - reflexivity.\n  - destruct p as [[l v] r]. simpl. Abort."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition better_t_tree_ind_type : Prop\n  . Admitted."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition better_t_tree_ind : better_t_tree_ind_type\n  . Admitted."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -4439,14 +4130,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import IndPrinciples."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import IndPrinciples."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -4458,11 +4157,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import IndPrinciples."
       },
       {
@@ -4525,7 +4224,11 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom LF Require Export Logic."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Export Logic."
       },
       {
         "type": "fixpoint",
@@ -4537,23 +4240,7 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Fail Fixpoint reaches1_in (n : nat) : nat :=\n  if n =? 1 then 0\n  else 1 + reaches1_in (csf n)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -4572,7 +4259,7 @@
         "raw": "Conjecture collatz : forall n, n <> 0 -> Collatz_holds_for n."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module LePlayground."
       },
       {
@@ -4588,24 +4275,12 @@
         "raw": "Example le_3_5 : 3 <= 5.\nProof.\n  apply le_S. apply le_S. apply le_n. Qed."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End LePlayground."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "inductive",
         "raw": "Inductive clos_trans {X: Type} (R: X->X->Prop) : X->X->Prop :=\n  | t_step (x y : X) :\n      R x y ->\n      clos_trans R x y\n  | t_trans (x y z : X) :\n      clos_trans R x y ->\n      clos_trans R y z ->\n      clos_trans R x z."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "inductive",
@@ -4616,128 +4291,28 @@
         "raw": "Inductive parent_of : Person -> Person -> Prop :=\n  po_SC : parent_of Sage Cleo\n| po_SR : parent_of Sage Ridley\n| po_CM : parent_of Cleo Moss."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition ancestor_of : Person -> Person -> Prop :=\n  clos_trans parent_of."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "example",
         "raw": "Example ancestor_of_ex : ancestor_of Sage Moss.\nProof.\n  unfold ancestor_of. apply t_trans with Cleo.\n  - apply t_step. apply po_SC.\n  - apply t_step. apply po_CM. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "inductive",
         "raw": "Inductive clos_refl_trans {X: Type} (R: X->X->Prop) : X->X->Prop :=\n  | rt_step (x y : X) :\n      R x y ->\n      clos_refl_trans R x y\n  | rt_refl (x : X) :\n      clos_refl_trans R x x\n  | rt_trans (x y z : X) :\n      clos_refl_trans R x y ->\n      clos_refl_trans R y z ->\n      clos_refl_trans R x z."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "definition",
         "raw": "Definition cs (n m : nat) : Prop := csf n = m."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition cms n m := clos_refl_trans cs n m.\nConjecture collatz' : forall n, n <> 0 -> cms n 1."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "inductive",
         "raw": "Inductive Perm3 {X : Type} : list X -> list X -> Prop :=\n  | perm3_swap12 (a b c : X) :\n      Perm3 [a;b;c] [b;a;c]\n  | perm3_swap23 (a b c : X) :\n      Perm3 [a;b;c] [a;c;b]\n  | perm3_trans (l1 l2 l3 : list X) :\n      Perm3 l1 l2 -> Perm3 l2 l3 -> Perm3 l1 l3."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "inductive",
@@ -4745,30 +4320,14 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Fail Inductive wrong_ev (n : nat) : Prop :=\n  | wrong_ev_0 : wrong_ev 0\n  | wrong_ev_SS (H: wrong_ev n) : wrong_ev (S (S n))."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
         "raw": "Check ev_0 : ev 0.\nCheck ev_SS : forall (n : nat), ev n -> ev (S (S n))."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
+        "type": "module",
         "raw": "Module EvPlayground."
       },
       {
@@ -4776,28 +4335,16 @@
         "raw": "Inductive ev : nat -> Prop :=\n  | ev_0  : ev 0\n  | ev_SS : forall (n : nat), ev n -> ev (S (S n))."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End EvPlayground."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
         "raw": "Theorem ev_4 : ev 4.\nProof. apply ev_SS. apply ev_SS. apply ev_0. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem ev_4' : ev 4.\nProof. apply (ev_SS 2 (ev_SS 0 ev_0)). Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -4868,28 +4415,12 @@
         "raw": "Theorem inversion_ex2 : forall (n : nat),\n  S n = O -> 2 + 2 = 5.\nProof.\n  intros n contra. inversion contra. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "lemma",
         "raw": "Lemma ev_Even_firsttry : forall n,\n  ev n -> Even n.\nProof.\n   unfold Even."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "intros n E. inversion E as [EQ' | n' E' EQ'].\n  -  exists 0. reflexivity.\n  -\n    assert (H: (exists k', n' = double k')\n               -> (exists n0, S (S n') = double n0)).\n        { intros [k' EQ'']. exists (S k'). simpl.\n          rewrite <- EQ''. reflexivity. }\n    apply H."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -4932,7 +4463,7 @@
         "raw": "Theorem ev'_ev : forall n, ev' n <-> ev n.\nProof.\n  Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Perm3Reminder."
       },
       {
@@ -4940,7 +4471,7 @@
         "raw": "Inductive Perm3 {X : Type} : list X -> list X -> Prop :=\n  | perm3_swap12 (a b c : X) :\n      Perm3 [a;b;c] [b;a;c]\n  | perm3_swap23 (a b c : X) :\n      Perm3 [a;b;c] [a;c;b]\n  | perm3_trans (l1 l2 l3 : list X) :\n      Perm3 l1 l2 -> Perm3 l2 l3 -> Perm3 l1 l3."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Perm3Reminder."
       },
       {
@@ -4960,7 +4491,7 @@
         "raw": "Example Perm3_example2 : ~ Perm3 [1;2;3] [1;2;4].\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Playground."
       },
       {
@@ -4996,10 +4527,6 @@
         "raw": "intros H. inversion H. inversion H2.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition lt (n m : nat) := le (S n) m."
       },
@@ -5008,28 +4535,12 @@
         "raw": "Notation \"n < m\" := (lt n m)."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition ge (m n : nat) : Prop := le n m.\nNotation \"m >= n\" := (ge m n)."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Playground."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "lemma",
@@ -5104,7 +4615,7 @@
         "raw": "Theorem leb_true_trans : forall n m o,\n  n <=? m = true -> m <=? o = true -> n <=? o = true.\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module R."
       },
       {
@@ -5124,7 +4635,7 @@
         "raw": "Theorem R_equiv_fR : forall m n o, R m n o <-> fR m n = o.\nProof.\n Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End R."
       },
       {
@@ -5158,26 +4669,6 @@
       {
         "type": "misc",
         "raw": "Arguments EmptySet {T}.\nArguments EmptyStr {T}.\nArguments Char {T} _.\nArguments App {T} _ _.\nArguments Union {T} _ _.\nArguments Star {T} _."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -5245,15 +4736,7 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "rewrite In_app_iff in *.\n    destruct Hin as [Hin | Hin].\n    +\n      left. apply (IH1 Hin).\n    +\n      right. apply (IH2 Hin).\n  -\n    simpl. rewrite In_app_iff.\n    left. apply (IH Hin).\n  -\n    simpl. rewrite In_app_iff.\n    right. apply (IH Hin).\n  -\n    destruct Hin.\n  -\n    simpl."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -5273,23 +4756,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "induction H1\n    as [|x'|s1 re1 s2' re2 Hmatch1 IH1 Hmatch2 IH2\n        |s1 re1 re2 Hmatch IH|re1 s2' re2 Hmatch IH\n        |re''|s1 s2' re'' Hmatch1 IH1 Hmatch2 IH2]."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "-\n    simpl. intros H. apply H."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -5309,23 +4780,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "induction H1\n    as [|x'|s1 re1 s2' re2 Hmatch1 IH1 Hmatch2 IH2\n        |s1 re1 re2 Hmatch IH|re1 s2' re2 Hmatch IH\n        |re''|s1 s2' re'' Hmatch1 IH1 Hmatch2 IH2]."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "-   discriminate.\n  -    discriminate.\n  -     discriminate.\n  -  discriminate.\n  -  discriminate."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -5344,7 +4803,7 @@
         "raw": "Lemma MStar'' : forall T (s : list T) (re : reg_exp T),\n  s =~ Star re ->\n  exists ss : list (list T),\n    s = fold app ss []\n    /\\ forall s', In s' ss -> s' =~ re.\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Pumping."
       },
       {
@@ -5388,7 +4847,7 @@
         "raw": "Proof.\n  intros T re s Hmatch.\n  induction Hmatch\n    as [ | x | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2\n       | s1 re1 re2 Hmatch IH | s2 re1 re2 Hmatch IH\n       | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ].\n  -\n    simpl. intros contra. inversion contra.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Pumping."
       },
       {
@@ -5488,12 +4947,16 @@
         "raw": "Theorem palindrome_converse: forall {X: Type} (l: list X),\n    l = rev l -> pal l.\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module RecallIn."
       },
       {
         "type": "fixpoint",
-        "raw": "Fixpoint In (A : Type) (x : A) (l : list A) : Prop :=\n     match l with\n     | [] => False\n     | x' :: l' => x' = x \\/ In A x l'\n     end.\nEnd RecallIn."
+        "raw": "Fixpoint In (A : Type) (x : A) (l : list A) : Prop :=\n     match l with\n     | [] => False\n     | x' :: l' => x' = x \\/ In A x l'\n     end."
+      },
+      {
+        "type": "end",
+        "raw": "End RecallIn."
       },
       {
         "type": "definition",
@@ -5659,14 +5122,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import IndProp."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import IndProp."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -5678,11 +5149,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import IndProp."
       },
       {
@@ -6044,16 +5515,12 @@
     "type": "coq_file",
     "items": [
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Export Basics."
       },
       {
         "type": "theorem",
         "raw": "Theorem add_0_r_firsttry : forall n:nat,\n  n + 0 = n."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -6068,24 +5535,12 @@
         "raw": "Theorem add_0_r : forall n:nat, n + 0 = n.\nProof.\n  intros n. induction n as [| n' IHn'].\n  -     reflexivity.\n  -  simpl. rewrite -> IHn'. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem minus_n_n : forall n,\n  minus n n = 0.\nProof."
       },
       {
         "type": "misc",
         "raw": "intros n. induction n as [| n' IHn'].\n  -\n    simpl. reflexivity.\n  -\n    simpl. rewrite -> IHn'. reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -6124,14 +5579,6 @@
         "raw": "Theorem mult_0_plus' : forall n m : nat,\n  (n + 0 + 0) * m = n * m.\nProof.\n  intros n m.\n  assert (H: n + 0 + 0 = n).\n    { rewrite add_comm. simpl. rewrite add_comm. reflexivity. }\n  rewrite -> H.\n  reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem plus_rearrange_firsttry : forall n m p q : nat,\n  (n + m) + (p + q) = (m + n) + (p + q).\nProof.\n  intros n m p q."
       },
@@ -6148,44 +5595,12 @@
         "raw": "Theorem plus_rearrange : forall n m p q : nat,\n  (n + m) + (p + q) = (m + n) + (p + q).\nProof.\n  intros n m p q.\n  assert (H: n + m = m + n).\n  { rewrite add_comm. reflexivity. }\n  rewrite H. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem add_assoc' : forall n m p : nat,\n  n + (m + p) = (n + m) + p.\nProof. intros n m p. induction n as [| n' IHn']. reflexivity.\n  simpl. rewrite IHn'. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem add_assoc'' : forall n m p : nat,\n  n + (m + p) = (n + m) + p.\nProof.\n  intros n m p. induction n as [| n' IHn'].\n  -\n    reflexivity.\n  -\n    simpl. rewrite IHn'. reflexivity.   Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -6197,27 +5612,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "*)"
       },
       {
         "type": "definition",
         "raw": "Definition manual_grade_for_eqb_refl_informal : option (nat*string) := None."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -6335,14 +5734,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Induction."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Induction."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -6354,11 +5761,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Induction."
       },
       {
@@ -6536,20 +5943,16 @@
     "type": "coq_file",
     "items": [
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Export Induction."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module NatList."
       },
       {
         "type": "inductive",
         "raw": "Inductive natprod : Type :=\n  | pair (n1 n2 : nat)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -6570,10 +5973,6 @@
       {
         "type": "misc",
         "raw": "Notation \"( x , y )\" := (pair x y)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -6604,20 +6003,12 @@
         "raw": "Theorem surjective_pairing' : forall (n m : nat),\n  (n,m) = (fst (n,m), snd (n,m)).\nProof.\n  reflexivity. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem surjective_pairing_stuck : forall (p : natprod),\n  p = (fst p, snd p).\nProof.\n  simpl.\nAbort."
       },
       {
         "type": "theorem",
         "raw": "Theorem surjective_pairing : forall (p : natprod),\n  p = (fst p, snd p).\nProof.\n  intros p. destruct p as [n m]. simpl. reflexivity. Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -6872,48 +6263,8 @@
         "raw": "Theorem tl_length_pred : forall l:natlist,\n  pred (length l) = length (tl l).\nProof.\n  intros l. destruct l as [| n l'].\n  -\n    reflexivity.\n  -\n    reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem app_assoc : forall l1 l2 l3 : natlist,\n  (l1 ++ l2) ++ l3 = l1 ++ (l2 ++ l3).\nProof.\n  intros l1 l2 l3. induction l1 as [| n l1' IHl1'].\n  -\n    reflexivity.\n  -\n    simpl. rewrite -> IHl1'. reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -6976,14 +6327,6 @@
         "raw": "intros l1 l2. induction l1 as [| n l1' IHl1'].\n  -\n    reflexivity.\n  -\n    simpl. rewrite -> IHl1'. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem rev_length : forall l : natlist,\n  length (rev l) = length l.\nProof.\n  intros l. induction l as [| n l' IHl'].\n  -\n    reflexivity.\n  -\n    simpl. rewrite -> app_length.\n    simpl. rewrite -> IHl'. rewrite add_comm.\n    reflexivity.\nQed."
       },
@@ -6993,23 +6336,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Search (_ + _ = _ + _)."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Search (_ + _ = _ + _) inside Induction."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -7062,10 +6393,6 @@
       {
         "type": "theorem",
         "raw": "Theorem leb_n_Sn : forall n,\n  n <=? (S n) = true.\nProof.\n  intros n. induction n as [| n' IHn'].\n  -\n    simpl.  reflexivity.\n  -\n    simpl.  rewrite IHn'.  reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -7128,7 +6455,7 @@
         "raw": "Theorem option_elim_hd : forall (l:natlist) (default:nat),\n  hd default l = option_elim default (hd_error l).\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End NatList."
       },
       {
@@ -7144,7 +6471,7 @@
         "raw": "Theorem eqb_id_refl : forall x, eqb_id x x = true.\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module PartialMap."
       },
       {
@@ -7172,7 +6499,7 @@
         "raw": "Theorem update_neq :\n  forall (d : partial_map) (x y : id) (o: nat),\n    eqb_id x y = false -> find x (update d y o) = find x d.\nProof.\n  Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End PartialMap."
       }
     ]
@@ -7183,14 +6510,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Lists."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Lists."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -7202,11 +6537,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Lists."
       },
       {
@@ -7537,19 +6872,15 @@
       },
       {
         "type": "require",
-        "raw": "Require Nat.\nFrom LF Require Export Tactics."
+        "raw": "Require Nat."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "import",
+        "raw": "From LF Require Export Tactics."
       },
       {
         "type": "check",
         "raw": "Check (forall n m : nat, n + m = m + n) : Prop."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -7569,7 +6900,11 @@
       },
       {
         "type": "definition",
-        "raw": "Definition plus_claim : Prop := 2 + 2 = 4.\nCheck plus_claim : Prop."
+        "raw": "Definition plus_claim : Prop := 2 + 2 = 4."
+      },
+      {
+        "type": "check",
+        "raw": "Check plus_claim : Prop."
       },
       {
         "type": "theorem",
@@ -7577,7 +6912,11 @@
       },
       {
         "type": "definition",
-        "raw": "Definition is_three (n : nat) : Prop :=\n  n = 3.\nCheck is_three : nat -> Prop."
+        "raw": "Definition is_three (n : nat) : Prop :=\n  n = 3."
+      },
+      {
+        "type": "check",
+        "raw": "Check is_three : nat -> Prop."
       },
       {
         "type": "definition",
@@ -7594,10 +6933,6 @@
       {
         "type": "example",
         "raw": "Example and_example : 3 + 4 = 7 /\\ 2 * 2 = 4."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -7652,10 +6987,6 @@
         "raw": "Theorem and_commut : forall P Q : Prop,\n  P /\\ Q -> Q /\\ P.\nProof.\n  intros P Q [HP HQ].\n  split.\n    -  apply HQ.\n    -  apply HP.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem and_assoc : forall P Q R : Prop,\n  P /\\ (Q /\\ R) -> (P /\\ Q) /\\ R.\nProof.\n  intros P Q R [HP [HQ HR]].\n   Admitted."
       },
@@ -7692,7 +7023,7 @@
         "raw": "Theorem or_commut : forall P Q : Prop,\n  P \\/ Q  -> Q \\/ P.\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module NotPlayground."
       },
       {
@@ -7708,7 +7039,7 @@
         "raw": "Notation \"~ x\" := (not x) : type_scope."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End NotPlayground."
       },
       {
@@ -7718,14 +7049,6 @@
       {
         "type": "misc",
         "raw": "intros P contra.\n  destruct contra.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -7772,20 +7095,8 @@
         "raw": "intros P H. unfold not. intros G. apply G. apply H.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition manual_grade_for_double_neg_informal : option (nat*string) := None."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -7832,7 +7143,7 @@
         "raw": "Theorem nil_is_not_cons : forall X (x : X) (xs : list X), ~ (nil = x :: xs).\nProof.\n   Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module IffPlayground."
       },
       {
@@ -7844,7 +7155,7 @@
         "raw": "Notation \"P <-> Q\" := (iff P Q)\n                      (at level 95, no associativity)\n                      : type_scope."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End IffPlayground."
       },
       {
@@ -7884,7 +7195,7 @@
         "raw": "Theorem or_distributes_over_and : forall P Q R : Prop,\n  P \\/ (Q /\\ R) <-> (P \\/ Q) /\\ (P \\/ R).\nProof.\n   Admitted."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From Coq Require Import Setoids.Setoid."
       },
       {
@@ -7901,7 +7212,11 @@
       },
       {
         "type": "definition",
-        "raw": "Definition Even x := exists n : nat, x = double n.\nCheck Even : nat -> Prop."
+        "raw": "Definition Even x := exists n : nat, x = double n."
+      },
+      {
+        "type": "check",
+        "raw": "Check Even : nat -> Prop."
       },
       {
         "type": "lemma",
@@ -7914,10 +7229,6 @@
       {
         "type": "misc",
         "raw": "intros n [m Hm].\n  exists (2 + m).\n  apply Hm.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -7993,23 +7304,23 @@
       },
       {
         "type": "check",
-        "raw": "Check plus : nat -> nat -> nat.\nCheck @rev : forall X, list X -> list X."
-      },
-      {
-        "type": "misc",
-        "raw": ""
+        "raw": "Check plus : nat -> nat -> nat."
       },
       {
         "type": "check",
-        "raw": "Check add_comm        : forall n m : nat, n + m = m + n.\nCheck plus_id_example : forall n m : nat, n = m -> n + n = m + m."
+        "raw": "Check @rev : forall X, list X -> list X."
+      },
+      {
+        "type": "check",
+        "raw": "Check add_comm        : forall n m : nat, n + m = m + n."
+      },
+      {
+        "type": "check",
+        "raw": "Check plus_id_example : forall n m : nat, n = m -> n + n = m + m."
       },
       {
         "type": "lemma",
         "raw": "Lemma add_comm3 :\n  forall x y z, x + (y + z) = (z + y) + x."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -8105,10 +7416,6 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Proof. unfold Even. exists 500. reflexivity. Qed."
       },
       {
@@ -8126,10 +7433,6 @@
       {
         "type": "example",
         "raw": "Example not_even_1001' : ~(Even 1001)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -8255,14 +7558,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Logic."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Logic."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -8274,11 +7585,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Logic."
       },
       {
@@ -8580,8 +7891,24 @@
     "type": "coq_file",
     "items": [
       {
-        "type": "require",
-        "raw": "From Coq Require Import Arith.\nFrom Coq Require Import Bool.\nFrom Coq Require Export Strings.String.\nFrom Coq Require Import FunctionalExtensionality.\nFrom Coq Require Import List."
+        "type": "import",
+        "raw": "From Coq Require Import Arith."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import Bool."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export Strings.String."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import FunctionalExtensionality."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Import List."
       },
       {
         "type": "import",
@@ -8593,39 +7920,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Locate \"+\"."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Print Init.Nat.add."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -8633,7 +7932,15 @@
       },
       {
         "type": "check",
-        "raw": "Check String.eqb_eq :\n  forall n m : string, (n =? m)%string = true <-> n = m.\nCheck String.eqb_neq :\n  forall n m : string, (n =? m)%string = false <-> n <> m.\nCheck String.eqb_spec :\n  forall x y : string, reflect (x = y) (String.eqb x y)."
+        "raw": "Check String.eqb_eq :\n  forall n m : string, (n =? m)%string = true <-> n = m."
+      },
+      {
+        "type": "check",
+        "raw": "Check String.eqb_neq :\n  forall n m : string, (n =? m)%string = false <-> n <> m."
+      },
+      {
+        "type": "check",
+        "raw": "Check String.eqb_spec :\n  forall x y : string, reflect (x = y) (String.eqb x y)."
       },
       {
         "type": "definition",
@@ -8775,14 +8082,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Maps."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Maps."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -8794,11 +8109,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Maps."
       },
       {
@@ -8849,7 +8164,11 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom LF Require Export Lists."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Export Lists."
       },
       {
         "type": "inductive",
@@ -8860,52 +8179,24 @@
         "raw": "Inductive list (X:Type) : Type :=\n  | nil\n  | cons (x : X) (l : list X)."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check list : Type -> Type."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
         "raw": "Check (nil nat) : list nat."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check (cons nat 3 (nil nat)) : list nat."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
         "raw": "Check nil : forall X : Type, list X."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check cons : forall X : Type, X -> list X -> list X."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -8924,7 +8215,7 @@
         "raw": "Example test_repeat2 :\n  repeat bool false 1 = cons bool false (nil bool).\nProof. reflexivity. Qed."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module MumbleGrumble."
       },
       {
@@ -8936,11 +8227,7 @@
         "raw": "Inductive grumble (X:Type) : Type :=\n  | d (m : mumble)\n  | e (x : X)."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
+        "type": "end",
         "raw": "End MumbleGrumble."
       },
       {
@@ -8948,12 +8235,12 @@
         "raw": "Fixpoint repeat' X x count : list X :=\n  match count with\n  | 0        => nil X\n  | S count' => cons X x (repeat' X x count')\n  end."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "check",
+        "raw": "Check repeat'\n  : forall X : Type, X -> nat -> list X."
       },
       {
         "type": "check",
-        "raw": "Check repeat'\n  : forall X : Type, X -> nat -> list X.\nCheck repeat\n  : forall X : Type, X -> nat -> list X."
+        "raw": "Check repeat\n  : forall X : Type, X -> nat -> list X."
       },
       {
         "type": "fixpoint",
@@ -8966,14 +8253,6 @@
       {
         "type": "definition",
         "raw": "Definition list123' :=\n  cons _ 1 (cons _ 2 (cons _ 3 (nil _)))."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -9017,23 +8296,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Fail Definition mynil := nil."
       },
       {
         "type": "definition",
         "raw": "Definition mynil : list nat := nil."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -9120,7 +8387,7 @@
         "raw": "Example test_split:\n  split [(1,false);(2,false)] = ([1;2],[false;false]).\nProof.\n Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module OptionPlayground."
       },
       {
@@ -9132,7 +8399,7 @@
         "raw": "Arguments Some {X}.\nArguments None {X}."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End OptionPlayground."
       },
       {
@@ -9156,10 +8423,6 @@
         "raw": "Definition hd_error {X : Type} (l : list X) : option X\n  . Admitted."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check @hd_error : forall X : Type, list X -> option X."
       },
@@ -9174,10 +8437,6 @@
       {
         "type": "definition",
         "raw": "Definition doit3times {X : Type} (f : X->X) (n : X) : X :=\n  f (f (f n))."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -9292,10 +8551,6 @@
         "raw": "Fixpoint fold {X Y: Type} (f : X->Y->Y) (l : list X) (b : Y)\n                         : Y :=\n  match l with\n  | nil => b\n  | h :: t => f h (fold f t b)\n  end."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check (fold andb) : list bool -> bool -> bool."
       },
@@ -9328,16 +8583,16 @@
         "raw": "Example constfun_example2 : (constfun 5) 99 = 5.\nProof. reflexivity. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "check",
         "raw": "Check plus : nat -> nat -> nat."
       },
       {
         "type": "definition",
-        "raw": "Definition plus3 := plus 3.\nCheck plus3 : nat -> nat."
+        "raw": "Definition plus3 := plus 3."
+      },
+      {
+        "type": "check",
+        "raw": "Check plus3 : nat -> nat."
       },
       {
         "type": "example",
@@ -9352,7 +8607,7 @@
         "raw": "Example test_plus3'' :  doit3times (plus 3) 0 = 9.\nProof. reflexivity. Qed."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Exercises."
       },
       {
@@ -9388,12 +8643,12 @@
         "raw": "Example test_map1': map (plus 3) [2;0;2] = [5;3;5].\nProof. reflexivity. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "check",
+        "raw": "Check @prod_curry."
       },
       {
         "type": "check",
-        "raw": "Check @prod_curry.\nCheck @prod_uncurry."
+        "raw": "Check @prod_uncurry."
       },
       {
         "type": "theorem",
@@ -9408,7 +8663,7 @@
         "raw": "Definition manual_grade_for_informal_proof : option (nat*string) := None."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Church."
       },
       {
@@ -9520,12 +8775,12 @@
         "raw": "Example exp_3 : exp three two = plus (mult two (mult two two)) one.\nProof.  Admitted."
       },
       {
-        "type": "misc",
-        "raw": ""
+        "type": "end",
+        "raw": "End Church."
       },
       {
-        "type": "misc",
-        "raw": "End Church.\nEnd Exercises."
+        "type": "end",
+        "raw": "End Exercises."
       }
     ]
   },
@@ -9535,14 +8790,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Poly."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Poly."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -9554,11 +8817,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Poly."
       },
       {
@@ -9882,12 +9145,7 @@
   {
     "fileName": "Postscript.v",
     "type": "coq_file",
-    "items": [
-      {
-        "type": "misc",
-        "raw": ""
-      }
-    ]
+    "items": []
   },
   {
     "fileName": "PostscriptTest.v",
@@ -9895,14 +9153,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Postscript."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Postscript."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -9914,11 +9180,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Postscript."
       },
       {
@@ -9942,12 +9208,7 @@
   {
     "fileName": "Preface.v",
     "type": "coq_file",
-    "items": [
-      {
-        "type": "misc",
-        "raw": ""
-      }
-    ]
+    "items": []
   },
   {
     "fileName": "PrefaceTest.v",
@@ -9955,14 +9216,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Preface."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Preface."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -9974,11 +9243,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Preface."
       },
       {
@@ -10005,23 +9274,15 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom LF Require Export IndProp."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Export IndProp."
       },
       {
         "type": "inductive",
         "raw": "Inductive ev : nat -> Prop :=\n  | ev_0                       : ev 0\n  | ev_SS (n : nat) (H : ev n) : ev (S (S n))."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -10033,27 +9294,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Print ev_4."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
         "raw": "Check (ev_SS 2 (ev_SS 0 ev_0))\n  : ev 4."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -10066,10 +9311,6 @@
       {
         "type": "definition",
         "raw": "Definition ev_4''' : ev 4 :=\n  ev_SS 2 (ev_SS 0 ev_0)."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -10136,11 +9377,11 @@
         "raw": "Compute add1 2."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Props."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module And."
       },
       {
@@ -10157,10 +9398,6 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Print prod."
       },
       {
@@ -10172,7 +9409,7 @@
         "raw": "Lemma and_comm : forall P Q : Prop, P /\\ Q <-> Q /\\ P.\nProof.\n  intros P Q. split.\n  - intros [HP HQ]. split.\n    + apply HQ.\n    + apply HP.\n  - intros [HQ HP]. split.\n    + apply HP.\n    + apply HQ.\nQed."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End And."
       },
       {
@@ -10192,7 +9429,7 @@
         "raw": "Definition conj_fact : forall P Q R, P /\\ Q -> Q /\\ R -> P /\\ R\n  . Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Or."
       },
       {
@@ -10224,7 +9461,7 @@
         "raw": "Theorem or_elim' : forall (P Q R : Prop), (P \\/ Q) -> (P -> R) -> (Q -> R) -> R.\nProof.\n  intros P Q R HPQ HPR HQR.\n  destruct HPQ as [HP | HQ].\n  - apply HPR. apply HP.\n  - apply HQR. apply HQ.\nQed."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Or."
       },
       {
@@ -10232,7 +9469,7 @@
         "raw": "Definition or_commut' : forall P Q, P \\/ Q -> Q \\/ P\n  . Admitted."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Ex."
       },
       {
@@ -10244,16 +9481,8 @@
         "raw": "Notation \"'exists' x , p\" :=\n  (ex (fun x => p))\n    (at level 200, right associativity) : type_scope."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Ex."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "check",
@@ -10289,10 +9518,6 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Fail"
       },
       {
@@ -10308,11 +9533,11 @@
         "raw": "Definition ex_falso_quodlibet' : forall P, False -> P\n  . Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Props."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module EqualityPlayground."
       },
       {
@@ -10360,52 +9585,12 @@
         "raw": "Lemma leibniz_equality__equality : forall (X : Type) (x y: X),\n  (forall P:X->Prop, P x -> P y) -> x == y.\nProof.\n Admitted."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End EqualityPlayground."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Fail Definition or_bogus : forall P Q, P \\/ Q -> P :=\n  fun (P Q : Prop) (A : P \\/ Q) =>\n    match A with\n    | or_introl H => H\n    end."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -10471,14 +9656,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import ProofObjects."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import ProofObjects."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -10490,11 +9683,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import ProofObjects."
       },
       {
@@ -10757,7 +9950,11 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom LF Require Export IndProp."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Export IndProp."
       },
       {
         "type": "definition",
@@ -10765,19 +9962,15 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Print le."
       },
       {
         "type": "check",
-        "raw": "Check le : nat -> nat -> Prop.\nCheck le : relation nat."
+        "raw": "Check le : nat -> nat -> Prop."
+      },
+      {
+        "type": "check",
+        "raw": "Check le : relation nat."
       },
       {
         "type": "definition",
@@ -10796,16 +9989,8 @@
         "raw": "Theorem next_nat_partial_function :\n  partial_function next_nat.\nProof.\n  unfold partial_function.\n  intros x y1 y2 H1 H2.\n  inversion H1. inversion H2.\n  reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem le_not_a_partial_function :\n  ~ (partial_function le).\nProof.\n  unfold not. unfold partial_function. intros Hc.\n  assert (0 = 1) as Nonsense. {\n    apply Hc with (x := 0).\n    - apply le_n.\n    - apply le_S. apply le_n. }\n  discriminate Nonsense.   Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "inductive",
@@ -10840,14 +10025,6 @@
         "raw": "Theorem le_reflexive :\n  reflexive le.\nProof.\n  unfold reflexive. intros n. apply le_n.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "definition",
         "raw": "Definition transitive {X: Type} (R: relation X) :=\n  forall a b c : X, (R a b) -> (R b c) -> (R a c)."
       },
@@ -10858,10 +10035,6 @@
       {
         "type": "theorem",
         "raw": "Theorem lt_trans:\n  transitive lt.\nProof.\n  unfold lt. unfold transitive.\n  intros n m o Hnm Hmo.\n  apply le_S in Hnm.\n  apply le_trans with (a := (S n)) (b := (S m)) (c := o).\n  apply Hnm.\n  apply Hmo. Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -10924,36 +10097,16 @@
         "raw": "Theorem le_order :\n  order le.\nProof.\n  unfold order. split.\n    -  apply le_reflexive.\n    - split.\n      +  apply le_antisymmetric.\n      +  apply le_trans.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "inductive",
         "raw": "Inductive clos_refl_trans {A: Type} (R: relation A) : relation A :=\n  | rt_step x y (H : R x y) : clos_refl_trans R x y\n  | rt_refl x : clos_refl_trans R x x\n  | rt_trans x y z\n        (Hxy : clos_refl_trans R x y)\n        (Hyz : clos_refl_trans R y z) :\n        clos_refl_trans R x z."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
         "raw": "Theorem next_nat_closure_is_le : forall n m,\n  (n <= m) <-> ((clos_refl_trans next_nat) n m).\nProof.\n  intros n m. split.\n  -\n    intro H. induction H.\n    +  apply rt_refl.\n    +\n      apply rt_trans with m. apply IHle. apply rt_step.\n      apply nn.\n  -\n    intro H. induction H.\n    +  inversion H. apply le_S. apply le_n.\n    +  apply le_n.\n    +\n      apply le_trans with y.\n      apply IHclos_refl_trans1.\n      apply IHclos_refl_trans2. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "inductive",
         "raw": "Inductive clos_refl_trans_1n {A : Type}\n                             (R : relation A) (x : A)\n                             : A -> Prop :=\n  | rt1n_refl : clos_refl_trans_1n R x x\n  | rt1n_trans (y z : A)\n      (Hxy : R x y) (Hrest : clos_refl_trans_1n R y z) :\n      clos_refl_trans_1n R x z."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "lemma",
@@ -10975,14 +10128,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Rel."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Rel."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -10994,11 +10155,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Rel."
       },
       {
@@ -11025,7 +10186,11 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\".\nFrom LF Require Export Poly."
+        "raw": "Set Warnings \"-notation-overridden,-parsing,-deprecated-hint-without-locality\"."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Export Poly."
       },
       {
         "type": "theorem",
@@ -11033,23 +10198,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "apply eq.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
         "raw": "Theorem silly2 : forall (n m o p : nat),\n  n = m ->\n  (n = m -> [n;o] = [m;p]) ->\n  [n;o] = [m;p].\nProof.\n  intros n m o p eq1 eq2.\n  apply eq2. apply eq1.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -11065,23 +10218,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "Fail apply H."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "symmetry. apply H.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -11092,16 +10233,8 @@
         "raw": "Example trans_eq_example : forall (a b c d e f : nat),\n     [a;b] = [c;d] ->\n     [c;d] = [e;f] ->\n     [a;b] = [e;f].\nProof.\n  intros a b c d e f eq1 eq2.\n  rewrite -> eq1. rewrite -> eq2. reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem trans_eq : forall (X:Type) (n m o : X),\n  n = m -> m = o -> n = o.\nProof.\n  intros X n m o eq1 eq2. rewrite -> eq1. rewrite -> eq2.\n  reflexivity.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "example",
@@ -11109,19 +10242,7 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "apply trans_eq with (m:=[c;d]).\n  apply eq1. apply eq2.   Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "example",
@@ -11138,10 +10259,6 @@
       {
         "type": "theorem",
         "raw": "Theorem S_injective' : forall (n m : nat),\n  S n = S m ->\n  n = m.\nProof.\n  intros n m H."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -11168,14 +10285,6 @@
         "raw": "Theorem discriminate_ex2 : forall (n : nat),\n  S n = O ->\n  2 + 2 = 5.\nProof.\n  intros n contra. discriminate contra. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "example",
         "raw": "Example discriminate_ex3 :\n  forall (X : Type) (x y z : X) (l j : list X),\n    x :: y :: l = [] ->\n    x = z.\nProof.\n   Admitted."
       },
@@ -11185,23 +10294,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "destruct n as [| n'] eqn:E.\n  -\n    intros H. reflexivity."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "-\n    simpl."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -11224,24 +10321,8 @@
         "raw": "Theorem S_inj : forall (n m : nat) (b : bool),\n  ((S n) =? (S m)) = b  ->\n  (n =? m) = b.\nProof.\n  intros n m b H. simpl in H. apply H.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem silly4 : forall (n m p q : nat),\n  (n = m -> p = q) ->\n  m = n ->\n  q = p.\nProof.\n  intros n m p q EQ H.\n  symmetry in H. apply EQ in H. symmetry in H.\n  apply H.  Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -11252,24 +10333,8 @@
         "raw": "Example trans_eq_example''' : forall (a b c d e f : nat),\n     [a;b] = [c;d] ->\n     [c;d] = [e;f] ->\n     [a;b] = [e;f].\nProof.\n  intros a b c d e f eq1 eq2.\n  specialize trans_eq with (m:=[c;d]) as H.\n  apply H.\n  apply eq1.\n  apply eq2. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem double_injective_FAILED : forall n m,\n  double n = double m ->\n  n = m.\nProof.\n  intros n m. induction n as [| n' IHn'].\n  -  simpl. intros eq. destruct m as [| m'] eqn:E.\n    +  reflexivity.\n    +  discriminate eq.\n  -  intros eq. destruct m as [| m'] eqn:E.\n    +  discriminate eq.\n    +  f_equal."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -11285,15 +10350,7 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "intros m eq."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -11301,27 +10358,11 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "discriminate eq.\n    +\n      f_equal."
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "apply IHn'. simpl in eq. injection eq as goal. apply goal. Qed."
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -11356,14 +10397,6 @@
         "raw": "induction m as [| m' IHm'].\n  -  simpl. intros n eq. destruct n as [| n'] eqn:E.\n    +  reflexivity.\n    +  discriminate eq.\n  -  intros n eq. destruct n as [| n'] eqn:E.\n    +  discriminate eq.\n    +  f_equal.\n      apply IHm'. injection eq as goal. apply goal. Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "theorem",
         "raw": "Theorem nth_error_after_last: forall (n : nat) (X : Type) (l : list X),\n  length l = n ->\n  nth_error l n = None.\nProof.\n   Admitted."
       },
@@ -11377,19 +10410,7 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "unfold square."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "misc",
@@ -11421,10 +10442,6 @@
       },
       {
         "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
         "raw": "destruct m eqn:E.\n  - reflexivity.\n  - reflexivity.\nQed."
       },
       {
@@ -11436,20 +10453,8 @@
         "raw": "Theorem sillyfun_false : forall (n : nat),\n  sillyfun n = false.\nProof.\n  intros n. unfold sillyfun.\n  destruct (n =? 3) eqn:E1.\n    -  reflexivity.\n    -  destruct (n =? 5) eqn:E2.\n      +  reflexivity.\n      +  reflexivity.  Qed."
       },
       {
-        "type": "misc",
-        "raw": ""
-      },
-      {
-        "type": "misc",
-        "raw": ""
-      },
-      {
         "type": "fixpoint",
         "raw": "Fixpoint split {X Y : Type} (l : list (X*Y))\n               : (list X) * (list Y) :=\n  match l with\n  | [] => ([], [])\n  | (x, y) :: t =>\n      match split t with\n      | (lx, ly) => (x :: lx, y :: ly)\n      end\n  end."
-      },
-      {
-        "type": "misc",
-        "raw": ""
       },
       {
         "type": "theorem",
@@ -11567,14 +10572,22 @@
     "items": [
       {
         "type": "global_directive",
-        "raw": "Set Warnings \"-notation-overridden,-parsing\".\nFrom Coq Require Export String.\nFrom LF Require Import Tactics."
+        "raw": "Set Warnings \"-notation-overridden,-parsing\"."
+      },
+      {
+        "type": "import",
+        "raw": "From Coq Require Export String."
+      },
+      {
+        "type": "import",
+        "raw": "From LF Require Import Tactics."
       },
       {
         "type": "misc",
         "raw": "Parameter MISSING: Type."
       },
       {
-        "type": "misc",
+        "type": "module",
         "raw": "Module Check."
       },
       {
@@ -11586,11 +10599,11 @@
         "raw": "Ltac print_manual_grade A :=\n    match eval compute in A with\n    | Some (_ ?S ?C) =>\n        idtac \"Score:\"  S;\n        match eval compute in C with\n          | \"\"%string => idtac \"Comment: None\"\n          | _ => idtac \"Comment:\" C\n        end\n    | None =>\n        idtac \"Score: Ungraded\";\n        idtac \"Comment: None\"\n    end."
       },
       {
-        "type": "misc",
+        "type": "end",
         "raw": "End Check."
       },
       {
-        "type": "require",
+        "type": "import",
         "raw": "From LF Require Import Tactics."
       },
       {

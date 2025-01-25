@@ -1,4 +1,5 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From LF Require Export IndProp.
 
 Definition relation (X: Type) := X -> X -> Prop.
@@ -10,6 +11,7 @@ Definition relation (X: Type) := X -> X -> Prop.
 Print le.
 
 Check le : nat -> nat -> Prop.
+
 Check le : relation nat.
 
 Definition partial_function {X: Type} (R: relation X) :=

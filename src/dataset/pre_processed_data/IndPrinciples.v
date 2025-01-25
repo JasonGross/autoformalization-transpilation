@@ -1,10 +1,6 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From LF Require Export ProofObjects.
-
-
-
-
-
 
 Check nat_ind :
   forall P : nat -> Prop,
@@ -43,6 +39,7 @@ Inductive rgb : Type :=
   | red
   | green
   | blue.
+
 Check rgb_ind.
 
 Inductive natlist : Type :=
@@ -59,8 +56,6 @@ Check natlist_ind :
 Inductive natlist' : Type :=
   | nnil'
   | nsnoc (l : natlist') (n : nat).
-
-
 
 Check natlist'_ind :
   forall P : natlist' -> Prop,
@@ -108,6 +103,7 @@ Proof.  Admitted.
 Inductive tree (X:Type) : Type :=
   | leaf (x : X)
   | node (t1 t2 : tree X).
+
 Check tree_ind.
 
 Inductive foo' (X:Type) : Type :=
@@ -223,8 +219,6 @@ Inductive le2 (n:nat) : nat -> Prop :=
 
 Notation "m <=2 n" := (le2 m n) (at level 70).
 
-
-
 Check le1_ind :
   forall P : nat -> nat -> Prop,
     (forall n : nat, P n n) ->
@@ -236,35 +230,6 @@ Check le2_ind :
     P n ->
     (forall m : nat, n <=2 m -> P m -> P (S m)) ->
     forall n0 : nat, n <=2 n0 -> P n0.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Check nat_ind :
   forall P : nat -> Prop,
@@ -332,8 +297,6 @@ Inductive t_tree (X : Type) : Type :=
 
 Arguments t_leaf {X}.
 Arguments t_branch {X}.
-
-
 
 Check t_tree_ind.
 

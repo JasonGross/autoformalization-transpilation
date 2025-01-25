@@ -1,15 +1,10 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From LF Require Export IndProp.
 
 Inductive ev : nat -> Prop :=
   | ev_0                       : ev 0
   | ev_SS (n : nat) (H : ev n) : ev (S (S n)).
-
-
-
-
-
-
 
 Check ev_SS
   : forall n,
@@ -211,10 +206,6 @@ Notation "'exists' x , p" :=
 
 End Ex.
 
-
-
-
-
 Check ex (fun n => ev n) : Prop.
 
 Definition some_nat_is_even : exists n, ev n :=
@@ -258,7 +249,6 @@ Definition false_implies_zero_eq_one : False -> 0 = 1 :=
 
 Definition ex_falso_quodlibet' : forall P, False -> P
   . Admitted.
-
 
 End Props.
 

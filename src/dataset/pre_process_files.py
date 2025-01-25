@@ -23,3 +23,4 @@ if __name__ == "__main__":
     preprocess_coq_files(folder_path, out_folder)
 
 ## "idtac" might not be handled correctly
+## Require better logic for module/section End statements

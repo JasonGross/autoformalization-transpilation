@@ -1,5 +1,7 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality,-deprecated-syntactic-definition,-deprecated]".
+
 From Coq Require Import Arith List.
+
 From LF Require Import IndProp.
 
 Fixpoint re_opt_e {T:Type} (re: reg_exp T) : reg_exp T :=
@@ -447,6 +449,7 @@ Proof.
 Qed.
 
 Check ev_0 : ev 0.
+
 Check ev_SS : forall n : nat, ev n -> ev (S (S n)).
 
 Example constructor_example: forall (n:nat),

@@ -1,11 +1,12 @@
 From Coq Require Extraction.
 Extraction Language OCaml.
 
-
-
 From Coq Require Import Arith.
+
 From Coq Require Import Init.Nat.
+
 From Coq Require Import EqNat.
+
 From LF Require Import ImpCEvalFun.
 
 
@@ -46,9 +47,8 @@ Require Import ExtrOcamlString.
 
 Extract Inductive sumbool => "bool" ["true" "false"].
 
-
-
 From LF Require Import Imp.
+
 From LF Require Import ImpParser.
 
 From LF Require Import Maps.

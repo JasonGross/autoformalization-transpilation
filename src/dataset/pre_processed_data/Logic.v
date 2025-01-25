@@ -3,13 +3,10 @@ Set Warnings "-notation-overridden,-parsing".
 Set Warnings "-deprecated-hint-without-locality".
 
 Require Nat.
+
 From LF Require Export Tactics.
 
-
-
 Check (forall n m : nat, n + m = m + n) : Prop.
-
-
 
 Check 2 = 2 : Prop.
 
@@ -22,6 +19,7 @@ Theorem plus_2_2_is_4 :
 Proof. reflexivity.  Qed.
 
 Definition plus_claim : Prop := 2 + 2 = 4.
+
 Check plus_claim : Prop.
 
 Theorem plus_claim_is_true :
@@ -30,6 +28,7 @@ Proof. reflexivity.  Qed.
 
 Definition is_three (n : nat) : Prop :=
   n = 3.
+
 Check is_three : nat -> Prop.
 
 Definition injective {A B} (f : A -> B) : Prop :=
@@ -388,6 +387,7 @@ Proof.
 Qed.
 
 Definition Even x := exists n : nat, x = double n.
+
 Check Even : nat -> Prop.
 
 Lemma four_is_Even : Even 4.
@@ -515,11 +515,11 @@ Proof.
    Admitted.
 
 Check plus : nat -> nat -> nat.
+
 Check @rev : forall X, list X -> list X.
 
-
-
 Check add_comm        : forall n m : nat, n + m = m + n.
+
 Check plus_id_example : forall n m : nat, n = m -> n + n = m + m.
 
 Lemma add_comm3 :

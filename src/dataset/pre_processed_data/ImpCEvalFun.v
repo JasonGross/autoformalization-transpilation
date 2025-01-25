@@ -1,9 +1,13 @@
 From Coq Require Import Lia.
+
 From Coq Require Import Arith.
+
 From Coq Require Import PeanoNat.
 
 Import Nat.
+
 From Coq Require Import EqNat.
+
 From LF Require Import Imp Maps.
 
 Fixpoint ceval_step1 (st : state) (c : com) : state :=

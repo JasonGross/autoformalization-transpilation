@@ -1,11 +1,19 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From Coq Require Import Bool.
+
 From Coq Require Import Init.Nat.
+
 From Coq Require Import Arith.
+
 From Coq Require Import EqNat. Import Nat.
+
 From Coq Require Import Lia.
+
 From Coq Require Import List. Import ListNotations.
+
 From Coq Require Import Strings.String.
+
 From LF Require Import Maps.
 
 Set Default Goal Selector "!".
@@ -287,8 +295,6 @@ Inductive aevalR : aexp -> nat -> Prop :=
       (H2 : aevalR e2 n2) :
       aevalR (AMult e1 e2) (n1 * n2).
 
-
-
 End HypothesisNames.
 
 Notation "e '==>' n"
@@ -412,8 +418,6 @@ Inductive aevalR : aexp -> nat -> Prop :=
       (mult n2 n3 = n1) -> (ADiv a1 a2) ==> n3
 
 where "a '==>' n" := (aevalR a n) : type_scope.
-
-
 
 End aevalR_division.
 
@@ -772,6 +776,7 @@ Proof.
    Admitted.
 
 Set Printing Implicit.
+
 Check @ceval_example2.
 
 Definition pup_to_n : com

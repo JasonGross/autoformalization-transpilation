@@ -1,10 +1,17 @@
 Set Warnings "-notation-overridden,-parsing,-deprecated-hint-without-locality".
+
 From Coq Require Import Strings.String.
+
 From Coq Require Import Strings.Ascii.
+
 From Coq Require Import Arith.
+
 From Coq Require Import Init.Nat.
+
 From Coq Require Import EqNat.
+
 From Coq Require Import List. Import ListNotations.
+
 From LF Require Import Maps Imp.
 
 Definition isWhite (c : ascii) : bool :=
