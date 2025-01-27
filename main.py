@@ -1,9 +1,29 @@
 #!/usr/bin/env python
 import subprocess
+import logging
+
+# Simple logging setup
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename="autoformalization.log",
+)
 
 build_dir = "/root/build"
 source_dir = "/root/autoformalization"
 export_dir = "/root/lean4export"
+
+
+def run_cmd(cmd, shell=True, check=True):
+    """Run subprocess command and log it"""
+    logging.debug(f"Running: {cmd}")
+    result = subprocess.run(
+        cmd, shell=shell, check=check, text=True, capture_output=True
+    )
+    logging.debug(f"Output: {result.stdout}")
+    if result.stderr:
+        logging.debug(f"Stderr: {result.stderr}")
+    return result
 
 
 def add_lean():
@@ -116,12 +136,8 @@ compile e2 ++ compile e1 ++ [Instr.iBinop b] ≠ [Instr.iConst n]
 
 end CompilerPlayground"""
 
-    subprocess.run(
-        f"""cat << 'EOF' > {export_dir}/Origin.lean
-    {lean}""",
-        shell=True,
-        check=True,
-    )
+    run_cmd(f"""cat << 'EOF' > {export_dir}/Origin.lean
+    {lean}""")
 
 
 def extract_definitions():
@@ -144,21 +160,16 @@ def lean_to_coq():
 
 def export_from_lean():
     # Mangle files
-    subprocess.run(
-        f"(grep -q 'lean_lib Origin' {export_dir}/lakefile.lean || (sed '8i\\lean_lib Origin' {export_dir}/lakefile.lean > temp && mv temp {export_dir}/lakefile.lean))",
-        shell=True,
-        check=True,
+    run_cmd(
+        f"(grep -q 'lean_lib Origin' {export_dir}/lakefile.lean || (sed '8i\\lean_lib Origin' {export_dir}/lakefile.lean > temp && mv temp {export_dir}/lakefile.lean))"
     )
-    subprocess.run(
-        f"(grep -q '^import Origin' {export_dir}/Main.lean || ((echo 'import Origin' && cat {export_dir}/Main.lean) > temp && mv temp {export_dir}/Main.lean))",
-        shell=True,
-        check=True,
+
+    run_cmd(
+        f"(grep -q '^import Origin' {export_dir}/Main.lean || ((echo 'import Origin' && cat {export_dir}/Main.lean) > temp && mv temp {export_dir}/Main.lean))"
     )
 
     # Run lake build to verify it's valid code
-    subprocess.run(
-        f"cd {export_dir} && lake update && lake build", shell=True, check=True
-    )
+    run_cmd(f"cd {export_dir} && lake update && lake build")
 
     # Run Lake exe export to get the exported code
     definitions = extract_definitions()
@@ -168,27 +179,24 @@ def export_from_lean():
 
     # Produce .out file and put in right place
     cmd += f" > {source_dir}/target.out"
-    subprocess.run(cmd, shell=True, check=True)
+    run_cmd(cmd)
 
     return True
 
 
 def import_to_coq():
     # Copy files first
-    subprocess.run(f"mkdir -p {build_dir}", shell=True, check=True)
-    subprocess.run(f"cp {source_dir}/target.out {build_dir}", shell=True, check=True)
-    subprocess.run(
-        f"""echo 'From LeanImport Require Import Lean.
-    Redirect "target.log" Lean Import "target.out".' > {build_dir}/target.v""",
-        shell=True,
-        check=True,
-    )
+    run_cmd(f"mkdir -p {build_dir}")
+    run_cmd(f"cp {source_dir}/target.out {build_dir}")
+
+    run_cmd(f"""echo 'From LeanImport Require Import Lean.
+    Redirect "target.log" Lean Import "target.out".' > {build_dir}/target.v""")
 
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
     try:
-        subprocess.run(f"cd {build_dir} && coqc target.v", shell=True, check=True)
+        run_cmd(f"cd {build_dir} && coqc target.v")
         return True
     except subprocess.CalledProcessError:
         print("Coq compilation failed")
@@ -211,4 +219,4 @@ if __name__ == "__main__":
     # If successful, extract statement pairs and add to training set
 
     # Return success or failure
-    print("Success")
+    print("Success!")
