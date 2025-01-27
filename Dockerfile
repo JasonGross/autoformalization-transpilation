@@ -55,7 +55,5 @@ ENV UV_PROJECT_ENVIRONMENT=/uv/.venv
 
 WORKDIR /root/autoformalization
 
-RUN chmod +x /root/autoformalization/main.py
-
 # Infinite loop to keep the container running
 ENTRYPOINT ["tail", "-f", "/dev/null"]
