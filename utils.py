@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import sys
 
 # Simple logging setup
 logging.basicConfig(
@@ -7,6 +8,12 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     filename="autoformalization.log",
 )
+
+# Add console handler with INFO level
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)  # Only show INFO and higher
+console_handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
+logging.getLogger().addHandler(console_handler)
 
 
 def run_cmd(cmd, shell=True, check=True):

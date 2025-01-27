@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 from utils import run_cmd, logging
+import os
 
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
 EXPORT_DIR = "/root/lean4export"
 
 
-def add_lean():
+def add_lean(target):
     # For now, just add the Lean example to a file
     with open("example.lean", "r", encoding="utf-8") as f:
         lean = f.read()
 
-    run_cmd(f"""cat << 'EOF' > {EXPORT_DIR}/Origin.lean
+    run_cmd(f"""cat << 'EOF' > {target}
     {lean}""")
 
 
@@ -25,7 +26,7 @@ def extract_definitions():
 
 def lean_to_coq():
     # For now we use pre-generated Lean code
-    add_lean()
+    add_lean(f"{EXPORT_DIR}/Origin.lean")
     # Export statements from Lean
     export_from_lean()
     # Import statements back into Coq
@@ -79,6 +80,34 @@ def import_to_coq():
 
 
 def check_compilation():
+    if not os.path.exists(f"{BUILD_DIR}/lean-build"):
+        run_cmd(f"cd {BUILD_DIR} && lake new lean-build", shell=True, check=False)
+
+    # Clear existing code, if any
+    run_cmd(f"rm -f {BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
+    run_cmd(f"rm -f {BUILD_DIR}/lean-build/Main.lean")
+
+    # Put new code in the right place
+    add_lean(f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
+    run_cmd(
+        [
+            f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
+import LeanBuild
+def main : IO Unit :=
+ IO.println s!"Compilation succeeded!"
+EOL"""
+        ]
+    )
+
+    # Then build
+    run_cmd(f"cd {BUILD_DIR}/lean-build/ && lake update")
+    result = run_cmd(
+        f"cd {BUILD_DIR}/lean-build/ && lake build", shell=True, check=False
+    )
+    if result.returncode != 0:
+        error_message = f"{result.stdout}\n{result.stderr}".strip()
+        logging.error(f"Compilation failed: {error_message}")
+        return False
     return True
 
 
@@ -96,6 +125,7 @@ if __name__ == "__main__":
     # and add the code to this repo
 
     success = False
+    # Should have a counter / timer so we don't go forever
     while not success:
         # Translate statements from Coq to Lean
         # TBD by all of us, with varying degrees of handholding
@@ -103,6 +133,7 @@ if __name__ == "__main__":
         # Verify that the Lean code compiles
         compile_success = check_compilation()
         if not compile_success:
+            assert False
             continue
 
         # Import statements back into Coq
