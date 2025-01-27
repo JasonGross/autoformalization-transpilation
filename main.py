@@ -1,4 +1,5 @@
-import os
+#!/usr/bin/env python
+import subprocess
 
 build_dir = "/root/build"
 source_dir = "/root/autoformalization"
@@ -115,8 +116,12 @@ compile e2 ++ compile e1 ++ [Instr.iBinop b] ≠ [Instr.iConst n]
 
 end CompilerPlayground"""
 
-    os.system(f"""cat << 'EOF' > {export_dir}/Origin.lean
-    {lean}""")
+    subprocess.run(
+        f"""cat << 'EOF' > {export_dir}/Origin.lean
+    {lean}""",
+        shell=True,
+        check=True,
+    )
 
 
 def extract_definitions():
@@ -139,15 +144,21 @@ def lean_to_coq():
 
 def export_from_lean():
     # Mangle files
-    os.system(
-        f"(grep -q 'lean_lib Origin' {export_dir}/lakefile.lean || (sed '8i\\lean_lib Origin' {export_dir}/lakefile.lean > temp && mv temp {export_dir}/lakefile.lean))"
+    subprocess.run(
+        f"(grep -q 'lean_lib Origin' {export_dir}/lakefile.lean || (sed '8i\\lean_lib Origin' {export_dir}/lakefile.lean > temp && mv temp {export_dir}/lakefile.lean))",
+        shell=True,
+        check=True,
     )
-    os.system(
-        f"(grep -q '^import Origin' {export_dir}/Main.lean || ((echo 'import Origin' && cat {export_dir}/Main.lean) > temp && mv temp {export_dir}/Main.lean))"
+    subprocess.run(
+        f"(grep -q '^import Origin' {export_dir}/Main.lean || ((echo 'import Origin' && cat {export_dir}/Main.lean) > temp && mv temp {export_dir}/Main.lean))",
+        shell=True,
+        check=True,
     )
 
     # Run lake build to verify it's valid code
-    os.system(f"cd {export_dir} && lake update && lake build")
+    subprocess.run(
+        f"cd {export_dir} && lake update && lake build", shell=True, check=True
+    )
 
     # Run Lake exe export to get the exported code
     definitions = extract_definitions()
@@ -157,26 +168,31 @@ def export_from_lean():
 
     # Produce .out file and put in right place
     cmd += f" > {source_dir}/target.out"
-    os.system(cmd)
+    subprocess.run(cmd, shell=True, check=True)
+
     return True
 
 
 def import_to_coq():
     # Copy files first
-    os.system(f"mkdir -p {build_dir}")
-    os.system(f"cp {source_dir}/target.out {build_dir}")
-
-    os.system(f"""echo 'From LeanImport Require Import Lean.
-    Redirect "target.log" Lean Import "target.out".' > {build_dir}/target.v""")
+    subprocess.run(f"mkdir -p {build_dir}", shell=True, check=True)
+    subprocess.run(f"cp {source_dir}/target.out {build_dir}", shell=True, check=True)
+    subprocess.run(
+        f"""echo 'From LeanImport Require Import Lean.
+    Redirect "target.log" Lean Import "target.out".' > {build_dir}/target.v""",
+        shell=True,
+        check=True,
+    )
 
     # Then run coqc and check its status
-    status = os.system(f"cd {build_dir} && coqc target.v")
-    if status != 0:
-        print("Coq compilation failed")
-
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
-    return status == 0
+    try:
+        subprocess.run(f"cd {build_dir} && coqc target.v", shell=True, check=True)
+        return True
+    except subprocess.CalledProcessError:
+        print("Coq compilation failed")
+        return False
 
 
 if __name__ == "__main__":
