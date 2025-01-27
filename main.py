@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 from utils import run_cmd, logging
 
-build_dir = "/root/build"
-source_dir = "/root/autoformalization"
-export_dir = "/root/lean4export"
+BUILD_DIR = "/root/build"
+SOURCE_DIR = "/root/autoformalization"
+EXPORT_DIR = "/root/lean4export"
 
 
 def add_lean():
@@ -11,7 +11,7 @@ def add_lean():
     with open("example.lean", "r", encoding="utf-8") as f:
         lean = f.read()
 
-    run_cmd(f"""cat << 'EOF' > {export_dir}/Origin.lean
+    run_cmd(f"""cat << 'EOF' > {EXPORT_DIR}/Origin.lean
     {lean}""")
 
 
@@ -36,24 +36,24 @@ def lean_to_coq():
 def export_from_lean():
     # Mangle files
     run_cmd(
-        f"(grep -q 'lean_lib Origin' {export_dir}/lakefile.lean || (sed '8i\\lean_lib Origin' {export_dir}/lakefile.lean > temp && mv temp {export_dir}/lakefile.lean))"
+        f"(grep -q 'lean_lib Origin' {EXPORT_DIR}/lakefile.lean || (sed '8i\\lean_lib Origin' {EXPORT_DIR}/lakefile.lean > temp && mv temp {EXPORT_DIR}/lakefile.lean))"
     )
 
     run_cmd(
-        f"(grep -q '^import Origin' {export_dir}/Main.lean || ((echo 'import Origin' && cat {export_dir}/Main.lean) > temp && mv temp {export_dir}/Main.lean))"
+        f"(grep -q '^import Origin' {EXPORT_DIR}/Main.lean || ((echo 'import Origin' && cat {EXPORT_DIR}/Main.lean) > temp && mv temp {EXPORT_DIR}/Main.lean))"
     )
 
     # Run lake build to verify it's valid code
-    run_cmd(f"cd {export_dir} && lake update && lake build")
+    run_cmd(f"cd {EXPORT_DIR} && lake update && lake build")
 
     # Run Lake exe export to get the exported code
     definitions = extract_definitions()
-    cmd = f"cd {export_dir} && lake exe lean4export Main --"
+    cmd = f"cd {EXPORT_DIR} && lake exe lean4export Main --"
     for definition in definitions:
         cmd += f" {definition}"
 
     # Produce .out file and put in right place
-    cmd += f" > {source_dir}/target.out"
+    cmd += f" > {SOURCE_DIR}/target.out"
     run_cmd(cmd)
 
     return True
@@ -61,16 +61,16 @@ def export_from_lean():
 
 def import_to_coq():
     # Copy files first
-    run_cmd(f"mkdir -p {build_dir}")
-    run_cmd(f"cp {source_dir}/target.out {build_dir}")
+    run_cmd(f"mkdir -p {BUILD_DIR}")
+    run_cmd(f"cp {SOURCE_DIR}/target.out {BUILD_DIR}")
 
     run_cmd(f"""echo 'From LeanImport Require Import Lean.
-    Redirect "target.log" Lean Import "target.out".' > {build_dir}/target.v""")
+    Redirect "target.log" Lean Import "target.out".' > {BUILD_DIR}/target.v""")
 
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
-    result = run_cmd(f"cd {build_dir} && coqc target.v", check=False)
+    result = run_cmd(f"cd {BUILD_DIR} && coqc target.v", check=False)
     if result.returncode == 0:
         return True
     else:
