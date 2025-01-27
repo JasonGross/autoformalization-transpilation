@@ -133,17 +133,19 @@ if __name__ == "__main__":
         # Verify that the Lean code compiles
         compile_success = check_compilation()
         if not compile_success:
-            assert False
+            assert False, "Lean code does not compile!"
             continue
 
         # Import statements back into Coq
         reimport_success = lean_to_coq()
         if not reimport_success:
+            assert False, "Importing from Lean to Coq failed!"
             continue
 
         # Generate and prove isomorphism
         iso_success = generate_and_prove_iso()
         if not iso_success:
+            assert False, "Failed to prove isomorphisms!"
             continue
         success = True
 
