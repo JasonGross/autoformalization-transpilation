@@ -78,20 +78,46 @@ def import_to_coq():
         return False
 
 
+def check_compilation():
+    return True
+
+
+def generate_and_prove_iso():
+    return True
+
+
+def extract_and_add():
+    return True
+
+
 if __name__ == "__main__":
     # Extract list of statements from input
     # @@Shiki to explain how we are doing this
     # and add the code to this repo
 
-    # Translate statements from Coq to Lean
-    # TBD by all of us, with varying degrees of handholding
+    success = False
+    while not success:
+        # Translate statements from Coq to Lean
+        # TBD by all of us, with varying degrees of handholding
 
-    # Import statements back into Coq
-    reimport_success = lean_to_coq()
+        # Verify that the Lean code compiles
+        compile_success = check_compilation()
+        if not compile_success:
+            continue
 
-    # Generate and prove isomorphism
+        # Import statements back into Coq
+        reimport_success = lean_to_coq()
+        if not reimport_success:
+            continue
+
+        # Generate and prove isomorphism
+        iso_success = generate_and_prove_iso()
+        if not iso_success:
+            continue
+        success = True
 
     # If successful, extract statement pairs and add to training set
+    extract_and_add()
 
     # Return success or failure
     print("Success!")
