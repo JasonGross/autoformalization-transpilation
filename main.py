@@ -1,29 +1,9 @@
 #!/usr/bin/env python
-import subprocess
-import logging
-
-# Simple logging setup
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    filename="autoformalization.log",
-)
+from utils import run_cmd, logging
 
 build_dir = "/root/build"
 source_dir = "/root/autoformalization"
 export_dir = "/root/lean4export"
-
-
-def run_cmd(cmd, shell=True, check=True):
-    """Run subprocess command and log it"""
-    logging.debug(f"Running: {cmd}")
-    result = subprocess.run(
-        cmd, shell=shell, check=check, text=True, capture_output=True
-    )
-    logging.debug(f"Output: {result.stdout}")
-    if result.stderr:
-        logging.debug(f"Stderr: {result.stderr}")
-    return result
 
 
 def add_lean():
@@ -195,11 +175,11 @@ def import_to_coq():
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
-    try:
-        run_cmd(f"cd {build_dir} && coqc target.v")
+    result = run_cmd(f"cd {build_dir} && coqc target.v", check=False)
+    if result.returncode == 0:
         return True
-    except subprocess.CalledProcessError:
-        print("Coq compilation failed")
+    else:
+        logging.error("Coq compilation failed")
         return False
 
 
