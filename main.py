@@ -80,6 +80,7 @@ def import_to_coq():
 
 
 def check_compilation():
+    # Check that we can compile in Lean
     if not os.path.exists(f"{BUILD_DIR}/lean-build"):
         run_cmd(f"cd {BUILD_DIR} && lake new lean-build", shell=True, check=False)
 
