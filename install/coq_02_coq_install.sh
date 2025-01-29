@@ -3,10 +3,10 @@ set -e
 
 # These commits are not particularly principled
 
-# checkout Coq to ac32339 (ac32339db951a48d24ac965a1f36391170c15bce)
+# checkout Coq to c22a07452968a5f7e22720b3b3adaf2710eb27dd
 cd /root
 git clone https://github.com/coq/coq.git
-(cd /root/coq && git checkout ac32339db951a48d24ac965a1f36391170c15bce)
+(cd /root/coq && git checkout c22a07452968a5f7e22720b3b3adaf2710eb27dd)
 
 # checkout vscoq to d5734a0 (d5734a0f458242f26021742623ad632c51e79890)
 git clone https://github.com/coq/vscoq.git
