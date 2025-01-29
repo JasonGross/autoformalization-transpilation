@@ -128,15 +128,33 @@ def generate_isos():
         "Original",
         "Imported",
         f"{SOURCE_DIR}/iso-checker/Isomorphisms.v",
-    )  # need to change this
+    )
 
-    # Should also be generating these programmatically
-    definition_pairs = []
+    # Should also be generating these programmatically, for now these are manual
+    definition_pairs = [
+        ("binop", "Binop"),
+        ("exp", "Exp"),
+        ("add", "Nat.add"),
+        ("mul", "Nat.mul"),
+        ("prod", "PProd"),
+        ("stack", "Stack"),
+        ("instr", "Instr"),
+        ("binopDenote", "binopDenote"),
+        ("app", "List.append.inst1"),
+        ("instrDenote", "instrDenote"),
+        ("prog", "Prog"),
+        ("expDenote", "expDenote"),
+        ("progDenote", "progDenote"),
+        ("compile", "compile"),
+        ("Binop", "Exp.binop"),
+        ("Const", "Exp.const"),
+        ("iConst", "Instr.iConst"),
+        ("iBinop", "Instr.iBinop"),
+    ]
 
     # Generate the isomorphism checks for each definition pair
     iso_checks = []
-
-    for lean_name, coq_name in definition_pairs:
+    for coq_name, lean_name in definition_pairs:
         # Replace dots with asterisks in lean name
         coq_lean_name = lean_name.replace(".", "_")
 
@@ -149,6 +167,7 @@ Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}."""
 
     # Combine all sections
     full_content = "\n\n".join([ISO_HEADER, "\n\n".join(iso_checks)])
+    logging.info(f"{full_content}")
 
     # Write to file
     with open(output_file, "w") as f:
