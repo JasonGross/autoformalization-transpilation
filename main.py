@@ -5,6 +5,15 @@ import os
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
 EXPORT_DIR = "/root/lean4export"
+ISO_HEADER = """From Stdlib Require Import Arith.
+From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
+Import IsoEq.
+From LeanImport Require Import Lean.
+#[local] Set Universe Polymorphism.
+#[local] Set Implicit Arguments.
+From IsomorphismChecker Require Original Imported.
+Print Imported.
+"""
 
 
 def add_lean(target):
@@ -81,6 +90,7 @@ def import_to_coq():
 
 def check_compilation():
     # Check that we can compile in Lean
+    run_cmd(f"mkdir -p {BUILD_DIR}")
     if not os.path.exists(f"{BUILD_DIR}/lean-build"):
         run_cmd(f"cd {BUILD_DIR} && lake new lean-build", shell=True, check=False)
 
@@ -112,7 +122,55 @@ EOL"""
     return True
 
 
+def generate_isos():
+    # Can make these parameters if needed
+    original_name, imported_name, output_file = (
+        "Original",
+        "Imported",
+        f"{SOURCE_DIR}/iso-checker/TARGET.v",
+    )  # need to change this
+
+    # Should also be generating these programmatically
+    definition_pairs = []
+
+    # Generate the isomorphism checks for each definition pair
+    iso_checks = []
+
+    for lean_name, coq_name in definition_pairs:
+        # Replace dots with asterisks in lean name
+        coq_lean_name = lean_name.replace(".", "_")
+
+        iso_block = f"""Instance {coq_lean_name}_iso : iso_statement {original_name}.{coq_name} {imported_name}.{coq_lean_name}.
+Proof. iso. Defined.
+Instance: KnownConstant {original_name}.{coq_name} := {{}}.
+Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}."""
+
+        iso_checks.append(iso_block)
+
+    # Combine all sections
+    full_content = "\n\n".join([ISO_HEADER, "\n\n".join(iso_checks)])
+
+    # Write to file
+    with open(output_file, "w") as f:
+        f.write(full_content)
+
+
 def generate_and_prove_iso():
+    # Make demo file
+    generate_isos()
+
+    # Check that the iso proof compiles
+    return make_isos()
+
+
+def make_isos():
+    run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make clean", shell=True, check=False)
+    result = run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make", shell=True, check=False)
+    if result.returncode != 0:
+        # We want to feed this back to the iso prover if we've failed, but for now just crash
+        error_message = f"{result.stdout}\n{result.stderr}".strip()
+        logging.error(f"Make failed: {error_message}")
+        return False
     return True
 
 
