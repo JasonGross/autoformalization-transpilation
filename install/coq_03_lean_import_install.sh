@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-opam pin add -yn 'git+https://github.com/JasonGross/coq-lean-import.git#tops/temp_fix'
+opam pin add -yn 'git+https://github.com/JasonGross/coq-lean-import.git#lean4-rebased'
 
 opam install -y coq coq-lean-import
 

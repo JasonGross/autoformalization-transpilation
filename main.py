@@ -127,7 +127,7 @@ def generate_isos():
     original_name, imported_name, output_file = (
         "Original",
         "Imported",
-        f"{SOURCE_DIR}/iso-checker/TARGET.v",
+        f"{SOURCE_DIR}/iso-checker/Isomorphisms.v",
     )  # need to change this
 
     # Should also be generating these programmatically
