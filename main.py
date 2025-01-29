@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from utils import run_cmd, logging
 import os
+import re
 
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
@@ -179,7 +180,10 @@ def generate_and_prove_iso():
     generate_isos()
 
     # Check that the iso proof compiles
-    return make_isos()
+    result, isos = make_isos()
+
+    # Eventually will want to feed back isos but for now just return result
+    return result
 
 
 def make_isos():
@@ -189,8 +193,16 @@ def make_isos():
         # We want to feed this back to the iso prover if we've failed, but for now just crash
         error_message = f"{result.stdout}\n{result.stderr}".strip()
         logging.error(f"Make failed: {error_message}")
-        return False
-    return True
+        # Check error message for missing isomorphisms
+        if iso_pairs := [
+            (match.group(1), match.group(2))
+            for match in re.finditer(
+                r"Could not find iso for (\w+) -> (\w+)", error_message
+            )
+        ]:
+            logging.info(f"Found missing isomorphisms: {iso_pairs}")
+        return False, iso_pairs
+    return True, None
 
 
 def extract_and_add():

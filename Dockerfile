@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     libgmp-dev \
     linux-libc-dev \
     rsync \
+    vim \
     && rm -rf /var/lib/apt/lists/*
 # N.B. rsync is required for opam pin to a directory
 
