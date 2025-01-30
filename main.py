@@ -155,9 +155,11 @@ def generate_isos():
 
     # Generate the isomorphism checks for each definition pair
     iso_checks = []
+    iso_names = []
     for coq_name, lean_name in definition_pairs:
         # Replace dots with asterisks in lean name
         coq_lean_name = lean_name.replace(".", "_")
+        iso_names.append(f"{coq_lean_name}_iso")
 
         iso_block = f"""Instance {coq_lean_name}_iso : iso_statement {original_name}.{coq_name} {imported_name}.{coq_lean_name}.
 Proof. iso. Defined.
@@ -166,8 +168,13 @@ Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}."""
 
         iso_checks.append(iso_block)
 
+    # Generate a `Print Assumptions` check for dependencies
+    print_assumptions_block = f"""Import IsomorphismChecker.Automation.HList.HListNotations.
+Definition everything := ({' :: '.join(iso_names)} :: [])%hlist.
+Print Assumptions everything."""
+
     # Combine all sections
-    full_content = "\n\n".join([ISO_HEADER, "\n\n".join(iso_checks)])
+    full_content = "\n\n".join([ISO_HEADER, "\n\n".join(iso_checks), print_assumptions_block])
     logging.info(f"{full_content}")
 
     # Write to file
