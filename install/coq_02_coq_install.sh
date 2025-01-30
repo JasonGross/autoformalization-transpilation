@@ -15,4 +15,4 @@ git clone https://github.com/coq/vscoq.git
 # passing -n allows pinning multiple repositories simultaneously before installing any of them so that there is less risk of version conflicts
 opam pin add -yn --kind=path /root/coq
 opam pin add -yn --kind=path /root/vscoq/language-server
-opam install -y coq vscoq-language-server #coq-dpdgraph
+opam install -y coq vscoq-language-server coq-dpdgraph
