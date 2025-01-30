@@ -124,6 +124,7 @@ EOL"""
 
 
 def generate_isos():
+    # TODO: Implement https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934686304
     # Can make these parameters if needed
     original_name, imported_name, output_file = (
         "Original",
