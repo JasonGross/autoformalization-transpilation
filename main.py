@@ -6,8 +6,7 @@ import re
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
 EXPORT_DIR = "/root/lean4export"
-ISO_HEADER = """From Stdlib Require Import Arith.
-From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
+ISO_HEADER = """From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
 Import IsoEq.
 From LeanImport Require Import Lean.
 #[local] Set Universe Polymorphism.
@@ -172,6 +171,7 @@ Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}."""
     logging.info(f"{full_content}")
 
     # Write to file
+    # TODO: Respond to https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934670423
     with open(output_file, "w") as f:
         f.write(full_content)
 
