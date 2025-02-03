@@ -1,7 +1,3 @@
--- Lean 4 translation, CHUNK #1
-
-namespace CompilerPlayground
-
 inductive Binop where
 | plus
 | times
@@ -19,12 +15,6 @@ def binopDenote : Binop → Nat → Nat → Nat
 def expDenote : Exp → Nat
 | Exp.const n      => n
 | Exp.binop b e1 e2 => binopDenote b (expDenote e1) (expDenote e2)
-
-end CompilerPlayground
-
--- Lean 4 translation, CHUNK #2
-
-namespace CompilerPlayground
 
 inductive Instr where
 | iConst : Nat → Instr
@@ -48,12 +38,6 @@ def progDenote : Prog → Stack → Option Stack
     match instrDenote i s with
     | none    => none
     | some s' => progDenote p' s'
-
-end CompilerPlayground
-
-
-
-namespace CompilerPlayground
 
 -- Explicitly open the List namespace to resolve `++` operation ambiguity
 open List
@@ -103,5 +87,3 @@ def listEq {A : Type} (a1 a2 : A) : Prop :=
 
 def constCmpl (n : Nat) (b : Binop) (e1 e2 : Exp) : Prop :=
 compile e2 ++ compile e1 ++ [Instr.iBinop b] ≠ [Instr.iConst n]
-
-end CompilerPlayground

@@ -2,6 +2,7 @@
 from utils import run_cmd, logging
 import os
 import re
+import sys
 
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
@@ -16,7 +17,11 @@ Print Imported.
 """
 
 
-def add_lean(target):
+def add_lean(code, target):
+    # @@Jacob: Takes a list of lean statements and a target file
+    if code != []:
+        # Actually build the file
+        pass
     # For now, just add the Lean example to a file
     with open("example.lean", "r", encoding="utf-8") as f:
         lean = f.read()
@@ -28,14 +33,15 @@ def add_lean(target):
 def extract_definitions():
     # TODO: Actually do something with Origin.lean
     # For now, just do this
-    lst = "CompilerPlayground.Binop CompilerPlayground.Exp CompilerPlayground.Instr CompilerPlayground.Prog CompilerPlayground.Stack CompilerPlayground.binopDenote CompilerPlayground.expDenote CompilerPlayground.instrDenote CompilerPlayground.progDenote CompilerPlayground.compile CompilerPlayground.compileOneInstrStatement CompilerPlayground.compileCorrect CompilerPlayground.binOpComm CompilerPlayground.reverseMerge CompilerPlayground.compileOpComm CompilerPlayground.constEq CompilerPlayground.constInsEq CompilerPlayground.constOnlyConst CompilerPlayground.listEq CompilerPlayground.constCmpl"
+    lst = "Binop Exp Instr Prog Stack binopDenote expDenote instrDenote progDenote compile compileOneInstrStatement compileCorrect binOpComm reverseMerge compileOpComm constEq constInsEq constOnlyConst listEq constCmpl"
     definitions = lst.split()
     return definitions
 
 
-def lean_to_coq():
+def lean_to_coq(statements):
+    # We will actually build a Lean file and translate
     # For now we use pre-generated Lean code
-    add_lean(f"{EXPORT_DIR}/Origin.lean")
+    add_lean(statements, f"{EXPORT_DIR}/Origin.lean")
     # Export statements from Lean
     export_from_lean()
     # Import statements back into Coq
@@ -88,7 +94,7 @@ def import_to_coq():
         return False
 
 
-def check_compilation():
+def check_compilation(lean_statements):
     # Check that we can compile in Lean
     run_cmd(f"mkdir -p {BUILD_DIR}")
     if not os.path.exists(f"{BUILD_DIR}/lean-build"):
@@ -99,7 +105,7 @@ def check_compilation():
     run_cmd(f"rm -f {BUILD_DIR}/lean-build/Main.lean")
 
     # Put new code in the right place
-    add_lean(f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
+    add_lean(lean_statements, f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
     run_cmd(
         [
             f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
@@ -170,11 +176,13 @@ Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}."""
 
     # Generate a `Print Assumptions` check for dependencies
     print_assumptions_block = f"""Import IsomorphismChecker.Automation.HList.HListNotations.
-Definition everything := ({' :: '.join(iso_names)} :: [])%hlist.
+Definition everything := ({" :: ".join(iso_names)} :: [])%hlist.
 Print Assumptions everything."""
 
     # Combine all sections
-    full_content = "\n\n".join([ISO_HEADER, "\n\n".join(iso_checks), print_assumptions_block])
+    full_content = "\n\n".join(
+        [ISO_HEADER, "\n\n".join(iso_checks), print_assumptions_block]
+    )
     logging.info(f"{full_content}")
 
     # Write to file
@@ -213,29 +221,50 @@ def make_isos():
     return True, None
 
 
-def extract_and_add():
+def extract_and_add(c_stms, l_stms):
+    for coq, lean in zip(c_stms, l_stms):
+        # Add this to the training set, if not already in it
+        pass
     return True
 
 
-if __name__ == "__main__":
+def preprocess_source(src):
+    if src is None:
+        return []
+
     # Extract list of statements from input
     # @@Shiki to explain how we are doing this
     # and add the code to this repo
 
+
+def translate(coq):
+    if coq is None:
+        return []
+
+    else:
+        # Translate things!
+        pass
+
+
+def translate_and_prove(coq_statements):
     success = False
+    lean_statements = []  # I wil try split the example.lean into a list of strings once I've worked out what's going on with the 'Explicitly open the List namespace' issue
     # Should have a counter / timer so we don't go forever
     while not success:
         # Translate statements from Coq to Lean
         # TBD by all of us, with varying degrees of handholding
+        # @@Jacob: Takes a list of Coq statements, returns list of translated Lean statements
+        lean_statements = translate(coq_statements)
 
         # Verify that the Lean code compiles
-        compile_success = check_compilation()
+        compile_success = check_compilation(lean_statements)
         if not compile_success:
             assert False, "Lean code does not compile!"
             continue
 
         # Import statements back into Coq
-        reimport_success = lean_to_coq()
+        # @@Jacob: I expect this to take the list of statements and return a bool
+        reimport_success = lean_to_coq(lean_statements)
         if not reimport_success:
             assert False, "Importing from Lean to Coq failed!"
             continue
@@ -246,9 +275,34 @@ if __name__ == "__main__":
             assert False, "Failed to prove isomorphisms!"
             continue
         success = True
+    return success, lean_statements
+
+
+if __name__ == "__main__":
+    # Extract a list of Coq statements from the input file(s)
+    # @@Shiki @@Jacob: I expect this to take a filename (or maybe directory path) and return an ordered list of strings (Coq statements) to translate, for example
+    # []"""Definition binopDenote (b : binop) : nat -> nat -> nat :=
+    # match b with
+    #     | Plus => plus
+    #     | Times => mult
+    # end."""]
+    coq_statements = preprocess_source(None)
+
+    # Translate them all into Lean and prove equivalence
+    # @@Jacob: Will take a list of strings and return a bool and a list of lean statements, for example
+    # (True, ["""def binopDenote : Binop → Nat → Nat → Nat
+    #   | Binop.plus, x, y  => x + y
+    #   | Binop.times, x, y => x * y"""])
+    success, lean_statements = translate_and_prove(coq_statements)
 
     # If successful, extract statement pairs and add to training set
-    extract_and_add()
+    if success:
+        extract_and_add(coq_statements, lean_statements)
 
-    # Return success or failure
-    print("Success!")
+        # Return success or failure
+        print("Success!")
+        sys.exit(0)
+    else:
+        # TODO: Explain in more detail what needs fixing manually
+        print("Could not translate and/or prove")
+        sys.exit(1)
