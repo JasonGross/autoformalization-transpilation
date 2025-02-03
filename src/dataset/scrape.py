@@ -1,6 +1,6 @@
 import os
 import json
-from helpers import extract_blocks_from_preprocessed
+from helpers import extractBlocksFromPreprocessed
 
 def scrape_preprocessed_coq_files(input_folder: str, output_json_path: str) -> None:
     results = []
@@ -12,7 +12,7 @@ def scrape_preprocessed_coq_files(input_folder: str, output_json_path: str) -> N
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        items = extract_blocks_from_preprocessed(content)
+        items = extractBlocksFromPreprocessed(content)
         items = [itm for itm in items if itm["raw"].strip() != ""]
 
         file_json = {

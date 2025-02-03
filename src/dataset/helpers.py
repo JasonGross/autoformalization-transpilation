@@ -1,129 +1,131 @@
 import re
 
-BLOCK_STARTERS = [
+blockStarters = [
     "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive", "Corollary",
     "Proposition", "Example", "Record", "CoFixpoint", "Fact", "Module",
-    "Section", "Variable", "Hypothesis", "Axiom", "Parameter", "Goal", 
-    "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import", 
+    "Section", "Variable", "Hypothesis", "Axiom", "Parameter", "Goal",
+    "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import",
     "Export", "From", "Check", "Hint", "Create", "End"
 ]
 
-PROOF_ENDINGS = ["Qed.", "Defined.", "Admitted.", "Abort."]
+proofEndings = ["Qed.", "Defined.", "Admitted.", "Abort."]
 
-def is_block_starter(line: str) -> bool:
-    stripped_line = line.lstrip()
-    for starter in BLOCK_STARTERS:
+def isBlockStarter(line: str) -> bool:
+    strippedLine = line.lstrip()
+    for starter in blockStarters:
         pattern = r"^" + re.escape(starter) + r"(\b|\s|\()"
-        if re.match(pattern, stripped_line):
+        if re.match(pattern, strippedLine):
             return True
     return False
 
-def format_coq_file(input_path: str, output_path: str) -> None:
-    with open(input_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    comment_pattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
-    content = re.sub(comment_pattern, '', content)
+def formatCoqFile(inputPath: str, outputPath: str) -> None:
+    with open(inputPath, 'r', encoding='utf-8') as file:
+        content = file.read()
+
+    commentPattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
+    content = re.sub(commentPattern, '', content)
 
     lines = content.split('\n')
     lines = [line.rstrip() for line in lines]
 
-    preprocessed_blocks = []
-    current_block = []
-    collecting_proof = False
+    preprocessedBlocks = []
+    currentBlock = []
+    collectingProof = False
 
-    def flush_block():
-        nonlocal current_block
-        if not current_block:
+    def flushBlock() -> None:
+        nonlocal currentBlock
+        if not currentBlock:
             return
 
-        while current_block and not current_block[0].strip():
-            current_block.pop(0)
-        while current_block and not current_block[-1].strip():
-            current_block.pop()
+        while currentBlock and not currentBlock[0].strip():
+            currentBlock.pop(0)
+        while currentBlock and not currentBlock[-1].strip():
+            currentBlock.pop()
 
-        if current_block:
-            block_text = "\n".join(current_block)
-            preprocessed_blocks.append(block_text)
-        current_block = []
+        if currentBlock:
+            blockText = "\n".join(currentBlock)
+            preprocessedBlocks.append(blockText)
+        currentBlock = []
 
     for line in lines:
-        stripped = line.strip()
+        strippedLine = line.strip()
 
-        if collecting_proof:
-            current_block.append(line)
-            if stripped in PROOF_ENDINGS:
-                flush_block()
-                collecting_proof = False
+        if collectingProof:
+            currentBlock.append(line)
+            if strippedLine in proofEndings:
+                flushBlock()
+                collectingProof = False
         else:
-            if is_block_starter(line):
-                flush_block()
-                current_block.append(line)
-            elif stripped == "Proof.":
-                current_block.append(line)
-                collecting_proof = True
-            elif stripped:
-                current_block.append(line)
+            if isBlockStarter(line):
+                flushBlock()
+                currentBlock.append(line)
+            elif strippedLine == "Proof.":
+                currentBlock.append(line)
+                collectingProof = True
+            elif strippedLine:
+                currentBlock.append(line)
             else:
-                if current_block:
-                    current_block.append(line)
+                if currentBlock:
+                    currentBlock.append(line)
 
-    flush_block()
+    flushBlock()
 
-    final_content = "\n\n".join(preprocessed_blocks) + "\n"
+    finalContent = "\n\n".join(preprocessedBlocks) + "\n"
 
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(final_content)
+    with open(outputPath, 'w', encoding='utf-8') as file:
+        file.write(finalContent)
 
-def classify_block(block_text: str) -> str:
-    lines = block_text.strip().split('\n')
+def classifyBlock(blockText: str) -> str:
+    lines = blockText.strip().split('\n')
     if not lines:
         return "misc"
-    first_line = lines[0].strip()
-    if first_line.startswith("Set") or first_line.startswith("Unset"):
+    firstLine = lines[0].strip()
+    if firstLine.startswith("Set") or firstLine.startswith("Unset"):
         return "global_directive"
-    if first_line.startswith("Require"): ## Check this
+    if firstLine.startswith("Require"):
         return "require"
-    if first_line.startswith("Fixpoint"):
+    if firstLine.startswith("Fixpoint"):
         return "fixpoint"
-    if first_line.startswith("Lemma"):
+    if firstLine.startswith("Lemma"):
         return "lemma"
-    if first_line.startswith("Theorem"):
+    if firstLine.startswith("Theorem"):
         return "theorem"
-    if first_line.startswith("Definition"):
+    if firstLine.startswith("Definition"):
         return "definition"
-    if first_line.startswith("Ltac"):
+    if firstLine.startswith("Ltac"):
         return "ltac"
-    if first_line.startswith("Inductive"):
+    if firstLine.startswith("Inductive"):
         return "inductive"
-    if first_line.startswith("Check"):
+    if firstLine.startswith("Check"):
         return "check"
-    if first_line.startswith("Hint"):
+    if firstLine.startswith("Hint"):
         return "hint"
-    if first_line.startswith("Create HintDb"): ## Check this
+    if firstLine.startswith("Create HintDb"):
         return "create_hint_db"
-    if first_line.startswith("Import") or first_line.startswith("Export") or first_line.startswith("From"):
+    if firstLine.startswith("Import") or firstLine.startswith("Export") or firstLine.startswith("From"):
         return "import"
-    if first_line.startswith("Example"):
+    if firstLine.startswith("Example"):
         return "example"
-    if first_line.startswith("Module"):
+    if firstLine.startswith("Module"):
         return "module"
-    if first_line.startswith("Section"):
+    if firstLine.startswith("Section"):
         return "section"
-    if first_line.startswith("End"):
+    if firstLine.startswith("End"):
         return "end"
     return "misc"
 
-## "idtac" might not be handled correctly
-## Require better logic for module/section End statements
-
-def extract_blocks_from_preprocessed(file_content: str):
-    raw_blocks = file_content.strip().split("\n\n")
+def extractBlocksFromPreprocessed(fileContent: str) -> list[dict[str, str]]:
+    rawBlocks = fileContent.strip().split("\n\n")
     items = []
-    for block_text in raw_blocks:
-        btype = classify_block(block_text)
+    for blockText in rawBlocks:
+        blockType = classifyBlock(blockText)
         items.append({
-            "type": btype,
-            "raw": block_text.strip()
+            "type": blockType,
+            "raw": blockText.strip()
         })
     return items
+
+
+
+## "idtac" might not be handled correctly
+## Require better logic for module/section End statements

@@ -1,27 +1,27 @@
 import os
 import json
 
-def reconstruct_coq_files(input_json_path: str, output_folder: str) -> None:
-    with open(input_json_path, "r", encoding="utf-8") as in_f:
-        data = json.load(in_f)
+def reconstructCoqFiles(inputJsonPath: str, outputFolder: str) -> None:
+    with open(inputJsonPath, "r", encoding="utf-8") as inputFile:
+        data = json.load(inputFile)
 
-    total_files = len(data)
+    totalFiles: int = len(data)
     
-    for i, file_data in enumerate(data, start=1):
-        filename = file_data["fileName"]
-        output_path = os.path.join(output_folder, filename)
+    for index, fileData in enumerate(data, start=1):
+        fileName: str = fileData["fileName"]
+        outputPath: str = os.path.join(outputFolder, fileName)
         
-        with open(output_path, "w", encoding="utf-8") as f:
-            for item in file_data["items"]:
-                raw_text = item["raw"]
-                f.write(f"{raw_text}\n\n")
+        with open(outputPath, "w", encoding="utf-8") as outputFile:
+            for item in fileData["items"]:
+                rawText: str = item["raw"]
+                outputFile.write(f"{rawText}\n\n")
         
-        print(f"[{i}/{total_files}] Reconstructed {filename}.")
+        print(f"[{index}/{totalFiles}] Reconstructed {fileName}.")
 
-    print(f"Done! Reconstructed {total_files} files into {output_folder}")
+    print(f"Done! Reconstructed {totalFiles} files into {outputFolder}")
 
 if __name__ == "__main__":
-    input_json_path = r"src\dataset\processed_data\coq_proofs_dataset.json"
-    output_folder = r"src\dataset\reconstructed_files"
-    os.makedirs(output_folder, exist_ok=True)
-    reconstruct_coq_files(input_json_path, output_folder)
+    inputJsonPath: str = r"src\dataset\processed_data\coq_proofs_dataset.json"
+    outputFolder: str = r"src\dataset\reconstructed_files"
+    os.makedirs(outputFolder, exist_ok=True)
+    reconstructCoqFiles(inputJsonPath, outputFolder)

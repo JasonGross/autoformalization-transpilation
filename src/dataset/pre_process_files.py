@@ -1,26 +1,28 @@
 import os
-from helpers import format_coq_file
+from helpers import formatCoqFile
 
-def preprocess_coq_files(folder_path: str, out_folder: str) -> None:
-    if not os.path.exists(out_folder):
-        os.makedirs(out_folder)
+def preprocessCoqFiles(folderPath: str, outFolder: str) -> None:
+    # Create output folder if it doesn't exist
+    if not os.path.exists(outFolder):
+        os.makedirs(outFolder)
 
-    coq_files = [f for f in os.listdir(folder_path) if f.endswith('.v')]
-    total_files = len(coq_files)
+    coqFiles: list[str] = [f for f in os.listdir(folderPath) if f.endswith('.v')]
+    totalFiles: int = len(coqFiles)
 
-    for i, filename in enumerate(coq_files, start=1):
-        input_path = os.path.join(folder_path, filename)
-        output_path = os.path.join(out_folder, filename)
+    for index, filename in enumerate(coqFiles, start=1):
+        inputPath: str = os.path.join(folderPath, filename)
+        outputPath: str = os.path.join(outFolder, filename)
         try:
-            format_coq_file(input_path, output_path)
-            print(f"[{i}/{total_files}] Preprocessed {filename} -> {output_path}")
-        except Exception as e:
-            print(f"Error processing {filename}: {e}")
+            formatCoqFile(inputPath, outputPath)
+            print(f"[{index}/{totalFiles}] Preprocessed {filename} -> {outputPath}")
+        except Exception as error:
+            print(f"Error processing {filename}: {error}")
 
 if __name__ == "__main__":
-    folder_path = r"src\dataset\raw_data\lf"
-    out_folder = r"src\dataset\pre_processed_data"
-    preprocess_coq_files(folder_path, out_folder)
+    folderPath: str = r"src\dataset\raw_data\lf"
+    outFolder: str = r"src\dataset\pre_processed_data"
+    preprocessCoqFiles(folderPath, outFolder)
+
 
 ## "idtac" might not be handled correctly
 ## Require better logic for module/section End statements
