@@ -13,11 +13,3 @@ opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev
 opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
 
 echo 'eval $(opam env)' >> ~/.bashrc
-
-# Create Coq development switch with required repositories and OCaml version
-# opam switch create coq-dev \
-#   --repositories=coq-core-dev=https://coq.inria.fr/opam/core-dev,\
-# coq-extra-dev=https://coq.inria.fr/opam/extra-dev,\
-# default=https://opam.ocaml.org \
-#   --packages=ocaml.4.14.2
-# opam switch set coq-dev
