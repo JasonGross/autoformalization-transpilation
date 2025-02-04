@@ -90,7 +90,7 @@ compile e2 ++ compile e1 ++ [Instr.iBinop b] ≠ [Instr.iConst n]""",
 
 def add_lean(code, target):
     # @@Jacob: Takes a list of lean statements and a target file
-    lean = "\n".join(code)
+    lean = "\n\n".join(code)
     run_cmd(f"""cat << 'EOF' > {target}
     {lean}""")
 
@@ -200,6 +200,9 @@ def generate_isos():
         "Imported",
         f"{SOURCE_DIR}/iso-checker/Isomorphisms.v",
     )
+
+    # Retrieve exported Lean file
+    run_cmd(f"cp {BUILD_DIR}/target.out {SOURCE_DIR}/iso-checker/imported.out")
 
     # Should also be generating these programmatically, for now these are manual
     definition_pairs = [
