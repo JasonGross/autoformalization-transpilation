@@ -11,6 +11,7 @@ from config import (
     ISO_HEADER,
     EXAMPLE_STATEMENTS,
 )
+from typing import Optional
 
 
 class Project:
@@ -50,6 +51,10 @@ class CoqFile(File):
     pass
 
 
+class ExportFile(File):
+    pass
+
+
 class Identifier:
     def __init__(self, name: str):
         self.name = name
@@ -74,17 +79,20 @@ def extract_definitions(file: str) -> list[LeanIdentifier]:
     return list(map(LeanIdentifier, definitions))
 
 
-def lean_to_coq(statements: LeanFile) -> tuple[bool, str]:
+def lean_to_coq(
+    statements: LeanFile, identifiers: list[tuple[CoqIdentifier, LeanIdentifier]]
+) -> tuple[bool, list[tuple[CoqIdentifier, CoqIdentifier]], str]:
     # Construct a Lean file from all our snippets
     statements.write(f"{EXPORT_DIR}/Origin.lean")
     # Export statements from Lean
-    export_from_lean()
+    _, lean_export = export_from_lean()  # Surely this will always succeed
     # Import statements back into Coq
-    success, error = import_to_coq()
-    return success, error
+    # TODO: convert the Lean identifiers into Coq identifiers
+    success, error = import_to_coq(lean_export)
+    return success, [], error
 
 
-def export_from_lean() -> bool:
+def export_from_lean() -> tuple[bool, ExportFile]:
     # Mangle files
     run_cmd(
         f"(grep -q 'lean_lib Origin' {EXPORT_DIR}/lakefile.lean || (sed '8i\\lean_lib Origin' {EXPORT_DIR}/lakefile.lean > temp && mv temp {EXPORT_DIR}/lakefile.lean))"
@@ -103,17 +111,15 @@ def export_from_lean() -> bool:
     for definition in definitions:
         cmd += f" {definition}"
 
-    # Produce .out file and put in right place
-    cmd += f" > {SOURCE_DIR}/target.out"
-    run_cmd(cmd)
-
-    return True
+    # # Produce .out file
+    export_file = ExportFile(run_cmd(cmd).stdout)
+    return True, export_file
 
 
-def import_to_coq() -> tuple[bool, str]:
+def import_to_coq(lean_export: ExportFile) -> tuple[bool, str]:
     # Copy files first
     run_cmd(f"mkdir -p {BUILD_DIR}")
-    run_cmd(f"cp {SOURCE_DIR}/target.out {BUILD_DIR}")
+    lean_export.write(f"{BUILD_DIR}/target.out")
 
     run_cmd(f"""echo 'From LeanImport Require Import Lean.
     Redirect "target.log" Lean Import "target.out".' > {BUILD_DIR}/target.v""")
@@ -163,7 +169,7 @@ EOL"""
     return True, ""
 
 
-def generate_isos():
+def generate_isos(cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]):
     # TODO: Implement https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934686304
     # Can make these parameters if needed
     original_name, imported_name, output_file = (
@@ -176,6 +182,7 @@ def generate_isos():
     run_cmd(f"cp {BUILD_DIR}/target.out {SOURCE_DIR}/iso-checker/imported.out")
 
     # Should also be generating these programmatically, for now these are manual
+    # TODO: This should happen in the reimport step!
     definition_pairs = [
         ("binop", "Binop"),
         ("exp", "Exp"),
@@ -229,14 +236,16 @@ Print Assumptions everything."""
         f.write(full_content)
 
 
-def repair_isos(errors):
+def repair_isos(errors: Optional[str]):
     # Look at the errors, attempt to fix the isos
-    pass
+    return True
 
 
-def generate_and_prove_iso() -> tuple[bool, str]:
+def generate_and_prove_iso(
+    cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]],
+) -> tuple[bool, Optional[str]]:
     # Make demo file
-    generate_isos()
+    generate_isos(cc_identifiers)
 
     # Check that the iso proof compiles
     result, errors = make_isos()
@@ -264,7 +273,7 @@ def generate_and_prove_iso() -> tuple[bool, str]:
     return result, errors
 
 
-def make_isos():
+def make_isos() -> tuple[bool, Optional[str]]:
     run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make clean", shell=True, check=False)
     result = run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make", shell=True, check=False)
     if result.returncode != 0:
@@ -283,10 +292,12 @@ def make_isos():
     return True, None
 
 
-def extract_and_add(c_stms: list[CoqIdentifier], l_stms: list[LeanIdentifier]) -> bool:
-    for coq, lean in zip(c_stms, l_stms):
-        # Add this to the training set, if not already in it
-        return True
+def extract_and_add(
+    c_stms: CoqFile,
+    l_stms: LeanFile,
+    cl_identifiers: list[tuple[CoqIdentifier, LeanIdentifier]],
+) -> bool:
+    # Use the identifier list to extract the statements from the file and add them to the training set, if not already in it
     return True
 
 
@@ -300,24 +311,29 @@ def preprocess_source(src):  # Optional[CoqProject]) -> CoqFile:
     # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
 
-def translate(coq: CoqFile, error_code: str, error: str) -> LeanFile:
+def translate(
+    coq: CoqFile, error_code: Optional[str], error: Optional[str]
+) -> tuple[LeanFile, list[tuple[CoqIdentifier, LeanIdentifier]]]:
     # If it's not the first attempt, we have an error code and message from the previous failure
     if not coq:
-        return LeanFile("\n".join(EXAMPLE_STATEMENTS))
+        # TODO: Have the actual identifier pairs
+        return LeanFile("\n".join(EXAMPLE_STATEMENTS)), []
 
     else:
         # Translate things!
-        return LeanFile("\n")
+        return LeanFile("\n"), []
 
 
-def translate_and_prove(coq_statements: CoqFile) -> tuple[bool, LeanFile]:
+def translate_and_prove(
+    coq_statements: CoqFile,
+) -> tuple[bool, LeanFile, list[tuple[CoqIdentifier, LeanIdentifier]]]:
     success = False
-    error_code, error = "", ""  # Used for subsequent attempts of translation
+    error_code, error = None, None  # Used for subsequent attempts of translation
     while not success:
         # Translate statements from Coq to Lean
         # TBD by all of us, with varying degrees of handholding
         # @@Jacob: Takes a list of Coq statements, returns list of translated Lean statements
-        lean_statements = translate(coq_statements, error_code, error)
+        lean_statements, cl_identifiers = translate(coq_statements, error_code, error)
 
         # Verify that the Lean code compiles
         compile_success, error = check_compilation(lean_statements)
@@ -328,7 +344,9 @@ def translate_and_prove(coq_statements: CoqFile) -> tuple[bool, LeanFile]:
             continue
 
         # Import statements back into Coq
-        reimport_success, error = lean_to_coq(lean_statements)
+        reimport_success, cc_identifiers, error = lean_to_coq(
+            lean_statements, cl_identifiers
+        )
         # TODO: Kick this back to the translator (if export failed) or end user (if import failed)
         if not reimport_success:
             assert False, "Importing from Lean to Coq failed!"
@@ -336,13 +354,13 @@ def translate_and_prove(coq_statements: CoqFile) -> tuple[bool, LeanFile]:
             continue
 
         # Generate and prove isomorphism
-        iso_success, error = generate_and_prove_iso()
+        iso_success, error = generate_and_prove_iso(cc_identifiers)
         if not iso_success:
             assert False, "Failed to prove isomorphisms!"
             error_code = "isomorphism_failure"
             continue
         success = True
-    return success, lean_statements
+    return success, lean_statements, cl_identifiers
 
 
 if __name__ == "__main__":
@@ -361,12 +379,12 @@ if __name__ == "__main__":
     #   | Binop.plus, x, y  => x + y
     #   | Binop.times, x, y => x * y"""])
     # We expect failures to be like "out of disk space" or "ran out of attempts to try", which should probably be raised rather than returned
-    success, lean_statements = translate_and_prove(coq_statements)
+    success, lean_statements, cl_identifiers = translate_and_prove(coq_statements)
 
     # If successful, extract statement pairs and add to training set
     if success:
         # Need to decide how this actually works
-        # extract_and_add(coq_statements, lean_statements)
+        # extract_and_add(coq_statements, lean_statements, cl_identifiers)
 
         # Return success or failure
         print("Success!")
