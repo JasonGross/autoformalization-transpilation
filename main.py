@@ -13,28 +13,54 @@ from config import (
 )
 
 
-class LeanFile:
-    def __init__(self, contents):
+class File:
+    def __init__(self, contents: str):
         self.contents = contents
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.contents
 
-    def write(self, filepath):
-        logging.debug(f"Writing Lean file to {filepath}\nContents:\n{self.contents}")
+    def write(self, filepath: str) -> None:
+        logging.debug(
+            f"Writing {self.__class__.__name__} to {filepath}\nContents:\n{self.contents}"
+        )
         with open(filepath, "w") as f:
             f.write(self.contents)
 
 
-def extract_definitions(file):
+class LeanFile(File):
+    pass
+
+
+class CoqFile(File):
+    pass
+
+
+class Identifier:
+    def __init__(self, name: str):
+        self.name = name
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class LeanIdentifier(Identifier):
+    pass
+
+
+class CoqIdentifier(Identifier):
+    pass
+
+
+def extract_definitions(file: str) -> list[LeanIdentifier]:
     # TODO: Actually do something with Origin.lean
     # For now, just do this
     lst = "Binop Exp Instr Prog Stack binopDenote expDenote instrDenote progDenote compile compileOneInstrStatement compileCorrect binOpComm reverseMerge compileOpComm constEq constInsEq constOnlyConst listEq constCmpl"
     definitions = lst.split()
-    return definitions
+    return list(map(LeanIdentifier, definitions))
 
 
-def lean_to_coq(statements):
+def lean_to_coq(statements: LeanFile) -> bool:
     # Construct a Lean file from all our snippets
     statements.write(f"{EXPORT_DIR}/Origin.lean")
     # Export statements from Lean
@@ -44,7 +70,7 @@ def lean_to_coq(statements):
     return success
 
 
-def export_from_lean():
+def export_from_lean() -> bool:
     # Mangle files
     run_cmd(
         f"(grep -q 'lean_lib Origin' {EXPORT_DIR}/lakefile.lean || (sed '8i\\lean_lib Origin' {EXPORT_DIR}/lakefile.lean > temp && mv temp {EXPORT_DIR}/lakefile.lean))"
@@ -70,7 +96,7 @@ def export_from_lean():
     return True
 
 
-def import_to_coq():
+def import_to_coq() -> bool:
     # Copy files first
     run_cmd(f"mkdir -p {BUILD_DIR}")
     run_cmd(f"cp {SOURCE_DIR}/target.out {BUILD_DIR}")
@@ -241,10 +267,10 @@ def make_isos():
     return True, None
 
 
-def extract_and_add(c_stms, l_stms):
+def extract_and_add(c_stms: list[CoqIdentifier], l_stms: list[LeanIdentifier]) -> bool:
     for coq, lean in zip(c_stms, l_stms):
         # Add this to the training set, if not already in it
-        pass
+        return True
     return True
 
 
@@ -257,16 +283,16 @@ def preprocess_source(src):
     # and add the code to this repo
 
 
-def translate(coq):
+def translate(coq: CoqFile) -> LeanFile:
     if not coq:
         return LeanFile("\n".join(EXAMPLE_STATEMENTS))
 
     else:
         # Translate things!
-        pass
+        return LeanFile("\n")
 
 
-def translate_and_prove(coq_statements):
+def translate_and_prove(coq_statements: CoqFile) -> tuple[bool, LeanFile]:
     success = False
     while not success:
         # Translate statements from Coq to Lean
@@ -316,7 +342,8 @@ if __name__ == "__main__":
 
     # If successful, extract statement pairs and add to training set
     if success:
-        extract_and_add(coq_statements, lean_statements)
+        # Need to decide how this actually works
+        # extract_and_add(coq_statements, lean_statements)
 
         # Return success or failure
         print("Success!")

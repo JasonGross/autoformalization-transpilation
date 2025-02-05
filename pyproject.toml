@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "For the AlphaProof for Software Verification MARS project"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "mypy>=1.15.0",
+]
 
 [tool.uv]
 dev-dependencies = [
