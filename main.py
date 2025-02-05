@@ -2,10 +2,12 @@
 from utils import run_cmd, logging
 import os
 import re
+import sys
 
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
 EXPORT_DIR = "/root/lean4export"
+ISO_RETRIES = 3
 ISO_HEADER = """From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
 Import IsoEq.
 From LeanImport Require Import Lean.
@@ -14,28 +16,97 @@ From LeanImport Require Import Lean.
 From IsomorphismChecker Require Original Imported.
 Print Imported.
 """
+EXAMPLE_STATEMENTS = [
+    """inductive Binop where
+| plus
+| times
+deriving Repr, DecidableEq""",
+    """inductive Exp where
+| const : Nat → Exp
+| binop : Binop → Exp → Exp → Exp
+deriving Repr, DecidableEq""",
+    """def binopDenote : Binop → Nat → Nat → Nat
+| Binop.plus, x, y  => x + y
+| Binop.times, x, y => x * y""",
+    """def expDenote : Exp → Nat
+| Exp.const n      => n
+| Exp.binop b e1 e2 => binopDenote b (expDenote e1) (expDenote e2)""",
+    """inductive Instr where
+| iConst : Nat → Instr
+| iBinop : Binop → Instr
+deriving Repr, DecidableEq""",
+    """def Prog := List Instr""",
+    """def Stack := List Nat""",
+    """def instrDenote (i : Instr) (s : Stack) : Option Stack :=
+match i with
+| Instr.iConst n => some (n :: s)
+| Instr.iBinop b =>
+    match s with
+    | arg1 :: arg2 :: s' => some ((binopDenote b) arg1 arg2 :: s')
+    | _                  => none""",
+    """def progDenote : Prog → Stack → Option Stack
+| [],      s => some s
+| i :: p', s =>
+    match instrDenote i s with
+    | none    => none
+    | some s' => progDenote p' s'""",
+    """-- Explicitly open the List namespace to resolve `++` operation ambiguity
+open List
+-- Define HAppend instance for Prog
+instance : HAppend Prog Prog Prog where
+hAppend := List.append
+instance : HAppend Prog (List Instr) Prog where
+hAppend := List.append""",
+    """-- Translation of the `compile` function
+def compile : Exp → Prog
+| Exp.const n      => [Instr.iConst n]
+| Exp.binop b e1 e2 => compile e2 ++ compile e1 ++ [Instr.iBinop b]""",
+    """-- Translation of the correctness property: compile_one_instr_statement
+def compileOneInstrStatement (e : Exp) (p : Prog) (s : Stack) : Prop :=
+progDenote (compile e ++ p) s = progDenote p (expDenote e :: s)""",
+    """-- Translation of the correctness property: compile_correct
+def compileCorrect (e : Exp) : Prop :=
+progDenote (compile e) [] = some [expDenote e]""",
+    """-- Translation of additional properties
+def binOpComm (b : Binop) (e1 e2 : Exp) : Prop :=
+expDenote (Exp.binop b e1 e2) = expDenote (Exp.binop b e2 e1)""",
+    """def reverseMerge (e1 e2 : Exp) (b : Binop) : Prop :=
+compile e2 ++ compile e1 ++ [Instr.iBinop b] = compile (Exp.binop b e1 e2)""",
+    """def compileOpComm (b : Binop) (e1 e2 : Exp) : Prop :=
+progDenote (compile e2 ++ compile e1 ++ [Instr.iBinop b]) [] =
+progDenote (compile e1 ++ compile e2 ++ [Instr.iBinop b]) []""",
+    """-- Translation of miscellaneous definitions and proofs
+def constEq (n n' : Nat) : Prop :=
+Exp.const n = Exp.const n' → n = n'""",
+    """def constInsEq (n n' : Nat) : Prop :=
+Instr.iConst n = Instr.iConst n' → n = n'""",
+    """def constOnlyConst (e : Exp) (n : Nat) : Prop :=
+Exp.const n = e → e = Exp.const n""",
+    """def listEq {A : Type} (a1 a2 : A) : Prop :=
+[a1] = [a2] → a1 = a2""",
+    """def constCmpl (n : Nat) (b : Binop) (e1 e2 : Exp) : Prop :=
+compile e2 ++ compile e1 ++ [Instr.iBinop b] ≠ [Instr.iConst n]""",
+]
 
 
-def add_lean(target):
-    # For now, just add the Lean example to a file
-    with open("example.lean", "r", encoding="utf-8") as f:
-        lean = f.read()
-
+def add_lean(code, target):
+    # @@Jacob: Takes a list of lean statements and a target file
+    lean = "\n\n".join(code)
     run_cmd(f"""cat << 'EOF' > {target}
     {lean}""")
 
 
-def extract_definitions():
+def extract_definitions(file):
     # TODO: Actually do something with Origin.lean
     # For now, just do this
-    lst = "CompilerPlayground.Binop CompilerPlayground.Exp CompilerPlayground.Instr CompilerPlayground.Prog CompilerPlayground.Stack CompilerPlayground.binopDenote CompilerPlayground.expDenote CompilerPlayground.instrDenote CompilerPlayground.progDenote CompilerPlayground.compile CompilerPlayground.compileOneInstrStatement CompilerPlayground.compileCorrect CompilerPlayground.binOpComm CompilerPlayground.reverseMerge CompilerPlayground.compileOpComm CompilerPlayground.constEq CompilerPlayground.constInsEq CompilerPlayground.constOnlyConst CompilerPlayground.listEq CompilerPlayground.constCmpl"
+    lst = "Binop Exp Instr Prog Stack binopDenote expDenote instrDenote progDenote compile compileOneInstrStatement compileCorrect binOpComm reverseMerge compileOpComm constEq constInsEq constOnlyConst listEq constCmpl"
     definitions = lst.split()
     return definitions
 
 
-def lean_to_coq():
-    # For now we use pre-generated Lean code
-    add_lean(f"{EXPORT_DIR}/Origin.lean")
+def lean_to_coq(statements):
+    # Construct a Lean file from all our snippets
+    add_lean(statements, f"{EXPORT_DIR}/Origin.lean")
     # Export statements from Lean
     export_from_lean()
     # Import statements back into Coq
@@ -57,7 +128,7 @@ def export_from_lean():
     run_cmd(f"cd {EXPORT_DIR} && lake update && lake build")
 
     # Run Lake exe export to get the exported code
-    definitions = extract_definitions()
+    definitions = extract_definitions("{EXPORT_DIR}/Origin.lean")
     cmd = f"cd {EXPORT_DIR} && lake exe lean4export Main --"
     for definition in definitions:
         cmd += f" {definition}"
@@ -88,7 +159,7 @@ def import_to_coq():
         return False
 
 
-def check_compilation():
+def check_compilation(lean_statements):
     # Check that we can compile in Lean
     run_cmd(f"mkdir -p {BUILD_DIR}")
     if not os.path.exists(f"{BUILD_DIR}/lean-build"):
@@ -99,7 +170,7 @@ def check_compilation():
     run_cmd(f"rm -f {BUILD_DIR}/lean-build/Main.lean")
 
     # Put new code in the right place
-    add_lean(f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
+    add_lean(lean_statements, f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
     run_cmd(
         [
             f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
@@ -130,6 +201,9 @@ def generate_isos():
         "Imported",
         f"{SOURCE_DIR}/iso-checker/Isomorphisms.v",
     )
+
+    # Retrieve exported Lean file
+    run_cmd(f"cp {BUILD_DIR}/target.out {SOURCE_DIR}/iso-checker/imported.out")
 
     # Should also be generating these programmatically, for now these are manual
     definition_pairs = [
@@ -170,11 +244,13 @@ Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}."""
 
     # Generate a `Print Assumptions` check for dependencies
     print_assumptions_block = f"""Import IsomorphismChecker.Automation.HList.HListNotations.
-Definition everything := ({' :: '.join(iso_names)} :: [])%hlist.
+Definition everything := ({" :: ".join(iso_names)} :: [])%hlist.
 Print Assumptions everything."""
 
     # Combine all sections
-    full_content = "\n\n".join([ISO_HEADER, "\n\n".join(iso_checks), print_assumptions_block])
+    full_content = "\n\n".join(
+        [ISO_HEADER, "\n\n".join(iso_checks), print_assumptions_block]
+    )
     logging.info(f"{full_content}")
 
     # Write to file
@@ -183,12 +259,34 @@ Print Assumptions everything."""
         f.write(full_content)
 
 
+def repair_isos(errors):
+    # Look at the errors, attempt to fix the isos
+    pass
+
+
 def generate_and_prove_iso():
     # Make demo file
     generate_isos()
 
     # Check that the iso proof compiles
-    result, isos = make_isos()
+    result, errors = make_isos()
+
+    if result:
+        logging.info("Isomorphism proof succeeded")
+    else:
+        attempt = 0
+        while attempt < ISO_RETRIES:
+            repair_isos(errors)
+            # Check that the iso proof compiles
+            result, isos = make_isos()
+            if not result:
+                # Should feed all errors for iso repair
+                logging.info(f"Isomorphism proof failed on attempt {attempt}: : {isos}")
+                if attempt < ISO_RETRIES - 1:
+                    logging.info("Retrying...")
+                else:
+                    logging.info("Isomorphism proof failed on final attempt")
+            attempt += 1
 
     # Eventually will want to feed back isos but for now just return result
     return result
@@ -198,7 +296,7 @@ def make_isos():
     run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make clean", shell=True, check=False)
     result = run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make", shell=True, check=False)
     if result.returncode != 0:
-        # We want to feed this back to the iso prover if we've failed, but for now just crash
+        # We log this and then feed it into our iso repair model
         error_message = f"{result.stdout}\n{result.stderr}".strip()
         logging.error(f"Make failed: {error_message}")
         # Check error message for missing isomorphisms
@@ -209,33 +307,52 @@ def make_isos():
             )
         ]:
             logging.info(f"Found missing isomorphisms: {iso_pairs}")
-        return False, iso_pairs
+        return False, error_message
     return True, None
 
 
-def extract_and_add():
+def extract_and_add(c_stms, l_stms):
+    for coq, lean in zip(c_stms, l_stms):
+        # Add this to the training set, if not already in it
+        pass
     return True
 
 
-if __name__ == "__main__":
+def preprocess_source(src):
+    if src is None:
+        return []
+
     # Extract list of statements from input
     # @@Shiki to explain how we are doing this
     # and add the code to this repo
 
+
+def translate(coq):
+    if not coq:
+        return EXAMPLE_STATEMENTS
+
+    else:
+        # Translate things!
+        pass
+
+
+def translate_and_prove(coq_statements):
     success = False
-    # Should have a counter / timer so we don't go forever
     while not success:
         # Translate statements from Coq to Lean
         # TBD by all of us, with varying degrees of handholding
+        # @@Jacob: Takes a list of Coq statements, returns list of translated Lean statements
+        lean_statements = translate(coq_statements)
 
         # Verify that the Lean code compiles
-        compile_success = check_compilation()
+        compile_success = check_compilation(lean_statements)
         if not compile_success:
             assert False, "Lean code does not compile!"
             continue
 
         # Import statements back into Coq
-        reimport_success = lean_to_coq()
+        # @@Jacob: I expect this to take the list of statements and return a bool
+        reimport_success = lean_to_coq(lean_statements)
         if not reimport_success:
             assert False, "Importing from Lean to Coq failed!"
             continue
@@ -246,9 +363,35 @@ if __name__ == "__main__":
             assert False, "Failed to prove isomorphisms!"
             continue
         success = True
+    return success, lean_statements
+
+
+if __name__ == "__main__":
+    # Extract a list of Coq statements from the input file(s)
+    # @@Shiki @@Jacob: I expect this to take a filename (or maybe directory path) and return an ordered list of strings (Coq statements) to translate, for example
+    # []"""Definition binopDenote (b : binop) : nat -> nat -> nat :=
+    # match b with
+    #     | Plus => plus
+    #     | Times => mult
+    # end."""]
+    coq_statements = preprocess_source(None)
+
+    # Translate them all into Lean and prove equivalence
+    # Will take a list of strings and return a bool and a list of lean statements, for example
+    # (True, ["""def binopDenote : Binop → Nat → Nat → Nat
+    #   | Binop.plus, x, y  => x + y
+    #   | Binop.times, x, y => x * y"""])
+    # We expect failures to be like "out of disk space" or "ran out of attempts to try", which should probably be raised rather than returned
+    success, lean_statements = translate_and_prove(coq_statements)
 
     # If successful, extract statement pairs and add to training set
-    extract_and_add()
+    if success:
+        extract_and_add(coq_statements, lean_statements)
 
-    # Return success or failure
-    print("Success!")
+        # Return success or failure
+        print("Success!")
+        sys.exit(0)
+    else:
+        # TODO: Explain in more detail what needs fixing manually
+        print("Could not translate and/or prove")
+        sys.exit(1)
