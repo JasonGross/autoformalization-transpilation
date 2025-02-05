@@ -13,6 +13,20 @@ from config import (
 )
 
 
+class Project:
+    # See this comment (https://github.com/JasonGross/autoformalization/pull/27#discussion_r1942030347) by Jason for a suggestion of structure here
+    def __init__(self):
+        pass
+
+
+class LeanProject(Project):
+    pass
+
+
+class CoqProject(Project):
+    pass
+
+
 class File:
     def __init__(self, contents: str):
         self.contents = contents
@@ -60,14 +74,14 @@ def extract_definitions(file: str) -> list[LeanIdentifier]:
     return list(map(LeanIdentifier, definitions))
 
 
-def lean_to_coq(statements: LeanFile) -> bool:
+def lean_to_coq(statements: LeanFile) -> tuple[bool, str]:
     # Construct a Lean file from all our snippets
     statements.write(f"{EXPORT_DIR}/Origin.lean")
     # Export statements from Lean
     export_from_lean()
     # Import statements back into Coq
-    success = import_to_coq()
-    return success
+    success, error = import_to_coq()
+    return success, error
 
 
 def export_from_lean() -> bool:
@@ -96,7 +110,7 @@ def export_from_lean() -> bool:
     return True
 
 
-def import_to_coq() -> bool:
+def import_to_coq() -> tuple[bool, str]:
     # Copy files first
     run_cmd(f"mkdir -p {BUILD_DIR}")
     run_cmd(f"cp {SOURCE_DIR}/target.out {BUILD_DIR}")
@@ -109,13 +123,13 @@ def import_to_coq() -> bool:
     # But for now we just check the status
     result = run_cmd(f"cd {BUILD_DIR} && coqc target.v", check=False)
     if result.returncode == 0:
-        return True
+        return True, ""
     else:
         logging.error("Coq compilation failed")
-        return False
+        return False, "Coq compilation failed"  # TODO: Actually retrieve error
 
 
-def check_compilation(lean_statements):
+def check_compilation(lean_statements: LeanFile) -> tuple[bool, str]:
     # Check that we can compile in Lean
     run_cmd(f"mkdir -p {BUILD_DIR}")
     if not os.path.exists(f"{BUILD_DIR}/lean-build"):
@@ -145,8 +159,8 @@ EOL"""
     if result.returncode != 0:
         error_message = f"{result.stdout}\n{result.stderr}".strip()
         logging.error(f"Compilation failed: {error_message}")
-        return False
-    return True
+        return False, error_message
+    return True, ""
 
 
 def generate_isos():
@@ -220,7 +234,7 @@ def repair_isos(errors):
     pass
 
 
-def generate_and_prove_iso():
+def generate_and_prove_iso() -> tuple[bool, str]:
     # Make demo file
     generate_isos()
 
@@ -234,10 +248,12 @@ def generate_and_prove_iso():
         while attempt < ISO_RETRIES:
             repair_isos(errors)
             # Check that the iso proof compiles
-            result, isos = make_isos()
+            result, errors = make_isos()
             if not result:
                 # Should feed all errors for iso repair
-                logging.info(f"Isomorphism proof failed on attempt {attempt}: : {isos}")
+                logging.info(
+                    f"Isomorphism proof failed on attempt {attempt}: : {errors}"
+                )
                 if attempt < ISO_RETRIES - 1:
                     logging.info("Retrying...")
                 else:
@@ -245,7 +261,7 @@ def generate_and_prove_iso():
             attempt += 1
 
     # Eventually will want to feed back isos but for now just return result
-    return result
+    return result, errors
 
 
 def make_isos():
@@ -274,16 +290,18 @@ def extract_and_add(c_stms: list[CoqIdentifier], l_stms: list[LeanIdentifier]) -
     return True
 
 
-def preprocess_source(src):
+def preprocess_source(src):  # Optional[CoqProject]) -> CoqFile:
     if src is None:
         return []
 
     # Extract list of statements from input
     # @@Shiki to explain how we are doing this
     # and add the code to this repo
+    # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
 
-def translate(coq: CoqFile) -> LeanFile:
+def translate(coq: CoqFile, error_code: str, error: str) -> LeanFile:
+    # If it's not the first attempt, we have an error code and message from the previous failure
     if not coq:
         return LeanFile("\n".join(EXAMPLE_STATEMENTS))
 
@@ -294,29 +312,34 @@ def translate(coq: CoqFile) -> LeanFile:
 
 def translate_and_prove(coq_statements: CoqFile) -> tuple[bool, LeanFile]:
     success = False
+    error_code, error = "", ""  # Used for subsequent attempts of translation
     while not success:
         # Translate statements from Coq to Lean
         # TBD by all of us, with varying degrees of handholding
         # @@Jacob: Takes a list of Coq statements, returns list of translated Lean statements
-        lean_statements = translate(coq_statements)
+        lean_statements = translate(coq_statements, error_code, error)
 
         # Verify that the Lean code compiles
-        compile_success = check_compilation(lean_statements)
+        compile_success, error = check_compilation(lean_statements)
         if not compile_success:
             assert False, "Lean code does not compile!"
+            # TODO: Kick this back to the translator
+            error_code = "compilation_failure"
             continue
 
         # Import statements back into Coq
-        # @@Jacob: I expect this to take the list of statements and return a bool
-        reimport_success = lean_to_coq(lean_statements)
+        reimport_success, error = lean_to_coq(lean_statements)
+        # TODO: Kick this back to the translator (if export failed) or end user (if import failed)
         if not reimport_success:
             assert False, "Importing from Lean to Coq failed!"
+            error_code = "export_import_failure"
             continue
 
         # Generate and prove isomorphism
-        iso_success = generate_and_prove_iso()
+        iso_success, error = generate_and_prove_iso()
         if not iso_success:
             assert False, "Failed to prove isomorphisms!"
+            error_code = "isomorphism_failure"
             continue
         success = True
     return success, lean_statements
