@@ -7,6 +7,7 @@ import sys
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
 EXPORT_DIR = "/root/lean4export"
+ISO_RETRIES = 3
 ISO_HEADER = """From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
 Import IsoEq.
 From LeanImport Require Import Lean.
@@ -258,12 +259,34 @@ Print Assumptions everything."""
         f.write(full_content)
 
 
+def repair_isos(errors):
+    # Look at the errors, attempt to fix the isos
+    pass
+
+
 def generate_and_prove_iso():
     # Make demo file
     generate_isos()
 
     # Check that the iso proof compiles
-    result, isos = make_isos()
+    result, errors = make_isos()
+
+    if result:
+        logging.info("Isomorphism proof succeeded")
+    else:
+        attempt = 0
+        while attempt < ISO_RETRIES:
+            repair_isos(errors)
+            # Check that the iso proof compiles
+            result, isos = make_isos()
+            if not result:
+                # Should feed all errors for iso repair
+                logging.info(f"Isomorphism proof failed on attempt {attempt}: : {isos}")
+                if attempt < ISO_RETRIES - 1:
+                    logging.info("Retrying...")
+                else:
+                    logging.info("Isomorphism proof failed on final attempt")
+            attempt += 1
 
     # Eventually will want to feed back isos but for now just return result
     return result
@@ -273,7 +296,7 @@ def make_isos():
     run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make clean", shell=True, check=False)
     result = run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make", shell=True, check=False)
     if result.returncode != 0:
-        # We want to feed this back to the iso prover if we've failed, but for now just crash
+        # We log this and then feed it into our iso repair model
         error_message = f"{result.stdout}\n{result.stderr}".strip()
         logging.error(f"Make failed: {error_message}")
         # Check error message for missing isomorphisms
@@ -284,7 +307,7 @@ def make_isos():
             )
         ]:
             logging.info(f"Found missing isomorphisms: {iso_pairs}")
-        return False, iso_pairs
+        return False, error_message
     return True, None
 
 
@@ -354,10 +377,11 @@ if __name__ == "__main__":
     coq_statements = preprocess_source(None)
 
     # Translate them all into Lean and prove equivalence
-    # @@Jacob: Will take a list of strings and return a bool and a list of lean statements, for example
+    # Will take a list of strings and return a bool and a list of lean statements, for example
     # (True, ["""def binopDenote : Binop → Nat → Nat → Nat
     #   | Binop.plus, x, y  => x + y
     #   | Binop.times, x, y => x * y"""])
+    # We expect failures to be like "out of disk space" or "ran out of attempts to try", which should probably be raised rather than returned
     success, lean_statements = translate_and_prove(coq_statements)
 
     # If successful, extract statement pairs and add to training set
