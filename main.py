@@ -13,11 +13,17 @@ from config import (
 )
 
 
-def add_lean(code, target):
-    # @@Jacob: Takes a list of lean statements and a target file
-    lean = "\n\n".join(code)
-    run_cmd(f"""cat << 'EOF' > {target}
-    {lean}""")
+class LeanFile:
+    def __init__(self, contents):
+        self.contents = contents
+
+    def __str__(self):
+        return self.contents
+
+    def write(self, filepath):
+        logging.debug(f"Writing Lean file to {filepath}\nContents:\n{self.contents}")
+        with open(filepath, "w") as f:
+            f.write(self.contents)
 
 
 def extract_definitions(file):
@@ -30,7 +36,7 @@ def extract_definitions(file):
 
 def lean_to_coq(statements):
     # Construct a Lean file from all our snippets
-    add_lean(statements, f"{EXPORT_DIR}/Origin.lean")
+    statements.write(f"{EXPORT_DIR}/Origin.lean")
     # Export statements from Lean
     export_from_lean()
     # Import statements back into Coq
@@ -94,7 +100,7 @@ def check_compilation(lean_statements):
     run_cmd(f"rm -f {BUILD_DIR}/lean-build/Main.lean")
 
     # Put new code in the right place
-    add_lean(lean_statements, f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
+    lean_statements.write(f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
     run_cmd(
         [
             f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
@@ -253,7 +259,7 @@ def preprocess_source(src):
 
 def translate(coq):
     if not coq:
-        return EXAMPLE_STATEMENTS
+        return LeanFile("\n".join(EXAMPLE_STATEMENTS))
 
     else:
         # Translate things!
