@@ -231,9 +231,7 @@ def generate_isos(cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]):
         iso_names.append(f"{coq_lean_name}_iso")
 
         iso_block = f"""Instance {coq_lean_name}_iso : iso_statement {original_name}.{coq_name} {imported_name}.{coq_lean_name}.
-Proof. iso. Defined.
-Instance: KnownConstant {original_name}.{coq_name} := {{}}.
-Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}."""
+Proof. iso. Defined."""
 
         iso_checks.append(iso_block)
 
