@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from utils import run_cmd, logging
+from dataclasses import dataclass
 import os
 import re
 import sys
@@ -28,9 +29,9 @@ class CoqProject(Project):
     pass
 
 
+@dataclass
 class File:
-    def __init__(self, contents: str):
-        self.contents = contents
+    contents: str
 
     def __str__(self) -> str:
         return self.contents
@@ -55,9 +56,9 @@ class ExportFile(File):
     pass
 
 
+@dataclass
 class Identifier:
-    def __init__(self, name: str):
-        self.name = name
+    name: str
 
     def __str__(self) -> str:
         return self.name
@@ -71,7 +72,34 @@ class CoqIdentifier(Identifier):
     pass
 
 
-def extract_definitions(file: str) -> list[LeanIdentifier]:
+DEFINITION_PAIRS = list(
+    map(
+        lambda x: (CoqIdentifier(x[0]), LeanIdentifier(x[1])),
+        [
+            ("binop", "Binop"),
+            ("exp", "Exp"),
+            ("add", "Nat.add"),
+            ("mul", "Nat.mul"),
+            ("prod", "PProd"),
+            ("stack", "Stack"),
+            ("instr", "Instr"),
+            ("binopDenote", "binopDenote"),
+            ("app", "List.append.inst1"),
+            ("instrDenote", "instrDenote"),
+            ("prog", "Prog"),
+            ("expDenote", "expDenote"),
+            ("progDenote", "progDenote"),
+            ("compile", "compile"),
+            ("Binop", "Exp.binop"),
+            ("Const", "Exp.const"),
+            ("iConst", "Instr.iConst"),
+            ("iBinop", "Instr.iBinop"),
+        ],
+    )
+)
+
+
+def extract_definitions(file_name: str) -> list[LeanIdentifier]:
     # TODO: Actually do something with Origin.lean
     # For now, just do this
     lst = "Binop Exp Instr Prog Stack binopDenote expDenote instrDenote progDenote compile compileOneInstrStatement compileCorrect binOpComm reverseMerge compileOpComm constEq constInsEq constOnlyConst listEq constCmpl"
@@ -85,11 +113,19 @@ def lean_to_coq(
     # Construct a Lean file from all our snippets
     statements.write(f"{EXPORT_DIR}/Origin.lean")
     # Export statements from Lean
-    _, lean_export = export_from_lean()  # Surely this will always succeed
+    export_success, lean_export = export_from_lean()
+    assert export_success, "Lean export failed!"
     # Import statements back into Coq
-    # TODO: convert the Lean identifiers into Coq identifiers
+    cc_identifiers = []
+    for coq_id, lean_id in identifiers:
+        cc_identifiers.append((coq_id, lean_id_to_coq(lean_id)))
+
     success, error = import_to_coq(lean_export)
-    return success, [], error
+    return success, cc_identifiers, error
+
+
+def lean_id_to_coq(lean_id: LeanIdentifier) -> CoqIdentifier:
+    return CoqIdentifier(str(lean_id).replace(".", "_"))
 
 
 def export_from_lean() -> tuple[bool, ExportFile]:
@@ -116,23 +152,28 @@ def export_from_lean() -> tuple[bool, ExportFile]:
     return True, export_file
 
 
-def import_to_coq(lean_export: ExportFile) -> tuple[bool, str]:
+def import_to_coq(
+    lean_export: ExportFile, coq_file: str = "target"
+) -> tuple[bool, str]:
     # Copy files first
     run_cmd(f"mkdir -p {BUILD_DIR}")
-    lean_export.write(f"{BUILD_DIR}/target.out")
+    lean_export.write(f"{BUILD_DIR}/{coq_file}.out")
 
     run_cmd(f"""echo 'From LeanImport Require Import Lean.
-    Redirect "target.log" Lean Import "target.out".' > {BUILD_DIR}/target.v""")
+    Redirect "{coq_file}.log" Lean Import "{coq_file}.out".' > {BUILD_DIR}/{coq_file}.v""")
 
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
-    result = run_cmd(f"cd {BUILD_DIR} && coqc target.v", check=False)
+    result = run_cmd(f"cd {BUILD_DIR} && coqc {coq_file}.v", check=False)
     if result.returncode == 0:
         return True, ""
     else:
         logging.error("Coq compilation failed")
-        return False, "Coq compilation failed"  # TODO: Actually retrieve error
+        # TODO: Actually retrieve error, for example look at result.stderr, search for the last
+        # instance of 'File "[^"]+", line ([0-9]+), characters ([0-9]+)-([0-9]+):\n', pick out the
+        #  line numbers from the file, so the LLM doesn't have to do arithmetic
+        return False, "Coq compilation failed"
 
 
 def check_compilation(lean_statements: LeanFile) -> tuple[bool, str]:
@@ -183,33 +224,10 @@ def generate_isos(cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]):
 
     # Should also be generating these programmatically, for now these are manual
     # TODO: This should happen in the reimport step!
-    definition_pairs = [
-        ("binop", "Binop"),
-        ("exp", "Exp"),
-        ("add", "Nat.add"),
-        ("mul", "Nat.mul"),
-        ("prod", "PProd"),
-        ("stack", "Stack"),
-        ("instr", "Instr"),
-        ("binopDenote", "binopDenote"),
-        ("app", "List.append.inst1"),
-        ("instrDenote", "instrDenote"),
-        ("prog", "Prog"),
-        ("expDenote", "expDenote"),
-        ("progDenote", "progDenote"),
-        ("compile", "compile"),
-        ("Binop", "Exp.binop"),
-        ("Const", "Exp.const"),
-        ("iConst", "Instr.iConst"),
-        ("iBinop", "Instr.iBinop"),
-    ]
-
     # Generate the isomorphism checks for each definition pair
     iso_checks = []
     iso_names = []
-    for coq_name, lean_name in definition_pairs:
-        # Replace dots with asterisks in lean name
-        coq_lean_name = lean_name.replace(".", "_")
+    for coq_name, coq_lean_name in cc_identifiers:
         iso_names.append(f"{coq_lean_name}_iso")
 
         iso_block = f"""Instance {coq_lean_name}_iso : iso_statement {original_name}.{coq_name} {imported_name}.{coq_lean_name}.
@@ -317,7 +335,7 @@ def translate(
     # If it's not the first attempt, we have an error code and message from the previous failure
     if not coq:
         # TODO: Have the actual identifier pairs
-        return LeanFile("\n".join(EXAMPLE_STATEMENTS)), []
+        return LeanFile("\n".join(EXAMPLE_STATEMENTS)), DEFINITION_PAIRS
 
     else:
         # Translate things!
@@ -332,7 +350,6 @@ def translate_and_prove(
     while not success:
         # Translate statements from Coq to Lean
         # TBD by all of us, with varying degrees of handholding
-        # @@Jacob: Takes a list of Coq statements, returns list of translated Lean statements
         lean_statements, cl_identifiers = translate(coq_statements, error_code, error)
 
         # Verify that the Lean code compiles

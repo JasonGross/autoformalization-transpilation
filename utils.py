@@ -16,7 +16,7 @@ console_handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
 logging.getLogger().addHandler(console_handler)
 
 
-def run_cmd(cmd, shell=True, check=True):
+def run_cmd(cmd: str, shell=True, check=True):
     """Run subprocess command and log it"""
     logging.debug(f"Running: {cmd}")
     result = subprocess.run(
