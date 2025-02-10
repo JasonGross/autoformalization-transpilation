@@ -227,7 +227,9 @@ def generate_isos(cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]):
         iso_names.append(f"{coq_lean_name}_iso")
 
         iso_block = f"""Instance {coq_lean_name}_iso : iso_statement {original_name}.{coq_name} {imported_name}.{coq_lean_name}.
-Proof. iso. Defined."""
+Proof. iso. Defined.
+Instance: KnownConstant {original_name}.{coq_name} := {{}}. (* only needed when rel_iso is typeclasses opaque *)
+Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}. (* only needed when rel_iso is typeclasses opaque *)"""
 
         iso_checks.append(iso_block)
 
@@ -240,7 +242,7 @@ Print Assumptions everything."""
     full_content = "\n\n".join(
         [ISO_HEADER, "\n\n".join(iso_checks), print_assumptions_block]
     )
-    logging.info(f"{full_content}")
+    logging.debug(f"{full_content}")
 
     # Write to file
     # TODO: Respond to https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934670423
@@ -324,11 +326,12 @@ def generate_and_prove_iso(
             if not result:
                 # Should feed all errors for iso repair
                 logging.info(
-                    f"Isomorphism proof failed on attempt {attempt}: : {errors}"
-                )
+                    f"Isomorphism proof failed on attempt {attempt}:")
                 if attempt < ISO_RETRIES - 1:
+                    logging.debug(errors)
                     logging.info("Retrying...")
                 else:
+                    logging.info(errors)
                     logging.info("Isomorphism proof failed on final attempt")
             attempt += 1
 
@@ -342,7 +345,7 @@ def make_isos() -> tuple[bool, Optional[str]]:
     if result.returncode != 0:
         # We log this and then feed it into our iso repair model
         error_message = f"{result.stdout}\n{result.stderr}".strip()
-        logging.error(f"Make failed: {error_message}")
+        logging.debug(f"Make failed: {error_message}")
         # Check error message for missing isomorphisms
         if iso_pairs := [
             (match.group(1), match.group(2))
@@ -350,7 +353,7 @@ def make_isos() -> tuple[bool, Optional[str]]:
                 r"Could not find iso for (\w+) -> (\w+)", error_message
             )
         ]:
-            logging.info(f"Found missing isomorphisms: {iso_pairs}")
+            logging.info(f"Found missing isomorphisms: {set(iso_pairs)}")
         return False, error_message
     return True, None
 

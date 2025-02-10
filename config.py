@@ -9,6 +9,7 @@ From LeanImport Require Import Lean.
 #[local] Set Implicit Arguments.
 From IsomorphismChecker Require Original Imported.
 Print Imported.
+Typeclasses Opaque rel_iso. (* for speed *)
 """
 EXAMPLE_STATEMENTS = [
     """inductive Binop where
