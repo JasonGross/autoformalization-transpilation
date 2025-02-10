@@ -188,15 +188,11 @@ def check_compilation(lean_statements: LeanFile) -> tuple[bool, str]:
 
     # Put new code in the right place
     lean_statements.write(f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
-    run_cmd(
-        [
-            f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
+    run_cmd(f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
 import LeanBuild
 def main : IO Unit :=
  IO.println s!"Compilation succeeded!"
-EOL"""
-        ]
-    )
+EOL""")
 
     # Then build
     run_cmd(f"cd {BUILD_DIR}/lean-build/ && lake update")
@@ -252,9 +248,60 @@ Print Assumptions everything."""
         f.write(full_content)
 
 
-def repair_isos(errors: Optional[str]):
+def parse_iso_errors(errors: str) -> str:
+    # Yes I know this should probably return an enum or something
+    if "Could not find iso" in errors:
+        return "missing_type_iso"
+    elif bool(re.search(r"Error:.*?constructor", errors, re.IGNORECASE)):
+        return "disordered_constr"
+    elif re.search(
+        r"Error:.*?(iso_statement|isomorphism for statement)", errors, re.IGNORECASE
+    ):
+        return "missing_stmnt_iso"
+    else:
+        return "other_iso_issue"
+
+
+def repair_isos(
+    errors: str, cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]
+) -> list[tuple[CoqIdentifier, CoqIdentifier]]:
     # Look at the errors, attempt to fix the isos
-    return True
+    error = parse_iso_errors(errors)
+    iso_file = f"{SOURCE_DIR}/iso-checker/Isomorphisms.v"
+    match error:
+        case "missing_type_iso":
+            # Add the missing iso and regenerate
+            source, target = re.search(
+                r"Could not find iso for (\w+) -> (\w+)", errors
+            ).groups()  # type: ignore
+            cc_identifiers.append((CoqIdentifier(source), CoqIdentifier(target)))
+            generate_isos(cc_identifiers)
+        case "disordered_constr":
+            # Reorder goals (via LLM) and update proof
+            # TODO: Should just define prompts in a dict somewhere
+            llm_repair(
+                iso_file,
+                f"Constructors are out of order, please reorder the goals - the error is {error}",
+            )
+        case "missing_stmnt_iso":
+            # Heuristically add missing statement (via LLM)
+            statement = re.search(
+                r"Error:.*?(iso_statement|isomorphism for statement).*?for (\w+)",
+                errors,
+                re.IGNORECASE,
+            ).group(2)  # type: ignore
+            llm_repair(
+                iso_file, f"We are missing a statement for {statement}, please fix"
+            )
+        case "other_iso_issue":
+            # Heuristically rewrite to account for Lean vs Coq differences (via LLM / COPRA)
+            llm_repair(iso_file, f"Please fix this error in our isomorphisms: {error}")
+    return cc_identifiers
+
+
+def llm_repair(file, prompt: str) -> None:
+    # Call out to the LLM
+    return None
 
 
 def generate_and_prove_iso(
@@ -270,8 +317,8 @@ def generate_and_prove_iso(
         logging.info("Isomorphism proof succeeded")
     else:
         attempt = 0
-        while attempt < ISO_RETRIES:
-            repair_isos(errors)
+        while attempt < ISO_RETRIES and errors:
+            cc_identifiers = repair_isos(errors, cc_identifiers)
             # Check that the iso proof compiles
             result, errors = make_isos()
             if not result:
