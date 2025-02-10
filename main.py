@@ -273,10 +273,16 @@ def repair_isos(
     match error:
         case "missing_type_iso":
             # Add the missing iso and regenerate
-            source, target = re.search(
-                r"Could not find iso for (\w+) -> (\w+)", errors
-            ).groups()  # type: ignore
-            cc_identifiers.append((CoqIdentifier(source), CoqIdentifier(target)))
+            result = re.search(
+                    r"While proving iso_statement ([\w\.]+) ([\w\.]+): Could not find iso for ([\w\.]+) -> ([\w\.]+)", errors
+                )
+            assert result is not None, errors
+            orig_source, orig_target, source, target = result.groups()
+            cc_identifiers_str = [(f"Original.{str(s)}", f"Imported.{str(t)}") for s, t in cc_identifiers]
+            assert (orig_source, orig_target) in cc_identifiers_str, ((orig_source, orig_target), cc_identifiers_str)
+            index = cc_identifiers_str.index((orig_source, orig_target))
+            cc_identifiers.insert(index, (CoqIdentifier(source), CoqIdentifier(target)))
+            generate_isos(cc_identifiers)
             generate_isos(cc_identifiers)
         case "disordered_constr":
             # Reorder goals (via LLM) and update proof
