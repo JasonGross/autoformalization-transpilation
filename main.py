@@ -76,24 +76,24 @@ DEFINITION_PAIRS = list(
     map(
         lambda x: (CoqIdentifier(x[0]), LeanIdentifier(x[1])),
         [
-            ("binop", "Binop"),
-            ("exp", "Exp"),
-            ("add", "Nat.add"),
-            ("mul", "Nat.mul"),
-            ("prod", "PProd"),
-            ("stack", "Stack"),
-            ("instr", "Instr"),
-            ("binopDenote", "binopDenote"),
-            ("app", "List.append.inst1"),
-            ("instrDenote", "instrDenote"),
-            ("prog", "Prog"),
-            ("expDenote", "expDenote"),
-            ("progDenote", "progDenote"),
-            ("compile", "compile"),
-            ("Binop", "Exp.binop"),
-            ("Const", "Exp.const"),
-            ("iConst", "Instr.iConst"),
-            ("iBinop", "Instr.iBinop"),
+            ("$binop", "$Binop"),
+            ("$exp", "$Exp"),
+            ("$add", "$Nat.add"),
+            ("$mul", "$Nat.mul"),
+            ("$prod", "$PProd"),
+            ("$stack", "$Stack"),
+            ("$instr", "$Instr"),
+            ("$binopDenote", "$binopDenote"),
+            ("$app", "$List.append.inst1"),
+            ("$instrDenote", "$instrDenote"),
+            ("$prog", "$Prog"),
+            ("$expDenote", "$expDenote"),
+            ("$progDenote", "$progDenote"),
+            ("$compile", "$compile"),
+            ("$Binop", "$Exp.binop"),
+            ("$Const", "$Exp.const"),
+            ("$iConst", "$Instr.iConst"),
+            ("$iBinop", "$Instr.iBinop"),
         ],
     )
 )
@@ -224,12 +224,22 @@ def generate_isos(cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]):
     iso_checks = []
     iso_names = []
     for coq_name, coq_lean_name in cc_identifiers:
+        first_id = coq_name
+        second_id = coq_lean_name
+        if str(coq_name)[0] == "$":
+            # Python is dynamically typed for a reason
+            coq_name = str(coq_name)[1:]  # type: ignore
+            first_id = original_name + "." + coq_name  # type: ignore
+        if str(coq_lean_name)[0] == "$":
+            coq_lean_name = str(coq_lean_name)[1:]  # type: ignore
+            second_id = imported_name + "." + coq_lean_name  # type: ignore
+
         iso_names.append(f"{coq_lean_name}_iso")
 
-        iso_block = f"""Instance {coq_lean_name}_iso : iso_statement {original_name}.{coq_name} {imported_name}.{coq_lean_name}.
+        iso_block = f"""Instance {coq_lean_name}_iso : iso_statement {first_id} {second_id}.
 Proof. iso. Defined.
-Instance: KnownConstant {original_name}.{coq_name} := {{}}. (* only needed when rel_iso is typeclasses opaque *)
-Instance: KnownConstant {imported_name}.{coq_lean_name} := {{}}. (* only needed when rel_iso is typeclasses opaque *)"""
+Instance: KnownConstant {first_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)
+Instance: KnownConstant {second_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)"""
 
         iso_checks.append(iso_block)
 
@@ -264,6 +274,12 @@ def parse_iso_errors(errors: str) -> str:
         return "other_iso_issue"
 
 
+def desigil(s):
+    if s[0] == "$":
+        return s[1:]
+    return s
+
+
 def repair_isos(
     errors: str, cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]
 ) -> list[tuple[CoqIdentifier, CoqIdentifier]]:
@@ -274,15 +290,21 @@ def repair_isos(
         case "missing_type_iso":
             # Add the missing iso and regenerate
             result = re.search(
-                    r"While proving iso_statement ([\w\.]+) ([\w\.]+): Could not find iso for ([\w\.]+) -> ([\w\.]+)", errors
-                )
+                r"While proving iso_statement ([\w\.]+) ([\w\.]+): Could not find iso for ([\w\.]+) -> ([\w\.]+)",
+                errors,
+            )
             assert result is not None, errors
             orig_source, orig_target, source, target = result.groups()
-            cc_identifiers_str = [(f"Original.{str(s)}", f"Imported.{str(t)}") for s, t in cc_identifiers]
-            assert (orig_source, orig_target) in cc_identifiers_str, ((orig_source, orig_target), cc_identifiers_str)
+            cc_identifiers_str = [
+                (f"Original.{desigil(str(s))}", f"Imported.{desigil(str(t))}")
+                for s, t in cc_identifiers
+            ]
+            assert (orig_source, orig_target) in cc_identifiers_str, (
+                (orig_source, orig_target),
+                cc_identifiers_str,
+            )
             index = cc_identifiers_str.index((orig_source, orig_target))
             cc_identifiers.insert(index, (CoqIdentifier(source), CoqIdentifier(target)))
-            generate_isos(cc_identifiers)
             generate_isos(cc_identifiers)
         case "disordered_constr":
             # Reorder goals (via LLM) and update proof
@@ -331,8 +353,7 @@ def generate_and_prove_iso(
             result, errors = make_isos()
             if not result:
                 # Should feed all errors for iso repair
-                logging.info(
-                    f"Isomorphism proof failed on attempt {attempt}:")
+                logging.info(f"Isomorphism proof failed on attempt {attempt}:")
                 if attempt < ISO_RETRIES - 1:
                     logging.debug(errors)
                     logging.info("Retrying...")
