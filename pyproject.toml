@@ -5,6 +5,11 @@ description = "For the AlphaProof for Software Verification MARS project"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "anthropic>=0.45.0",
+    "inspect-ai>=0.3.59",
+    "openai>=1.61.1",
+    "pydantic>=2.10.6",
+    "python-dotenv>=1.0.1",
     "mypy>=1.15.0",
 ]
 
@@ -13,3 +18,10 @@ dev-dependencies = [
     "ruff>=0.6.2",
     "pre-commit>=4.0.1",
 ]
+
+[tool.ruff]
+line-length = 88  # Adjust as needed
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["I"]  # Enable import sorting
