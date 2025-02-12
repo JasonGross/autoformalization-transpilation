@@ -1,18 +1,19 @@
 #!/usr/bin/env python
-from utils import run_cmd, logging
-from dataclasses import dataclass
 import os
 import re
 import sys
+from dataclasses import dataclass
+from typing import Optional
+
 from config import (
     BUILD_DIR,
-    SOURCE_DIR,
-    EXPORT_DIR,
-    ISO_RETRIES,
-    ISO_HEADER,
     EXAMPLE_STATEMENTS,
+    EXPORT_DIR,
+    ISO_HEADER,
+    ISO_RETRIES,
+    SOURCE_DIR,
 )
-from typing import Optional
+from utils import logging, run_cmd
 
 
 class Project:
@@ -78,9 +79,6 @@ DEFINITION_PAIRS = list(
         [
             ("$binop", "$Binop"),
             ("$exp", "$Exp"),
-            ("$add", "$Nat.add"),
-            ("$mul", "$Nat.mul"),
-            ("$prod", "$PProd"),
             ("$stack", "$Stack"),
             ("$instr", "$Instr"),
             ("$binopDenote", "$binopDenote"),
