@@ -220,6 +220,8 @@ time-of-build-pretty.log
 
 Makefile.coq
 Makefile.coq.conf
+*.eval
+logs/
 iso-checker/Isomorphisms.v
 iso-checker/imported.out
 *.out

@@ -54,6 +54,7 @@ ENV PATH="/uv/.venv/bin:$PATH"
 # Tell uv where the environment is
 ENV VIRTUAL_ENV=/uv/.venv
 ENV UV_PROJECT_ENVIRONMENT=/uv/.venv
+ENV PYTHONPATH=$PYTHONPATH:/root/autoformalization:/root/autoformalization/src
 
 WORKDIR /root/autoformalization
 
