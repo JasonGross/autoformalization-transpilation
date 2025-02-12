@@ -1,11 +1,23 @@
 #!/bin/bash
 
-# Define output directory
-outputDir="/root/autoformalization/src/dataset/dependency_graph"
+# Get the script's directory dynamically
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Define output directory relative to script location
+outputDir="$SCRIPT_DIR/../dataset/dependency_graph"
 mkdir -p "$outputDir"
 
-# Get the correct project root dynamically
-projectRoot="/root/autoformalization/src/dataset/raw_data/lf"
+# Define project root dynamically
+projectRoot="$SCRIPT_DIR/../dataset/raw_data/lf"
+
+echo "Output directory: $outputDir"
+echo "Project root: $projectRoot"
+
+# Verify that projectRoot exists before proceeding
+if [ ! -d "$projectRoot" ]; then
+    echo "Error: Project root directory '$projectRoot' does not exist!"
+    exit 1
+fi
 
 # Define files to process
 files=(
@@ -44,23 +56,26 @@ EOF
   fi
 
   # Cleanup temp files
-  rm temp_$file.v
+  rm -f temp_$file.v
   rm -f temp_$file.{aux,glob,vo,vok,vos}
   rm -f .temp_$file.{aux,glob,vo,vok,vos}
 done
 
 echo "All dependency graphs saved under $outputDir."
 
+# Path for combine_graph.py (relative to script)
+combineScript="$SCRIPT_DIR/combine_graph.py"
+
 # Check if combine_graph.py exists before running
-combineScript="/root/lf/combine_graph.py"
 if [ -f "$combineScript" ]; then
-  python3 "$combineScript"
+    echo "Running combine_graph.py..."
+    python3 "$combineScript"
 else
-  echo "Warning: $combineScript not found. Skipping graph combination."
+    echo "Warning: $combineScript not found. Skipping graph combination."
 fi
 
 # Remove unnecessary .dpd files, keeping only dgraph.dpd
 cd "$outputDir" || exit
 find . -type f -name "*.dpd" ! -name "dgraph.dpd" -delete
 
-echo "Only dgraph.dpd remains in $outputDir."
+echo "dgraph.dpd in $outputDir."

@@ -2,7 +2,7 @@ import os
 import re
 from typing import Dict, Tuple, List
 
-dpdDir: str = "/root/lf/dgraph"
+dpdDir: str = "/root/autoformalization/src/dataset/dependency_graph"
 outputFile: str = os.path.join(dpdDir, "dgraph.dpd")
 
 nodeMap: Dict[str, Tuple[int, str]] = {}
