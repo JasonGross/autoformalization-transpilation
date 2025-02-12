@@ -1,11 +1,13 @@
 #!/bin/bash
 
-output_dir="/root/lf/dgraph"
-mkdir -p "$output_dir"
+# Define output directory
+outputDir="/root/autoformalization/src/dataset/dependency_graph"
+mkdir -p "$outputDir"
 
-declare -A node_map
-next_id=1
+# Get the correct project root dynamically
+projectRoot="/root/autoformalization/src/dataset/raw_data/lf"
 
+# Define files to process
 files=(
   "AltAuto" "AltAutoTest" "Auto" "AutoTest" "Basics" "BasicsTest" "Bib" "BibTest"
   "Extraction" "ExtractionTest" "Imp" "ImpCEvalFun" "ImpCEvalFunTest" "ImpParser"
@@ -15,38 +17,50 @@ files=(
   "PrefaceTest" "ProofObjects" "ProofObjectsTest" "Rel" "RelTest" "Tactics" "TacticsTest"
 )
 
+# Process each file
 for file in "${files[@]}"; do
   echo "Processing $file.v..."
 
-  temp_dpd="$output_dir/$file.dpd"
+  tempDpd="$outputDir/$file.dpd"
 
+  # Create a temporary Coq file
   cat <<EOF > temp_$file.v
 Require dpdgraph.dpdgraph.
 From LF Require $file.
-Set DependGraph File "$temp_dpd".
+Set DependGraph File "$tempDpd".
 Print FileDependGraph $file.
 EOF
 
-  coqc -R . LF -q temp_$file.v
-
-  if [ -f "$temp_dpd" ]; then
-    echo "Dependency graph saved to $temp_dpd"
+  # Run coqc with corrected path
+  if ! coqc -q -Q "$projectRoot" LF temp_$file.v; then
+    echo "Error processing $file.v. Skipping..."
+    rm -f temp_$file.v
+    continue
   fi
 
+  # Confirm success
+  if [ -f "$tempDpd" ]; then
+    echo "Dependency graph saved to $tempDpd"
+  fi
+
+  # Cleanup temp files
   rm temp_$file.v
   rm -f temp_$file.{aux,glob,vo,vok,vos}
   rm -f .temp_$file.{aux,glob,vo,vok,vos}
 done
 
-echo "All dependency graphs saved under $output_dir."
+echo "All dependency graphs saved under $outputDir."
 
-# Run the script to combine dependency graphs
-python3 /root/lf/combine_graph.py
+# Check if combine_graph.py exists before running
+combineScript="/root/lf/combine_graph.py"
+if [ -f "$combineScript" ]; then
+  python3 "$combineScript"
+else
+  echo "Warning: $combineScript not found. Skipping graph combination."
+fi
 
-# Navigate to dgraph directory
-cd "$output_dir"
-
-# Remove all individual .dpd files except dgraph.dpd
+# Remove unnecessary .dpd files, keeping only dgraph.dpd
+cd "$outputDir" || exit
 find . -type f -name "*.dpd" ! -name "dgraph.dpd" -delete
 
-echo "Only dgraph.dpd remains in $output_dir."
+echo "Only dgraph.dpd remains in $outputDir."
