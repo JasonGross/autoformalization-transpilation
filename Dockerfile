@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 # N.B. rsync is required for opam pin to a directory
 
+RUN printf '\nsource /usr/share/bash-completion/completions/git\n' >> $HOME/.bashrc
+
 # Install Coq and Lean as early as possible to minimize rebuild frequency
 # Install OCaml separately from Coq to allow changing the version of Coq without reinstalling OCaml
 # Install the coq-lean-importer late to allow rebuilding it without rebuilding everything else
