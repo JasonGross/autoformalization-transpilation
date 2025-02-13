@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     bubblewrap \
     libgmp-dev \
     unzip \
+    time \
     pkg-config \
     build-essential \
     libgmp-dev \
