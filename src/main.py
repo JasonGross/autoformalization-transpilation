@@ -345,6 +345,9 @@ def generate_and_prove_iso(
         logging.info("Isomorphism proof succeeded")
     else:
         attempt = 0
+        # TODO: Only steps that call out to the llm should decrease the retry count, and the retry count should be per-isomorphism.
+        # That is, we should be able to add as many missing isomorphisms as are required, and we shouldn't quit early if we are
+        # making progress towards proving more and more isomorphisms.
         while attempt < ISO_RETRIES and errors:
             cc_identifiers = repair_isos(errors, cc_identifiers)
             # Check that the iso proof compiles
