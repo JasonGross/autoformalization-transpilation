@@ -76,22 +76,17 @@ class CoqIdentifier(Identifier):
 DEFINITION_PAIRS = list(
     map(
         lambda x: (CoqIdentifier(x[0]), LeanIdentifier(x[1])),
-        [
+        [  # TODO: Resolve https://github.com/JasonGross/autoformalization/pull/47#issuecomment-2655085138
             ("$binop", "$Binop"),
             ("$exp", "$Exp"),
             ("$stack", "$Stack"),
             ("$instr", "$Instr"),
             ("$binopDenote", "$binopDenote"),
-            ("$app", "$List.append.inst1"),
             ("$instrDenote", "$instrDenote"),
             ("$prog", "$Prog"),
             ("$expDenote", "$expDenote"),
             ("$progDenote", "$progDenote"),
             ("$compile", "$compile"),
-            ("$Binop", "$Exp.binop"),
-            ("$Const", "$Exp.const"),
-            ("$iConst", "$Instr.iConst"),
-            ("$iBinop", "$Instr.iBinop"),
         ],
     )
 )
