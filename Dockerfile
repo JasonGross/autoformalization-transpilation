@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     bubblewrap \
     libgmp-dev \
     unzip \
+    time \
     pkg-config \
     build-essential \
     libgmp-dev \
@@ -19,6 +20,8 @@ RUN apt-get update && apt-get install -y \
     autoconf \
     && rm -rf /var/lib/apt/lists/*
 # N.B. rsync is required for opam pin to a directory
+
+RUN printf '\nsource /usr/share/bash-completion/completions/git\n' >> $HOME/.bashrc
 
 # Install Coq and Lean as early as possible to minimize rebuild frequency
 # Install OCaml separately from Coq to allow changing the version of Coq without reinstalling OCaml
