@@ -2,8 +2,14 @@ import os
 import re
 from typing import Dict, Tuple, List
 
-dpdDir: str = "/root/autoformalization/src/dataset/dependency_graph"
+BASE_DIR: str = os.path.abspath(os.path.dirname(__file__))
+dpdDir: str = os.path.join(BASE_DIR, "src", "dataset", "dependency_graph")
 outputFile: str = os.path.join(dpdDir, "dgraph.dpd")
+
+if not os.path.exists(dpdDir):
+    print(f"Warning: Directory '{dpdDir}' does not exist. Creating it now.")
+    os.makedirs(dpdDir, exist_ok=True)
+    print(f"Created missing directory: {dpdDir}")
 
 nodeMap: Dict[str, Tuple[int, str]] = {}
 nextGlobalId: int = 1
