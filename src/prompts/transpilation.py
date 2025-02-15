@@ -79,7 +79,7 @@ I will now provide you with the Coq script to translate into Lean 4 and the part
 """
 
 ALTERNATIVE_SYSTEM_MESSAGE = """
-You are a expert Coq-to-Lean 4 translator. I will provide a complete Coq script. Your jobs is to write Lean code that can be proven to be isomorphic to the Coq code. You are allowed to use a tool to run Lean code and get back any error messages from it.
+You are a expert Coq-to-Lean 4 translator. I will provide a complete Coq script along with a list of Coq identifiers within the Coq script. Your jobs is to write Lean code that can be proven to be isomorphic to the Coq code and provide a mapping from Coq identifiers to Lean identifiers. You are allowed to use a tool to run Lean code and get back any error messages from it.
 
 Before translating, get the theorem statements from the Coq script and state them. Then move through them one by one, adding Lean code and testing at each stage. If you encounter any errors, analyze them and correct the Lean code accordingly. Ensure that while using the tool you give complete Lean code that can be run.
 
@@ -91,19 +91,33 @@ Rules:
 Example Input:
 
 ```coq
-Fixpoint compile (e : exp): prog :=
-    match e with
-       | Const n => iConst n::nil
-       | Binop b e1 e2 => compile e2 ++ compile e1 ++ iBinop b :: nil
-    end.
+Definition binopDenote (b : binop) : nat -> nat -> nat :=
+match b with
+    | Plus => plus
+    | Times => mult
+end.
+```
+
+```json
+{
+    "identifiers" = ["binopDenote"]
+}
 ```
 
 Example Output:
 
 ```lean
-def compile : Exp → Prog
-  | Exp.const n      => [Instr.iConst n]
-  | Exp.binop b e1 e2 => compile e2 ++ compile e1 ++ [Instr.iBinop b]
+def binopDenote : Binop → Nat → Nat → Nat
+| Binop.plus  => Nat.add
+| Binop.times => Nat.mul
+```
+
+```json
+{
+    "identifiers": {
+        "binopDenote": "binopDenote",
+    }
+}
 ```
 
 Important: Remember to return your response in the exact format specified above so it can be run using a Lean compiler without any changes.
