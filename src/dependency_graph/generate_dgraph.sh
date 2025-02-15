@@ -36,7 +36,7 @@ for file in "${files[@]}"; do
   tempDpd="$outputDir/$file.dpd"
 
   # Create a temporary Coq file
-  cat <<EOF > temp_$file.v
+  cat <<EOF > temp_"$file".v
 Require dpdgraph.dpdgraph.
 From LF Require $file.
 Set DependGraph File "$tempDpd".
@@ -44,9 +44,9 @@ Print FileDependGraph $file.
 EOF
 
   # Run coqc with corrected path
-  if ! coqc -q -Q "$projectRoot" LF temp_$file.v; then
+  if ! coqc -q -Q "$projectRoot" LF temp_"$file".v; then
     echo "Error processing $file.v. Skipping..."
-    rm -f temp_$file.v
+    rm -f temp_"$file".v
     continue
   fi
 
@@ -56,9 +56,9 @@ EOF
   fi
 
   # Cleanup temp files
-  rm -f temp_$file.v
-  rm -f temp_$file.{aux,glob,vo,vok,vos}
-  rm -f .temp_$file.{aux,glob,vo,vok,vos}
+  rm -f temp_"$file".v
+  rm -f temp_"$file".{aux,glob,vo,vok,vos}
+  rm -f .temp_"$file".{aux,glob,vo,vok,vos}
 done
 
 echo "All dependency graphs saved under $outputDir."
