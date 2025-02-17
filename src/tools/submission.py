@@ -48,7 +48,7 @@ def coq_submit_tool (
     #remove
     # print(checker_file.read_text())
 
-    def submit(coq_code: str):
+    async def submit(coq_code: str):
         """
         Submits the given Coq code in the project environment. Code needs to submitted using this tool to be considered for evaluation. The tool ensures that all definitions from the input file have been written in the submission and there are no assumptions in the given code. It then returns a dictionary containing the status, stdout, stderr, submission status and any assumptions given from the execution of the code. 
 
@@ -75,7 +75,7 @@ def coq_submit_tool (
     return submit
 
 
-my_interface = \
+sample_interface = \
 """
 Module Type Interface.
 
@@ -113,9 +113,11 @@ Proof.
 Qed.
 """
 
+sample_definitions = ["plus_0_r", "plus_comm"]
+
 if __name__ == "__main__":
     # Example usage
-    submit = coq_submit_tool(definitions=['plus_0_r', 'plus_comm'], interface_file_contents=my_interface)
+    submit = coq_submit_tool(definitions=my_definitions, interface_file_contents=my_interface)
     result = submit(my_submission)
     print(result)
     pass
