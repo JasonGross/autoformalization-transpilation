@@ -4,6 +4,7 @@ import inspect_ai.util
 import tempfile
 import subprocess
 import shutil
+import asyncio
 from pathlib import Path
 
 def store_result(result):
@@ -117,7 +118,7 @@ sample_definitions = ["plus_0_r", "plus_comm"]
 
 if __name__ == "__main__":
     # Example usage
-    submit = coq_submit_tool(definitions=my_definitions, interface_file_contents=my_interface)
-    result = submit(my_submission)
+    submit = coq_submit_tool(definitions=sample_definitions, interface_file_contents=sample_interface)
+    result = asyncio.run(submit(my_submission))
     print(result)
     pass
