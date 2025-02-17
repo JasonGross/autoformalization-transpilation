@@ -1,8 +1,15 @@
 from inspect_ai.tool import tool
+from inspect_ai.util import Store
+import inspect_ai.util
 import tempfile
 import subprocess
 import shutil
 from pathlib import Path
+
+def store_result(result):
+    cur_index = inspect_ai.util.store().get("cur_index", 0)
+    inspect_ai.util.store().set(f"result_{cur_index}", result)
+    inspect_ai.util.store().set("cur_index", cur_index + 1)
 
 @tool
 def coq_submit_tool (
@@ -54,15 +61,16 @@ def coq_submit_tool (
         file_path = Path(temp_dir) / file_name
         file_path.write_text(coq_code)
         command = f"coqc -q -Q . {project_name} Interface.v && coqc -q -Q . {project_name} {file_name} && coqc -q -Q . {project_name} Checker.v"
-        print(command)
+        # print(command)
         process = subprocess.run(command, shell=True, text=True, cwd=temp_dir, capture_output=True)
         result = {"status": process.returncode, "stdout": process.stdout, "stderr": process.stderr,"submission_status": False, "assumptions": []}
         if process.returncode == 0:
             assumptions = process.stdout.strip().split('\n')
-            print(assumptions)
+            # print(assumptions)
             result["assumptions"] = assumptions
             if all(assumption in white_list for assumption in assumptions):
                 result["submission_status"] = True
+        store_result(result)
         return result
     return submit
 
