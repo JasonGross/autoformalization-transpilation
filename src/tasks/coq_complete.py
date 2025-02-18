@@ -32,5 +32,5 @@ def coq_completion():
 
 
 if __name__ == "__main__":
-    eval(coq_completion(), model=OpenAIModel.O1PREVIEW, message_limit=20)
+    eval(coq_completion(), model=OpenAIModel.BEST, message_limit=20)
     pass
