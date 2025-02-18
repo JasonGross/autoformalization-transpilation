@@ -5,12 +5,14 @@ set -e
 
 # checkout Coq to 5c7f0150dd555e22b0830d9ca93b8aee5dff4d4c
 cd /root
-git clone https://github.com/coq/coq.git
-(cd /root/coq && git checkout 5c7f0150dd555e22b0830d9ca93b8aee5dff4d4c)
+# git clone https://github.com/coq/coq.git
+git clone https://github.com/JasonGross/coq.git
+# (cd /root/coq && git checkout 5c7f0150dd555e22b0830d9ca93b8aee5dff4d4c)
+(cd /root/coq && git checkout unset-universe-checking-qsort)
 
-# checkout vscoq to 78839d1077bd4ef20a4a91f0478c3c9bd79f1b0f
+# checkout vscoq to d5629060e60dc5951dbf5a9c8e446254f667c5d2
 git clone https://github.com/coq/vscoq.git
-(cd /root/vscoq && git checkout 78839d1077bd4ef20a4a91f0478c3c9bd79f1b0f)
+(cd /root/vscoq && git checkout d5629060e60dc5951dbf5a9c8e446254f667c5d2)
 
 # passing -n allows pinning multiple repositories simultaneously before installing any of them so that there is less risk of version conflicts
 opam pin add -yn --kind=path /root/coq
