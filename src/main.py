@@ -4,6 +4,7 @@ import re
 import sys
 from dataclasses import dataclass
 from typing import Optional
+import shlex
 
 from config import (
     BUILD_DIR,
@@ -12,6 +13,8 @@ from config import (
     ISO_HEADER,
     ISO_RETRIES,
     SOURCE_DIR,
+    ISO_INTERFACE_HEADER,
+    ISO_CHECKER_HEADER,
 )
 from utils import logging, run_cmd
 
@@ -152,8 +155,10 @@ def import_to_coq(
     run_cmd(f"mkdir -p {BUILD_DIR}")
     lean_export.write(f"{BUILD_DIR}/{coq_file}.out")
 
-    run_cmd(f"""echo 'From LeanImport Require Import Lean.
-    Redirect "{coq_file}.log" Lean Import "{coq_file}.out".' > {BUILD_DIR}/{coq_file}.v""")
+    run_cmd(
+        f"""echo 'From LeanImport Require Import Lean.
+    Redirect "{coq_file}.log" Lean Import "{coq_file}.out".' > {BUILD_DIR}/{coq_file}.v"""
+    )
 
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
@@ -181,11 +186,13 @@ def check_compilation(lean_statements: LeanFile) -> tuple[bool, str]:
 
     # Put new code in the right place
     lean_statements.write(f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
-    run_cmd(f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
+    run_cmd(
+        f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
 import LeanBuild
 def main : IO Unit :=
  IO.println s!"Compilation succeeded!"
-EOL""")
+EOL"""
+    )
 
     # Then build
     run_cmd(f"cd {BUILD_DIR}/lean-build/ && lake update")
@@ -197,6 +204,79 @@ EOL""")
         logging.error(f"Compilation failed: {error_message}")
         return False, error_message
     return True, ""
+
+
+def generate_interface(coq_identifiers: list[CoqIdentifier]):
+    # TODO: Implement https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934686304
+    # Can make these parameters if needed
+    original_name, output_file, checker_file = (
+        "Original",
+        f"{SOURCE_DIR}/iso-checker/Interface.v",
+        f"{SOURCE_DIR}/iso-checker/Checker.v",
+    )
+
+    # Should also be generating these programmatically, for now these are manual
+    # TODO: This should happen in the reimport step!
+    # Generate the isomorphism checks for each definition pair
+    iso_interface_checks = []
+    iso_checks = []
+    iso_names = []
+    for coq_name in coq_identifiers:
+        first_id = str(coq_name)
+        coq_id = str(coq_name).replace(".", "_")
+        iso_name = f"{coq_id}_iso"
+        if str(coq_name)[0] == "$":
+            # Python is dynamically typed for a reason
+            coq_name = str(coq_name)[1:]
+            coq_id = coq_id[1:]
+            first_id = f"{original_name}.{coq_name}"
+            iso_name = f"{coq_id}_iso"
+            iso_names.append(iso_name)
+        iso_interface_block = f"""Parameter imported_{coq_id} : import_of {first_id}.
+Parameter {iso_name} : iso_statement {first_id} imported_{coq_id}.
+Existing Instance {iso_name}."""
+        iso_interface_checks.append(iso_interface_block)
+        iso_block = f"""Derive imported_{coq_id} in (iso_statement {first_id} (imported_{coq_id} :> import_of {first_id})) as {iso_name}.
+Proof. subst imported_{coq_id}. exact Isomorphisms.{iso_name}. Defined.
+Existing Instance {iso_name}."""
+        iso_checks.append(iso_block)
+
+    # Generate a `Print Assumptions` check for dependencies
+    everything_interface_block = f"""Import IsomorphismChecker.Automation.HList.HListNotations.
+Definition everything := ({" :: ".join(iso_names)} :: [])%hlist."""
+
+    everything_block = f"""Definition everything := Isomorphisms.everything."""
+
+    # Combine all sections
+    full_interface_content = "\n\n".join(
+        [
+            ISO_INTERFACE_HEADER,
+            "\n\n".join(iso_interface_checks),
+            everything_interface_block,
+            "End Interface.",
+        ]
+    )
+    logging.debug(f"{full_interface_content}")
+
+    full_content = "\n\n".join(
+        [
+            ISO_CHECKER_HEADER,
+            "\n\n".join(iso_checks),
+            everything_block,
+            "End DoesItCheck.",
+        ]
+    )
+    logging.debug(f"{full_content}")
+
+    # Write to file
+    # TODO: Respond to https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934670423
+    with open(output_file, "w") as f:
+        f.write(full_interface_content)
+
+    # Write to file
+    # TODO: Respond to https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934670423
+    with open(checker_file, "w") as f:
+        f.write(full_content)
 
 
 def generate_isos(cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]):
@@ -219,17 +299,22 @@ def generate_isos(cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]):
     for coq_name, coq_lean_name in cc_identifiers:
         first_id = coq_name
         second_id = coq_lean_name
+        coq_id = str(coq_name).replace(".", "_")
+        iso_name = f"{coq_id}_iso"
         if str(coq_name)[0] == "$":
             # Python is dynamically typed for a reason
             coq_name = str(coq_name)[1:]  # type: ignore
-            first_id = original_name + "." + coq_name  # type: ignore
+            coq_id = coq_id[1:]
+            first_id = f"{original_name}.{coq_name}"  # type: ignore
+            iso_name = f"{coq_id}_iso"
+            iso_names.append(iso_name)
         if str(coq_lean_name)[0] == "$":
             coq_lean_name = str(coq_lean_name)[1:]  # type: ignore
             second_id = imported_name + "." + coq_lean_name  # type: ignore
 
-        iso_names.append(f"{coq_lean_name}_iso")
+        iso_names.append(iso_name)
 
-        iso_block = f"""Instance {coq_lean_name}_iso : iso_statement {first_id} {second_id}.
+        iso_block = f"""Instance {iso_name} : iso_statement {first_id} {second_id}.
 Proof. iso. Defined.
 Instance: KnownConstant {first_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)
 Instance: KnownConstant {second_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)"""
@@ -273,6 +358,30 @@ def desigil(s):
     return s
 
 
+def repair_isos_interface(
+    errors: str, coq_identifiers: list[CoqIdentifier]
+) -> list[CoqIdentifier]:
+    # Look at the errors, attempt to fix the isos
+    error = parse_iso_errors(errors)
+    iso_file = f"{SOURCE_DIR}/iso-checker/Interface.v"
+    result = re.search(
+        r"While importing ([\w\.]+): Consider adding iso_statement ([\w\.]+) ",
+        re.sub(r"\s+", " ", errors),
+    )
+    assert result is not None, re.sub(r"\s+", " ", errors)
+    orig_source, source = result.groups()
+    coq_identifiers_str = [f"Original.{desigil(str(s))}" for s in coq_identifiers]
+    assert orig_source in coq_identifiers_str, (
+        orig_source,
+        coq_identifiers_str,
+    )
+    logging.info(f"Adding iso_statement {source} for {orig_source}")
+    index = coq_identifiers_str.index(orig_source)
+    coq_identifiers.insert(index, CoqIdentifier(source))
+    generate_interface(coq_identifiers)
+    return coq_identifiers
+
+
 def repair_isos(
     errors: str, cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]
 ) -> list[tuple[CoqIdentifier, CoqIdentifier]]:
@@ -312,7 +421,9 @@ def repair_isos(
                 r"Error:.*?(iso_statement|isomorphism for statement).*?for (\w+)",
                 errors,
                 re.IGNORECASE,
-            ).group(2)  # type: ignore
+            ).group(
+                2
+            )  # type: ignore
             llm_repair(
                 iso_file, f"We are missing a statement for {statement}, please fix"
             )
@@ -327,6 +438,30 @@ def llm_repair(file, prompt: str) -> None:
     return None
 
 
+def generate_and_prove_iso_interface(
+    coq_identifiers: list[CoqIdentifier],
+) -> tuple[bool, Optional[str]]:
+    # Make interface file
+    generate_interface(coq_identifiers)
+
+    # Check that the iso proof compiles
+    result, errors = make_isos_interface()
+
+    if result:
+        logging.info("Isomorphism interface proof succeeded")
+    else:
+        attempt = 0
+        while errors:
+            attempt += 1
+            logging.info(f"Isomorphism interface proof failed on attempt {attempt}")
+            logging.debug(errors)
+            repair_isos_interface(errors, coq_identifiers)
+            result, errors = make_isos_interface()
+
+    # Eventually will want to feed back isos but for now just return result
+    return result, errors
+
+
 def generate_and_prove_iso(
     cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]],
 ) -> tuple[bool, Optional[str]]:
@@ -334,7 +469,7 @@ def generate_and_prove_iso(
     generate_isos(cc_identifiers)
 
     # Check that the iso proof compiles
-    result, errors = make_isos()
+    result, errors = make_isos("Checker.vo")
 
     if result:
         logging.info("Isomorphism proof succeeded")
@@ -346,7 +481,7 @@ def generate_and_prove_iso(
         while attempt < ISO_RETRIES and errors:
             cc_identifiers = repair_isos(errors, cc_identifiers)
             # Check that the iso proof compiles
-            result, errors = make_isos()
+            result, errors = make_isos("Checker.vo")
             if not result:
                 # Should feed all errors for iso repair
                 logging.info(f"Isomorphism proof failed on attempt {attempt}:")
@@ -362,9 +497,13 @@ def generate_and_prove_iso(
     return result, errors
 
 
-def make_isos() -> tuple[bool, Optional[str]]:
+def make_isos(*targets: str) -> tuple[bool, Optional[str]]:
     run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make clean", shell=True, check=False)
-    result = run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make", shell=True, check=False)
+    result = run_cmd(
+        f"cd {SOURCE_DIR}/iso-checker/ && {shlex.join(['make', *targets])}",
+        shell=True,
+        check=False,
+    )
     if result.returncode != 0:
         # We log this and then feed it into our iso repair model
         error_message = f"{result.stdout}\n{result.stderr}".strip()
@@ -379,6 +518,10 @@ def make_isos() -> tuple[bool, Optional[str]]:
             logging.info(f"Found missing isomorphisms: {set(iso_pairs)}")
         return False, error_message
     return True, None
+
+
+def make_isos_interface() -> tuple[bool, Optional[str]]:
+    return make_isos("Interface.vo")
 
 
 def extract_and_add(
@@ -399,6 +542,15 @@ def preprocess_source(src):  # Optional[CoqProject]) -> CoqFile:
     # and add the code to this repo
     # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
+def extract_coq_identifiers(coq: CoqFile) -> list[CoqIdentifier]:
+    # Extract identifiers from Coq statements
+    if not coq:
+        # TODO: Have the actual identifier pairs
+        return [coq_id for coq_id, _ in DEFINITION_PAIRS]
+
+    else:
+        # extract things
+        assert False
 
 def translate(
     coq: CoqFile, error_code: Optional[str], error: Optional[str]
@@ -418,6 +570,13 @@ def translate_and_prove(
 ) -> tuple[bool, LeanFile, list[tuple[CoqIdentifier, LeanIdentifier]]]:
     success = False
     error_code, error = None, None  # Used for subsequent attempts of translation
+
+    coq_identifiers = extract_coq_identifiers(coq_statements)
+    interface_success, error = generate_and_prove_iso_interface(coq_identifiers)
+    if not interface_success:
+        assert False, "Failed to generate isomorphism interface!"
+        error_code = "isomorphism_interface_failure"
+
     while not success:
         # Translate statements from Coq to Lean
         # TBD by all of us, with varying degrees of handholding

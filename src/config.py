@@ -11,6 +11,31 @@ From IsomorphismChecker Require Original Imported.
 Print Imported.
 Typeclasses Opaque rel_iso. (* for speed *)
 """
+ISO_INTERFACE_HEADER = """From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
+Import IsoEq.
+#[local] Set Universe Polymorphism.
+#[local] Set Implicit Arguments.
+Import KnownConstantHints.
+From IsomorphismChecker Require Original.
+Module Type Interface.
+"""
+ISO_CHECKER_HEADER = """From Stdlib Require Import Derive.
+From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
+Import IsoEq.
+#[local] Unset Universe Polymorphism.
+#[local] Set Implicit Arguments.
+Import KnownConstantHints.
+From IsomorphismChecker Require Original Interface Isomorphisms.
+Module CheckAssumptions.
+Import Ltac2.Ltac2 Ltac2.Printf.
+Ltac2 Eval printf "Begin Print Assumptions Isomorphisms.everything.".
+Print Assumptions Isomorphisms.everything.
+Ltac2 Eval printf "End Print Assumptions Isomorphisms.everything.".
+End CheckAssumptions.
+#[local] Unset Universe Checking.
+#[local] Unset Universe Polymorphism.
+Module DoesItCheck <: Interface.Interface.
+"""
 EXAMPLE_STATEMENTS = [
     """inductive Binop where
 | plus
