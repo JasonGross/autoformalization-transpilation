@@ -182,10 +182,8 @@ def main : IO Unit :=
 
     # Then build
     project.write(Path(__file__).parent.parent / "temp_debug")
-    with project.tempdir():
-        run_cmd(["lake", "update"], shell=False)
-        result = run_cmd(["lake", "build"], shell=False)
-        project = LeanProject.read(".")
+    _result, project = project.run_cmd(["lake", "update"], shell=False)
+    result, project = project.run_cmd(["lake", "build"], shell=False)
     if result.returncode != 0:
         error_message = f"{result.stdout}\n{result.stderr}".strip()
         logging.error(f"Compilation failed: {error_message}")
