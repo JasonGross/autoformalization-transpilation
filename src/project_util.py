@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from collections import OrderedDict
 import contextlib
@@ -64,12 +64,7 @@ class ExportFile(File):
 @dataclass
 class Project:
     # See this comment (https://github.com/JasonGross/autoformalization/pull/27#discussion_r1942030347) by Jason for a suggestion of structure here
-    files: OrderedDict[str, File]
-
-    def __init__(self, files: dict[str, File] | None = None):
-        if files is None:
-            files = {}
-        self.files = OrderedDict(files)
+    files: OrderedDict[str, File] = field(default_factory=OrderedDict)
 
     def write(self, directory: str | Path) -> None:
         logging.debug("Writing %s to %s", self.__class__.__name__, directory)
