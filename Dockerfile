@@ -27,13 +27,17 @@ RUN printf '\nsource /usr/share/bash-completion/completions/git\n' >> $HOME/.bas
 # Install OCaml separately from Coq to allow changing the version of Coq without reinstalling OCaml
 # Install the coq-lean-importer late to allow rebuilding it without rebuilding everything else
 RUN mkdir -p /root/autoformalization
-COPY install/ /root/install
+RUN mkdir -p /root/install
+COPY install/coq_01_opam_install.sh /root/install/coq_01_opam_install.sh
 RUN chmod +x /root/install/coq_01_opam_install.sh \
     && /root/install/coq_01_opam_install.sh
+COPY install/coq_02_coq_install.sh /root/install/coq_02_coq_install.sh
 RUN chmod +x /root/install/coq_02_coq_install.sh \
     && /root/install/coq_02_coq_install.sh
+COPY install/lean_install.sh /root/install/lean_install.sh
 RUN chmod +x /root/install/lean_install.sh \
     && /root/install/lean_install.sh
+COPY install/coq_03_lean_import_install.sh /root/install/coq_03_lean_import_install.sh
 RUN chmod +x /root/install/coq_03_lean_import_install.sh \
     && /root/install/coq_03_lean_import_install.sh
 
