@@ -1,22 +1,19 @@
 import os
 import re
-from typing import Dict, List, Tuple
-
-from utils import logging
+from typing import Dict, Tuple, List
 
 BASE_DIR: str = os.path.abspath(os.path.dirname(__file__))
 dpdDir: str = os.path.join(BASE_DIR, "src", "dataset", "dependency_graph")
 outputFile: str = os.path.join(dpdDir, "dgraph.dpd")
 
 if not os.path.exists(dpdDir):
-    logging.info(f"Warning: Directory '{dpdDir}' does not exist. Creating it now.")
+    print(f"Warning: Directory '{dpdDir}' does not exist. Creating it now.")
     os.makedirs(dpdDir, exist_ok=True)
-    logging.info(f"Created missing directory: {dpdDir}")
+    print(f"Created missing directory: {dpdDir}")
 
 nodeMap: Dict[str, Tuple[int, str]] = {}
 nextGlobalId: int = 1
 edges: List[Tuple[int, int, str]] = []
-
 
 def processDpdFile(filePath: str) -> List[Tuple[int, int, str]]:
     global nextGlobalId
@@ -27,7 +24,7 @@ def processDpdFile(filePath: str) -> List[Tuple[int, int, str]]:
     with open(filePath, "r", encoding="utf-8") as dpdFile:
         for line in dpdFile:
             nodeMatch = re.match(r'N: (\d+) "(.*?)" (\[.*?\])?;', line)
-            edgeMatch = re.match(r"E: (\d+) (\d+) (\[.*?\])?;", line)
+            edgeMatch = re.match(r'E: (\d+) (\d+) (\[.*?\])?;', line)
 
             if nodeMatch:
                 oldId: int = int(nodeMatch.group(1))
@@ -51,20 +48,18 @@ def processDpdFile(filePath: str) -> List[Tuple[int, int, str]]:
     ]
     return updatedEdges
 
+allFiles: List[str] = [file for file in os.listdir(dpdDir) if file.endswith(".dpd")]
+finalEdges: List[Tuple[int, int, str]] = []
 
-if __name__ == "__main__":
-    allFiles: List[str] = [file for file in os.listdir(dpdDir) if file.endswith(".dpd")]
-    finalEdges: List[Tuple[int, int, str]] = []
+for dpdFile in allFiles:
+    filePath: str = os.path.join(dpdDir, dpdFile)
+    finalEdges.extend(processDpdFile(filePath))
 
-    for dpdFile in allFiles:
-        filePath: str = os.path.join(dpdDir, dpdFile)
-        finalEdges.extend(processDpdFile(filePath))
+with open(outputFile, "w", encoding="utf-8") as mergedFile:
+    for nodeName, (globalId, attributes) in nodeMap.items():
+        mergedFile.write(f'N: {globalId} "{nodeName}" {attributes};\n')
 
-    with open(outputFile, "w", encoding="utf-8") as mergedFile:
-        for nodeName, (globalId, attributes) in nodeMap.items():
-            mergedFile.write(f'N: {globalId} "{nodeName}" {attributes};\n')
+    for src, dst, attr in finalEdges:
+        mergedFile.write(f"E: {src} {dst} {attr};\n")
 
-        for src, dst, attr in finalEdges:
-            mergedFile.write(f"E: {src} {dst} {attr};\n")
-
-    logging.info(f"Dependency graphs merged successfully into {outputFile}")
+print(f"Dependency graphs merged successfully into {outputFile}")
