@@ -223,5 +223,7 @@ Makefile.coq.conf
 *.eval
 logs/
 iso-checker/Isomorphisms.v
+iso-checker/Interface.v
+iso-checker/Checker.v
 iso-checker/imported.out
 *.out

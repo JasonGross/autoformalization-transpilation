@@ -1,7 +1,7 @@
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
 EXPORT_DIR = "/root/lean4export"
-ISO_RETRIES = 3
+ISO_RETRIES = 30  # TODO: change back to 3 when we make this per-iso
 ISO_HEADER = """From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
 Import IsoEq.
 From LeanImport Require Import Lean.
@@ -10,6 +10,31 @@ From LeanImport Require Import Lean.
 From IsomorphismChecker Require Original Imported.
 Print Imported.
 Typeclasses Opaque rel_iso. (* for speed *)
+"""
+ISO_INTERFACE_HEADER = """From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
+Import IsoEq.
+#[local] Set Universe Polymorphism.
+#[local] Set Implicit Arguments.
+Import KnownConstantHints.
+From IsomorphismChecker Require Original.
+Module Type Interface.
+"""
+ISO_CHECKER_HEADER = """From Stdlib Require Import Derive.
+From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
+Import IsoEq.
+#[local] Unset Universe Polymorphism.
+#[local] Set Implicit Arguments.
+Import KnownConstantHints.
+From IsomorphismChecker Require Original Interface Isomorphisms.
+Module CheckAssumptions.
+Import Ltac2.Ltac2 Ltac2.Printf.
+Ltac2 Eval printf "Begin Print Assumptions Isomorphisms.everything.".
+Print Assumptions Isomorphisms.everything.
+Ltac2 Eval printf "End Print Assumptions Isomorphisms.everything.".
+End CheckAssumptions.
+#[local] Unset Universe Checking.
+#[local] Unset Universe Polymorphism.
+Module DoesItCheck <: Interface.Interface.
 """
 EXAMPLE_STATEMENTS = [
     """inductive Binop where

@@ -4,12 +4,13 @@ from inspect_ai import Task, eval, task
 from inspect_ai.solver import generate, system_message, use_tools
 
 from dataset.prepare import format_translation_input, prepare_dataset
-from models import AnthropicModel
+from models import AnthropicModel, OpenAIModel
 from prompts.completion import ALTERNATE_SYSTEM_MESSAGE, COQ_STATEMENTS
-from scorers.completion import coq_runs_scorer
+from scorers.completion import coq_runs_scorer, coq_proven_scorer
 from tools.itp import coq_run_tool
+from tools.submission import coq_submit_tool, sample_definitions, sample_interface
 
-EXAMPLE_COQ_FILEPATH = Path(__file__).parent / "simple-tests" / "incomplete.v"
+EXAMPLE_COQ_FILEPATH = Path(__file__).parent.parent / "simple-tests" / "incomplete.v"
 
 
 @task
@@ -23,13 +24,13 @@ def coq_completion():
         dataset=dataset,
         solver=[
             system_message(ALTERNATE_SYSTEM_MESSAGE),
+            use_tools(coq_run_tool(), coq_submit_tool(interface_file_contents=sample_interface, definitions=sample_definitions)),
             generate(),
-            use_tools(coq_run_tool()),
         ],
-        scorer=coq_runs_scorer(),
+        scorer=coq_proven_scorer(),
     )
 
 
 if __name__ == "__main__":
-    eval(coq_completion(), model=AnthropicModel.BEST, message_limit=20)
+    eval(coq_completion(), model=OpenAIModel.BEST, message_limit=20)
     pass
