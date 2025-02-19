@@ -1,13 +1,23 @@
 #!/usr/bin/env python
-import os
 import re
-import shlex
 import sys
-from dataclasses import dataclass
 from typing import Optional
+import contextlib
+import tempfile
+from enum import StrEnum
+from pathlib import Path
+from project_util import (
+    CoqFile,
+    CoqIdentifier,
+    CoqProject,
+    LeanProject,
+    LeanFile,
+    LeanIdentifier,
+    ExportFile,
+)
+
 
 from config import (
-    BUILD_DIR,
     EXAMPLE_STATEMENTS,
     EXPORT_DIR,
     ISO_CHECKER_HEADER,
@@ -17,63 +27,7 @@ from config import (
     SOURCE_DIR,
 )
 from utils import logging, run_cmd
-
-
-class Project:
-    # See this comment (https://github.com/JasonGross/autoformalization/pull/27#discussion_r1942030347) by Jason for a suggestion of structure here
-    def __init__(self):
-        pass
-
-
-class LeanProject(Project):
-    pass
-
-
-class CoqProject(Project):
-    pass
-
-
-@dataclass
-class File:
-    contents: str
-
-    def __str__(self) -> str:
-        return self.contents
-
-    def write(self, filepath: str) -> None:
-        logging.debug(
-            f"Writing {self.__class__.__name__} to {filepath}\nContents:\n{self.contents}"
-        )
-        with open(filepath, "w") as f:
-            f.write(self.contents)
-
-
-class LeanFile(File):
-    pass
-
-
-class CoqFile(File):
-    pass
-
-
-class ExportFile(File):
-    pass
-
-
-@dataclass
-class Identifier:
-    name: str
-
-    def __str__(self) -> str:
-        return self.name
-
-
-class LeanIdentifier(Identifier):
-    pass
-
-
-class CoqIdentifier(Identifier):
-    pass
+from utils.memoshelve import cache
 
 
 DEFINITION_PAIRS = list(
@@ -100,7 +54,7 @@ KNOWN_PAIRS = [
 ]
 
 
-def extract_definitions(file_name: str) -> list[LeanIdentifier]:
+def extract_definitions(file: LeanFile) -> list[LeanIdentifier]:
     # TODO: Actually do something with Origin.lean
     # For now, just do this
     lst = "Binop Exp Instr Prog Stack binopDenote expDenote instrDenote progDenote compile compileOneInstrStatement compileCorrect binOpComm reverseMerge compileOpComm constEq constInsEq constOnlyConst listEq constCmpl"
@@ -109,115 +63,146 @@ def extract_definitions(file_name: str) -> list[LeanIdentifier]:
 
 
 def lean_to_coq(
-    statements: LeanFile, identifiers: list[tuple[CoqIdentifier, LeanIdentifier]]
-) -> tuple[bool, list[tuple[CoqIdentifier, CoqIdentifier]], str]:
+    lean_project: LeanProject,
+    coq_project: CoqProject,
+    statements: LeanFile,
+    identifiers: list[tuple[CoqIdentifier, LeanIdentifier]],
+) -> tuple[
+    LeanProject, CoqProject, bool, list[tuple[CoqIdentifier, CoqIdentifier]], str
+]:
+    lean_project = lean_project.copy()
+
     # Construct a Lean file from all our snippets
-    statements.write(f"{EXPORT_DIR}/Origin.lean")
+    lean_project["Origin.lean"] = statements
+
     # Export statements from Lean
-    export_success, lean_export = export_from_lean()
+    lean_project, export_success, lean_export = export_from_lean(lean_project)
     assert export_success, "Lean export failed!"
     # Import statements back into Coq
     cc_identifiers = []
     for coq_id, lean_id in identifiers:
         cc_identifiers.append((coq_id, lean_id_to_coq(lean_id)))
 
-    success, error = import_to_coq(lean_export)
-    return success, cc_identifiers, error
+    coq_project, success, error = import_to_coq(coq_project, lean_export)
+    return lean_project, coq_project, success, cc_identifiers, error
 
 
 def lean_id_to_coq(lean_id: LeanIdentifier) -> CoqIdentifier:
     return CoqIdentifier(str(lean_id).replace(".", "_"))
 
 
-def export_from_lean() -> tuple[bool, ExportFile]:
-    # Mangle files
-    run_cmd(
-        f"(grep -q 'lean_lib Origin' {EXPORT_DIR}/lakefile.lean || (sed '8i\\lean_lib Origin' {EXPORT_DIR}/lakefile.lean > temp && mv temp {EXPORT_DIR}/lakefile.lean))"
-    )
+@cache()
+def export_from_lean(project: LeanProject) -> tuple[LeanProject, bool, ExportFile]:
+    with project.tempdir():
+        # Mangle files
+        run_cmd(
+            f"(grep -q 'lean_lib Origin' lakefile.lean || (sed '8i\\lean_lib Origin' lakefile.lean > temp && mv temp lakefile.lean))",
+            shell=True,
+        )
 
-    run_cmd(
-        f"(grep -q '^import Origin' {EXPORT_DIR}/Main.lean || ((echo 'import Origin' && cat {EXPORT_DIR}/Main.lean) > temp && mv temp {EXPORT_DIR}/Main.lean))"
-    )
+        run_cmd(
+            f"(grep -q '^import Origin' Main.lean || ((echo 'import Origin' && cat Main.lean) > temp && mv temp Main.lean))",
+            shell=True,
+        )
 
-    # Run lake build to verify it's valid code
-    run_cmd(f"cd {EXPORT_DIR} && lake update && lake build")
+        # Run lake build to verify it's valid code
+        run_cmd(f"lake update && lake build")
 
-    # Run Lake exe export to get the exported code
-    definitions = extract_definitions("{EXPORT_DIR}/Origin.lean")
-    cmd = f"cd {EXPORT_DIR} && lake exe lean4export Main --"
-    for definition in definitions:
-        cmd += f" {definition}"
+        # Run Lake exe export to get the exported code
+        definitions = extract_definitions(LeanFile.read_text("Origin.lean"))
+        cmd = f"lake exe lean4export Main --"
+        for definition in definitions:
+            cmd += f" {definition}"
 
-    # # Produce .out file
-    export_file = ExportFile(run_cmd(cmd).stdout)
-    return True, export_file
+        # # Produce .out file
+        export_file = ExportFile(run_cmd(cmd).stdout)
+        return LeanProject.read("."), True, export_file
 
 
 def import_to_coq(
-    lean_export: ExportFile, coq_file: str = "target"
-) -> tuple[bool, str]:
+    project: CoqProject, lean_export: ExportFile, coq_file: str = "target"
+) -> tuple[CoqProject, bool, str]:
     # Copy files first
-    run_cmd(f"mkdir -p {BUILD_DIR}")
-    lean_export.write(f"{BUILD_DIR}/{coq_file}.out")
+    project = project.copy()
+    project[f"{coq_file}.out"] = lean_export
 
-    run_cmd(
-        f"""echo 'From LeanImport Require Import Lean.
-    Redirect "{coq_file}.log" Lean Import "{coq_file}.out".' > {BUILD_DIR}/{coq_file}.v"""
+    project[f"{coq_file}.v"] = CoqFile(
+        f"""From LeanImport Require Import Lean.
+Redirect "{coq_file}.log" Lean Import "{coq_file}.out"."""
     )
 
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
-    result = run_cmd(f"cd {BUILD_DIR} && coqc {coq_file}.v", check=False)
-    if result.returncode == 0:
-        return True, ""
-    else:
-        logging.error("Coq compilation failed")
-        # TODO: Actually retrieve error, for example look at result.stderr, search for the last
-        # instance of 'File "[^"]+", line ([0-9]+), characters ([0-9]+)-([0-9]+):\n', pick out the
-        #  line numbers from the file, so the LLM doesn't have to do arithmetic
-        return False, "Coq compilation failed"
+    with project.tempdir():
+        result = run_cmd(f"coqc {coq_file}.v", check=False)
+        project = CoqProject.read(".")
+        if result.returncode == 0:
+            return project, True, ""
+        else:
+            logging.error("Coq compilation failed")
+            # TODO: Actually retrieve error, for example look at result.stderr, search for the last
+            # instance of 'File "[^"]+", line ([0-9]+), characters ([0-9]+)-([0-9]+):\n', pick out the
+            #  line numbers from the file, so the LLM doesn't have to do arithmetic
+            return project, False, "Coq compilation failed"
 
 
-def check_compilation(lean_statements: LeanFile) -> tuple[bool, str]:
-    # Check that we can compile in Lean
-    run_cmd(f"mkdir -p {BUILD_DIR}")
-    if not os.path.exists(f"{BUILD_DIR}/lean-build"):
-        run_cmd(f"cd {BUILD_DIR} && lake new lean-build", shell=True, check=False)
+@cache()
+def new_lake_project(name: str = "lean-build") -> LeanProject:
+    with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = Path(tempdir)
+        (tempdir / name).mkdir()
+        with contextlib.chdir(tempdir):
+            run_cmd(["lake", "new", name], check=False, shell=False)
+        return LeanProject.read(tempdir / name)
+
+
+@cache()
+def check_compilation(
+    lean_statements: LeanFile, project: LeanProject | None = None
+) -> tuple[LeanProject, bool, str]:
+    if project is None:
+        project = new_lake_project(name="lean-build")
+    assert isinstance(project, LeanProject)  # dumb typechecker around @cache()
 
     # Clear existing code, if any
-    run_cmd(f"rm -f {BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
-    run_cmd(f"rm -f {BUILD_DIR}/lean-build/Main.lean")
+    if "LeanBuild/Basic.lean" in project:
+        del project["LeanBuild/Basic.lean"]
+    if "Main.lean" in project:
+        del project["Main.lean"]
 
     # Put new code in the right place
-    lean_statements.write(f"{BUILD_DIR}/lean-build/LeanBuild/Basic.lean")
-    run_cmd(
-        f"""cat > {BUILD_DIR}/lean-build/Main.lean << 'EOL'
-import LeanBuild
+    project["LeanBuild/Basic.lean"] = lean_statements
+    project["Main.lean"] = LeanFile(
+        """import LeanBuild
 def main : IO Unit :=
  IO.println s!"Compilation succeeded!"
-EOL"""
+"""
     )
 
     # Then build
-    run_cmd(f"cd {BUILD_DIR}/lean-build/ && lake update")
-    result = run_cmd(
-        f"cd {BUILD_DIR}/lean-build/ && lake build", shell=True, check=False
-    )
+    project.write(Path(__file__).parent.parent / "temp_debug")
+    with project.tempdir():
+        run_cmd(["lake", "update"], shell=False)
+        result = run_cmd(["lake", "build"], shell=False)
+        project = LeanProject.read(".")
     if result.returncode != 0:
         error_message = f"{result.stdout}\n{result.stderr}".strip()
         logging.error(f"Compilation failed: {error_message}")
-        return False, error_message
-    return True, ""
+        return project, False, error_message
+    return project, True, ""
 
 
-def generate_interface(coq_identifiers: list[CoqIdentifier]):
+def generate_interface(
+    project: CoqProject, coq_identifiers: list[CoqIdentifier]
+) -> CoqProject:
+    project = project.copy()
     # TODO: Implement https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934686304
     # Can make these parameters if needed
     original_name, output_file, checker_file = (
         "Original",
-        f"{SOURCE_DIR}/iso-checker/Interface.v",
-        f"{SOURCE_DIR}/iso-checker/Checker.v",
+        "Interface.v",
+        "Checker.v",
     )
 
     # Should also be generating these programmatically, for now these are manual
@@ -274,27 +259,26 @@ Definition everything := ({" :: ".join(iso_names)} :: [])%hlist."""
     logging.debug(f"{full_content}")
 
     # Write to file
-    # TODO: Respond to https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934670423
-    with open(output_file, "w") as f:
-        f.write(full_interface_content)
+    project[output_file] = CoqFile(full_interface_content)
 
     # Write to file
-    # TODO: Respond to https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934670423
-    with open(checker_file, "w") as f:
-        f.write(full_content)
+    project[checker_file] = CoqFile(full_content)
+
+    return project
 
 
-def generate_isos(cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]):
-    # TODO: Implement https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934686304
-    # Can make these parameters if needed
-    original_name, imported_name, output_file = (
-        "Original",
-        "Imported",
-        f"{SOURCE_DIR}/iso-checker/Isomorphisms.v",
-    )
+def generate_isos(
+    project: CoqProject,
+    cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    output_file: str = "Isomorphisms.v",
+) -> CoqProject:
+    project = project.copy()
 
     # Retrieve exported Lean file
-    run_cmd(f"cp {BUILD_DIR}/target.out {SOURCE_DIR}/iso-checker/imported.out")
+    project["imported.out"] = project["target.out"]
 
     # Should also be generating these programmatically, for now these are manual
     # TODO: This should happen in the reimport step!
@@ -338,42 +322,52 @@ Print Assumptions everything."""
     logging.debug(f"{full_content}")
 
     # Write to file
-    # TODO: Respond to https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934670423
-    with open(output_file, "w") as f:
-        f.write(full_content)
+    project[output_file] = CoqFile(full_content)
+
+    return project
 
 
-def parse_iso_errors(errors: str) -> str:
+class IsoError(StrEnum):
+    MISSING_TYPE_ISO = "missing_type_iso"
+    DISORDERED_CONSTR = "disordered_constr"
+    MAYBE_MISSING_STMNT_ISO = "maybe_missing_stmnt_iso"
+    OTHER_ISO_ISSUE = "other_iso_issue"
+
+
+def parse_iso_errors(errors: str) -> IsoError:
     # Yes I know this should probably return an enum or something
     if "Could not find iso" in errors:
-        return "missing_type_iso"
+        return IsoError.MISSING_TYPE_ISO
     elif bool(re.search(r"Error:.*?constructor", errors, re.IGNORECASE)):
-        return "disordered_constr"
+        return IsoError.DISORDERED_CONSTR
     elif "Unfolding unknown" in errors or "Reducing unknown" in errors:
-        return "maybe_missing_stmnt_iso"
+        return IsoError.MAYBE_MISSING_STMNT_ISO
     else:
-        return "other_iso_issue"
+        return IsoError.OTHER_ISO_ISSUE
 
 
-def desigil(s, prefix: str = ""):
+def desigil(s: str, prefix: str = "") -> str:
     if s[0] == "$":
         return prefix + s[1:]
     return s
 
 
 def repair_isos_interface(
-    errors: str, coq_identifiers: list[CoqIdentifier]
-) -> list[CoqIdentifier]:
+    project: CoqProject,
+    errors: str,
+    coq_identifiers: list[CoqIdentifier],
+    original_name: str = "Original",
+) -> tuple[CoqProject, list[CoqIdentifier]]:
     # Look at the errors, attempt to fix the isos
-    error = parse_iso_errors(errors)
-    iso_file = f"{SOURCE_DIR}/iso-checker/Interface.v"
     result = re.search(
         r"While importing ([\w\.]+): Consider adding iso_statement ([\w\.]+) ",
         re.sub(r"\s+", " ", errors),
     )
     assert result is not None, re.sub(r"\s+", " ", errors)
     orig_source, source = result.groups()
-    coq_identifiers_str = [desigil(str(s), "Original.") for s in coq_identifiers]
+    coq_identifiers_str = [
+        desigil(str(s), f"{original_name}.") for s in coq_identifiers
+    ]
     assert orig_source in coq_identifiers_str, (
         orig_source,
         coq_identifiers_str,
@@ -381,18 +375,25 @@ def repair_isos_interface(
     logging.info(f"Adding iso_statement {source} for {orig_source}")
     index = coq_identifiers_str.index(orig_source)
     coq_identifiers.insert(index, CoqIdentifier(source))
-    generate_interface(coq_identifiers)
-    return coq_identifiers
+    project = generate_interface(project, coq_identifiers)
+    return project, coq_identifiers
 
 
 def repair_isos(
-    errors: str, cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]]
-) -> list[tuple[CoqIdentifier, CoqIdentifier]]:
+    project: CoqProject,
+    errors: str,
+    cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> tuple[CoqProject, list[tuple[CoqIdentifier, CoqIdentifier]]]:
+    project = project.copy()
     # Look at the errors, attempt to fix the isos
     error = parse_iso_errors(errors)
-    iso_file = f"{SOURCE_DIR}/iso-checker/Isomorphisms.v"
+
     match error:
-        case "missing_type_iso":
+        case IsoError.MISSING_TYPE_ISO:
             # Add the missing iso and regenerate
             result = re.search(
                 r"While proving iso_statement ([\w\.]+) ([\w\.]+): Could not find iso for ([\w\.]+) -> ([\w\.]+)",
@@ -401,7 +402,10 @@ def repair_isos(
             assert result is not None, errors
             orig_source, orig_target, source, target = result.groups()
             cc_identifiers_str = [
-                (desigil(str(s), "Original."), desigil(str(t), "Imported."))
+                (
+                    desigil(str(s), f"{original_name}."),
+                    desigil(str(t), f"{imported_name}."),
+                )
                 for s, t in cc_identifiers
             ]
             assert (orig_source, orig_target) in cc_identifiers_str, (
@@ -410,15 +414,20 @@ def repair_isos(
             )
             index = cc_identifiers_str.index((orig_source, orig_target))
             cc_identifiers.insert(index, (CoqIdentifier(source), CoqIdentifier(target)))
-            generate_isos(cc_identifiers)
-        case "disordered_constr":
+            project = generate_isos(
+                project,
+                cc_identifiers,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+        case IsoError.DISORDERED_CONSTR:
             # Reorder goals (via LLM) and update proof
             # TODO: Should just define prompts in a dict somewhere
             llm_repair(
                 iso_file,
                 f"Constructors are out of order, please reorder the goals - the error is {error}",
             )
-        case "maybe_missing_stmnt_iso":
+        case IsoError.MAYBE_MISSING_STMNT_ISO:
             csts = re.findall(
                 r"(Unfolding|Reducing) unknown \w+ on (lhs|rhs)\s*:\s*([^ $]+)$",
                 errors,
@@ -435,7 +444,10 @@ def repair_isos(
                 assert False, errors
             orig_source, orig_target = last_proving_statement
             cc_identifiers_str = [
-                (desigil(str(s), "Original."), desigil(str(t), "Imported."))
+                (
+                    desigil(str(s), f"{original_name}."),
+                    desigil(str(t), f"{imported_name}."),
+                )
                 for s, t in cc_identifiers
             ]
             assert (orig_source, orig_target) in cc_identifiers_str, (
@@ -468,20 +480,25 @@ def repair_isos(
                 )
                 index = cc_identifiers_str.index((orig_source, orig_target))
                 cc_identifiers.insert(index, new_pair)
-                generate_isos(cc_identifiers)
+                project = generate_isos(
+                    project,
+                    cc_identifiers,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                )
             else:
                 # TODO: rewrite with Nat.add_comm or w/e
                 logging.info((lhs, rhs))
                 assert False, errors
-        case "other_iso_issue":
+        case IsoError.OTHER_ISO_ISSUE:
             # Heuristically rewrite to account for Lean vs Coq differences (via LLM / COPRA)
             llm_repair(iso_file, f"Please fix this error in our isomorphisms: {error}")
-    return cc_identifiers
+    return project, cc_identifiers
 
 
 def llm_repair(file, prompt: str) -> None:
     # Call out to the LLM
-    return None
+    assert False, (file, prompt)
 
 
 def llm_suggest_paired_identifier(
@@ -494,13 +511,14 @@ def llm_suggest_paired_identifier(
 
 
 def generate_and_prove_iso_interface(
+    project: CoqProject,
     coq_identifiers: list[CoqIdentifier],
-) -> tuple[bool, Optional[str]]:
+) -> tuple[CoqProject, bool, Optional[str]]:
     # Make interface file
-    generate_interface(coq_identifiers)
+    project = generate_interface(project, coq_identifiers)
 
     # Check that the iso proof compiles
-    result, errors = make_isos_interface()
+    project, result, errors = make_isos_interface(project)
 
     if result:
         logging.info("Isomorphism interface proof succeeded")
@@ -510,21 +528,24 @@ def generate_and_prove_iso_interface(
             attempt += 1
             logging.info(f"Isomorphism interface proof failed on attempt {attempt}")
             logging.debug(errors)
-            repair_isos_interface(errors, coq_identifiers)
-            result, errors = make_isos_interface()
+            project, coq_identifiers = repair_isos_interface(
+                project, errors, coq_identifiers
+            )
+            project, result, errors = make_isos_interface(project)
 
     # Eventually will want to feed back isos but for now just return result
-    return result, errors
+    return project, result, errors
 
 
 def generate_and_prove_iso(
+    project: CoqProject,
     cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier]],
-) -> tuple[bool, Optional[str]]:
+) -> tuple[CoqProject, bool, Optional[str]]:
     # Make demo file
-    generate_isos(cc_identifiers)
+    project = generate_isos(project, cc_identifiers)
 
     # Check that the iso proof compiles
-    result, errors = make_isos("Checker.vo")
+    project, result, errors = make_isos(project, "Checker.vo")
 
     if result:
         logging.info("Isomorphism proof succeeded")
@@ -534,9 +555,9 @@ def generate_and_prove_iso(
         # That is, we should be able to add as many missing isomorphisms as are required, and we shouldn't quit early if we are
         # making progress towards proving more and more isomorphisms.
         while attempt < ISO_RETRIES and errors:
-            cc_identifiers = repair_isos(errors, cc_identifiers)
+            project, cc_identifiers = repair_isos(project, errors, cc_identifiers)
             # Check that the iso proof compiles
-            result, errors = make_isos("Checker.vo")
+            project, result, errors = make_isos(project, "Checker.vo")
             if not result:
                 # Should feed all errors for iso repair
                 logging.info(f"Isomorphism proof failed on attempt {attempt}:")
@@ -549,16 +570,17 @@ def generate_and_prove_iso(
             attempt += 1
 
     # Eventually will want to feed back isos but for now just return result
-    return result, errors
+    return project, result, errors
 
 
-def make_isos(*targets: str) -> tuple[bool, Optional[str]]:
-    run_cmd(f"cd {SOURCE_DIR}/iso-checker/ && make clean", shell=True, check=False)
-    result = run_cmd(
-        f"cd {SOURCE_DIR}/iso-checker/ && {shlex.join(['make', *targets])}",
-        shell=True,
-        check=False,
-    )
+def make_isos(
+    project: CoqProject, *targets: str
+) -> tuple[CoqProject, bool, Optional[str]]:
+    with project.tempdir():
+        # make clean should not be needed, but if it is, we can uncomment this
+        # run_cmd(["make", "clean"], shell=False, check=False)
+        result = run_cmd(["make", *targets], shell=False, check=False)
+        project = CoqProject.read(".")
     if result.returncode != 0:
         # We log this and then feed it into our iso repair model
         error_message = f"{result.stdout}\n{result.stderr}".strip()
@@ -571,12 +593,12 @@ def make_isos(*targets: str) -> tuple[bool, Optional[str]]:
             )
         ]:
             logging.info(f"Found missing isomorphisms: {set(iso_pairs)}")
-        return False, error_message
-    return True, None
+        return project, False, error_message
+    return project, True, None
 
 
-def make_isos_interface() -> tuple[bool, Optional[str]]:
-    return make_isos("Interface.vo")
+def make_isos_interface(project: CoqProject) -> tuple[CoqProject, bool, Optional[str]]:
+    return make_isos(project, "Interface.vo")
 
 
 def extract_and_add(
@@ -588,9 +610,10 @@ def extract_and_add(
     return True
 
 
-def preprocess_source(src):  # Optional[CoqProject]) -> CoqFile:
-    if src is None:
-        return []
+def preprocess_source(src) -> CoqFile | None:  # Optional[CoqProject]) -> CoqFile:
+    # if src is None:
+    # return []
+    return None
 
     # Extract list of statements from input
     # @@Shiki to explain how we are doing this
@@ -598,7 +621,7 @@ def preprocess_source(src):  # Optional[CoqProject]) -> CoqFile:
     # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
 
-def extract_coq_identifiers(coq: CoqFile) -> list[CoqIdentifier]:
+def extract_coq_identifiers(coq: CoqFile | None) -> list[CoqIdentifier]:
     # Extract identifiers from Coq statements
     if not coq:
         # TODO: Have the actual identifier pairs
@@ -610,7 +633,7 @@ def extract_coq_identifiers(coq: CoqFile) -> list[CoqIdentifier]:
 
 
 def translate(
-    coq: CoqFile, error_code: Optional[str], error: Optional[str]
+    coq: CoqFile | None, error_code: Optional[str], error: Optional[str]
 ) -> tuple[LeanFile, list[tuple[CoqIdentifier, LeanIdentifier]]]:
     # If it's not the first attempt, we have an error code and message from the previous failure
     if not coq:
@@ -622,66 +645,134 @@ def translate(
         return LeanFile("\n"), []
 
 
+class ErrorCode(StrEnum):
+    COMPILATION_FAILURE = "compilation_failure"
+    EXPORT_IMPORT_FAILURE = "export_import_failure"
+    ISOMORPHISM_FAILURE = "isomorphism_failure"
+
+
 def translate_and_prove(
-    coq_statements: CoqFile,
-) -> tuple[bool, LeanFile, list[tuple[CoqIdentifier, LeanIdentifier]]]:
+    lean_export_project: LeanProject,
+    lean_project: LeanProject | None,
+    coq_project: CoqProject,
+    coq_statements: CoqFile | None,
+) -> tuple[
+    LeanProject,
+    LeanProject,
+    CoqProject,
+    bool,
+    LeanFile,
+    list[tuple[CoqIdentifier, LeanIdentifier]],
+]:
     success = False
     error_code, error = None, None  # Used for subsequent attempts of translation
 
     coq_identifiers = extract_coq_identifiers(coq_statements)
-    interface_success, error = generate_and_prove_iso_interface(coq_identifiers)
+    coq_project, interface_success, error = generate_and_prove_iso_interface(
+        coq_project, coq_identifiers
+    )
     if not interface_success:
         assert False, "Failed to generate isomorphism interface!"
         error_code = "isomorphism_interface_failure"
 
-    while not success:
+    while True:
         # Translate statements from Coq to Lean
         # TBD by all of us, with varying degrees of handholding
         lean_statements, cl_identifiers = translate(coq_statements, error_code, error)
 
-        success, error_code, error = check_translation(lean_statements, cl_identifiers)
+        lean_export_project, lean_project, coq_project, success, error_code, error = (
+            check_translation(
+                lean_export_project,
+                lean_project,
+                coq_project,
+                lean_statements,
+                cl_identifiers,
+            )
+        )
 
         # TODO: we might retry this (or control retries from inspect, TBD)
-        if error_code == "isomorphism_failure":
-            assert False, "Failed to prove isomorphisms!"
-        elif error_code == "export_import_failure":
-            assert False, "Importing from Lean to Coq failed!"
-        elif error_code == "compilation_failure":
-            assert False, "Lean code does not compile!"
+        match error_code:
+            case ErrorCode.ISOMORPHISM_FAILURE:
+                assert False, "Failed to prove isomorphisms!"
+            case ErrorCode.EXPORT_IMPORT_FAILURE:
+                assert False, "Importing from Lean to Coq failed!"
+            case ErrorCode.COMPILATION_FAILURE:
+                assert False, "Lean code does not compile!"
+            case None:
+                pass
 
-    return success, lean_statements, cl_identifiers
+        if success:
+            return (
+                lean_export_project,
+                lean_project,
+                coq_project,
+                success,
+                lean_statements,
+                cl_identifiers,
+            )
 
 
 # TODO: Move this (and called functions) to a different file
 def check_translation(
+    lean_export_project: LeanProject,
+    lean_project: LeanProject | None,
+    coq_project: CoqProject,
     lean_statements: LeanFile,
     cl_identifiers: list[tuple[CoqIdentifier, LeanIdentifier]],
-) -> tuple[bool, Optional[str], Optional[str]]:
+) -> tuple[
+    LeanProject, LeanProject, CoqProject, bool, Optional[ErrorCode], Optional[str]
+]:
     success, error_code = False, None
     # Verify that the Lean code compiles
-    compile_success, error = check_compilation(lean_statements)
+    lean_project, compile_success, error = check_compilation(
+        lean_statements, project=lean_project
+    )
+    assert isinstance(lean_project, LeanProject)  # dumb typechecker around @cache()
     # TODO: Use a class derived from Enum or StrEnum
     if not compile_success:
         # TODO: Kick this back to the translator
-        error_code = "compilation_failure"
-        return success, error_code, error
+        error_code = ErrorCode.COMPILATION_FAILURE
+        return (
+            lean_export_project,
+            lean_project,
+            coq_project,
+            success,
+            error_code,
+            error,
+        )
 
     # Import statements back into Coq
-    reimport_success, cc_identifiers, error = lean_to_coq(
-        lean_statements, cl_identifiers
+    lean_export_project, coq_project, reimport_success, cc_identifiers, error = (
+        lean_to_coq(lean_export_project, coq_project, lean_statements, cl_identifiers)
     )
     # TODO: Kick this back to the translator (if export failed) or end user (if import failed)
     if not reimport_success:
-        error_code = "export_import_failure"
-        return success, error_code, error
+        error_code = ErrorCode.EXPORT_IMPORT_FAILURE
+        return (
+            lean_export_project,
+            lean_project,
+            coq_project,
+            success,
+            error_code,
+            error,
+        )
 
     # Generate and prove isomorphism
-    iso_success, error = generate_and_prove_iso(cc_identifiers)
+    coq_project, iso_success, error = generate_and_prove_iso(
+        coq_project, cc_identifiers
+    )
     if not iso_success:
-        error_code = "isomorphism_failure"
-        return success, error_code, error
+        error_code = ErrorCode.ISOMORPHISM_FAILURE
+        return (
+            lean_export_project,
+            lean_project,
+            coq_project,
+            success,
+            error_code,
+            error,
+        )
     success = True
-    return success, error_code, error
+    return lean_export_project, lean_project, coq_project, success, error_code, error
 
 
 if __name__ == "__main__":
@@ -700,7 +791,16 @@ if __name__ == "__main__":
     #   | Binop.plus, x, y  => x + y
     #   | Binop.times, x, y => x * y"""])
     # We expect failures to be like "out of disk space" or "ran out of attempts to try", which should probably be raised rather than returned
-    success, lean_statements, cl_identifiers = translate_and_prove(coq_statements)
+    coq_project = CoqProject.read(f"{SOURCE_DIR}/iso-checker").clean()
+    lean_export_project = LeanProject.read(EXPORT_DIR)
+    (
+        lean_export_project,
+        lean_project,
+        coq_project,
+        success,
+        lean_statements,
+        cl_identifiers,
+    ) = translate_and_prove(lean_export_project, None, coq_project, coq_statements)
 
     # If successful, extract statement pairs and add to training set
     if success:

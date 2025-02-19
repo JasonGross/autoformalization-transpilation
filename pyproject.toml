@@ -22,7 +22,7 @@ dev-dependencies = [
 
 [tool.ruff]
 line-length = 88  # Adjust as needed
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["I"]  # Enable import sorting
