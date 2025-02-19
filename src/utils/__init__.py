@@ -1,6 +1,8 @@
 import subprocess
 import logging
 import sys
+from pathlib import Path
+from typing import Optional
 
 # Simple logging setup
 logging.basicConfig(
@@ -26,3 +28,16 @@ def run_cmd(cmd: str, shell=True, check=True):
     if result.stderr:
         logging.debug(f"Stderr: {result.stderr}")
     return result
+
+
+def backup(filename: str | Path, ext: str = ".bak") -> Optional[Path]:
+    filename = Path(filename)
+    assert ext != ""
+    backup_name = filename.with_suffix(filename.suffix + ext)
+    if filename.exists():
+        if backup_name.exists():
+            backup(backup_name, ext=ext)
+            assert not backup_name.exists()
+            filename.rename(backup_name)
+            return backup_name
+    return None
