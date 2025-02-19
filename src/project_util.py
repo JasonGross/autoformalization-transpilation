@@ -4,6 +4,7 @@ from collections import OrderedDict
 import contextlib
 import tempfile
 from typing import Self
+from subprocess import CompletedProcess
 
 from utils import logging, run_cmd
 from utils.memoshelve import cache
@@ -83,6 +84,11 @@ class Project:
                 files[str(relative_path)] = File.read(file)
         return cls(files)
 
+    def reread(self: Self, directory: str | Path) -> Self:
+        project = self.copy()
+        project.files = self.__class__.read(directory).files
+        return project
+
     def keys(self):
         return self.files.keys()
 
@@ -125,10 +131,13 @@ class Project:
                 yield Path(".").absolute()
 
     @cache()
-    def make(self: Self, *targets: str) -> Self:
+    def run_cmd(self: Self, *args, **kwargs) -> tuple[CompletedProcess[str], Self]:
         with self.tempdir():
-            run_cmd(["make", *targets], shell=False, check=False)
-            return self.__class__.read(".")
+            result = run_cmd(*args, **kwargs)
+            return result, self.reread(".")
+
+    def make(self: Self, *targets: str, check: bool = False) -> tuple[CompletedProcess[str], Self]:
+        return self.run_cmd(["make", *targets], shell=False, check=check)
 
     def clean(self):
         return self.make("clean")

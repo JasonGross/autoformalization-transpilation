@@ -834,7 +834,7 @@ if __name__ == "__main__":
     #   | Binop.plus, x, y  => x + y
     #   | Binop.times, x, y => x * y"""])
     # We expect failures to be like "out of disk space" or "ran out of attempts to try", which should probably be raised rather than returned
-    coq_project = CoqProject.read(f"{SOURCE_DIR}/iso-checker").clean()
+    _, coq_project = CoqProject.read(f"{SOURCE_DIR}/iso-checker").clean()
     lean_export_project = LeanProject.read(EXPORT_DIR)
     (
         lean_export_project,
