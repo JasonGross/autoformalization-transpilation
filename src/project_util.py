@@ -122,9 +122,12 @@ class Project:
             file = File(file)
         self.files[name] = file
 
-    def __ior__(self: Self, other: Self | dict[str, File | bytes | str]) -> Self:
+    def update(self: Self, other: Self | dict[str, File | bytes | str]) -> None:
         for name, file in other.items():
             self[name] = file
+
+    def __ior__(self: Self, other: Self | dict[str, File | bytes | str]) -> Self:
+        self.update(other)
         return self
 
     def __or__(self: Self, other: Self | dict[str, File | bytes | str]) -> Self:

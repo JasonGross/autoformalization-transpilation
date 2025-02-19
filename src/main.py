@@ -95,6 +95,7 @@ def lean_id_to_coq(lean_id: LeanIdentifier) -> CoqIdentifier:
 
 @cache()
 def export_from_lean(project: LeanProject) -> tuple[LeanProject, bool, ExportFile]:
+    project = project.copy()
     with project.tempdir():
         # Mangle files
         run_cmd(
@@ -653,11 +654,7 @@ def generate_and_prove_iso(
 def make_isos(
     project: CoqProject, *targets: str
 ) -> tuple[CoqProject, bool, Optional[str]]:
-    with project.tempdir():
-        # make clean should not be needed, but if it is, we can uncomment this
-        # run_cmd(["make", "clean"], shell=False, check=False)
-        result = run_cmd(["make", *targets], shell=False, check=False)
-        project = CoqProject.read(".")
+    result, project = project.make(*targets, check=False)
     if result.returncode != 0:
         # We log this and then feed it into our iso repair model
         error_message = f"{result.stdout}\n{result.stderr}".strip()
