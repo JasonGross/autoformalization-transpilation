@@ -1,20 +1,20 @@
 #!/usr/bin/env python
 import os
 import re
+import shlex
 import sys
 from dataclasses import dataclass
 from typing import Optional
-import shlex
 
 from config import (
     BUILD_DIR,
     EXAMPLE_STATEMENTS,
     EXPORT_DIR,
+    ISO_CHECKER_HEADER,
     ISO_HEADER,
+    ISO_INTERFACE_HEADER,
     ISO_RETRIES,
     SOURCE_DIR,
-    ISO_INTERFACE_HEADER,
-    ISO_CHECKER_HEADER,
 )
 from utils import logging, run_cmd
 
@@ -447,9 +447,19 @@ def repair_isos(
             lhs = []
             rhs = []
             for _, side, statement in csts:
-                if side == "lhs" and statement not in lhs and statement not in cc_lhs and statement != orig_source:
+                if (
+                    side == "lhs"
+                    and statement not in lhs
+                    and statement not in cc_lhs
+                    and statement != orig_source
+                ):
                     lhs.append(statement)
-                elif side == "rhs" and statement not in rhs and statement not in cc_rhs and statement != orig_target:
+                elif (
+                    side == "rhs"
+                    and statement not in rhs
+                    and statement not in cc_rhs
+                    and statement != orig_target
+                ):
                     rhs.append(statement)
             new_pair = llm_suggest_paired_identifier(lhs, rhs)
             if new_pair:
@@ -587,6 +597,7 @@ def preprocess_source(src):  # Optional[CoqProject]) -> CoqFile:
     # and add the code to this repo
     # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
+
 def extract_coq_identifiers(coq: CoqFile) -> list[CoqIdentifier]:
     # Extract identifiers from Coq statements
     if not coq:
@@ -596,6 +607,7 @@ def extract_coq_identifiers(coq: CoqFile) -> list[CoqIdentifier]:
     else:
         # extract things
         assert False
+
 
 def translate(
     coq: CoqFile, error_code: Optional[str], error: Optional[str]
@@ -627,32 +639,49 @@ def translate_and_prove(
         # TBD by all of us, with varying degrees of handholding
         lean_statements, cl_identifiers = translate(coq_statements, error_code, error)
 
-        # Verify that the Lean code compiles
-        compile_success, error = check_compilation(lean_statements)
-        if not compile_success:
-            assert False, "Lean code does not compile!"
-            # TODO: Kick this back to the translator
-            error_code = "compilation_failure"
-            continue
+        success, error_code, error = check_translation(lean_statements, cl_identifiers)
 
-        # Import statements back into Coq
-        reimport_success, cc_identifiers, error = lean_to_coq(
-            lean_statements, cl_identifiers
-        )
-        # TODO: Kick this back to the translator (if export failed) or end user (if import failed)
-        if not reimport_success:
-            assert False, "Importing from Lean to Coq failed!"
-            error_code = "export_import_failure"
-            continue
-
-        # Generate and prove isomorphism
-        iso_success, error = generate_and_prove_iso(cc_identifiers)
-        if not iso_success:
+        # TODO: we might retry this (or control retries from inspect, TBD)
+        if error_code == "isomorphism_failure":
             assert False, "Failed to prove isomorphisms!"
-            error_code = "isomorphism_failure"
-            continue
-        success = True
+        elif error_code == "export_import_failure":
+            assert False, "Importing from Lean to Coq failed!"
+        elif error_code == "compilation_failure":
+            assert False, "Lean code does not compile!"
+
     return success, lean_statements, cl_identifiers
+
+
+# TODO: Move this (and called functions) to a different file
+def check_translation(
+    lean_statements: LeanFile,
+    cl_identifiers: list[tuple[CoqIdentifier, LeanIdentifier]],
+) -> tuple[bool, Optional[str], Optional[str]]:
+    success, error_code = False, None
+    # Verify that the Lean code compiles
+    compile_success, error = check_compilation(lean_statements)
+    # TODO: Use a class derived from Enum or StrEnum
+    if not compile_success:
+        # TODO: Kick this back to the translator
+        error_code = "compilation_failure"
+        return success, error_code, error
+
+    # Import statements back into Coq
+    reimport_success, cc_identifiers, error = lean_to_coq(
+        lean_statements, cl_identifiers
+    )
+    # TODO: Kick this back to the translator (if export failed) or end user (if import failed)
+    if not reimport_success:
+        error_code = "export_import_failure"
+        return success, error_code, error
+
+    # Generate and prove isomorphism
+    iso_success, error = generate_and_prove_iso(cc_identifiers)
+    if not iso_success:
+        error_code = "isomorphism_failure"
+        return success, error_code, error
+    success = True
+    return success, error_code, error
 
 
 if __name__ == "__main__":

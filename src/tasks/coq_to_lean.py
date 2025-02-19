@@ -10,11 +10,11 @@ from prompts.transpilation import (
     SYSTEM_MESSAGE,
     TRANSLATION_STATE_TEMPLATE,
 )
-from scorers.transpilation import lean_runs_scorer
+from scorers.transpilation import lean_runs_scorer, transpilation_scorer
 from tools.itp import lean_run_tool
 
 EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
-    Path(__file__).parent / "simple-tests" / "proof.v"
+    Path(__file__).parent.parent / "simple-tests" / "proof.v"
 )
 
 
@@ -27,6 +27,7 @@ def coq_to_lean():
     dataset = prepare_dataset([input_msg])
 
     # define task
+    # TODO: Take Coq file and series of Coq identifiers and return a lean file and corresponding lean identifiers
     return Task(
         dataset=dataset,
         solver=basic_agent(
@@ -34,8 +35,9 @@ def coq_to_lean():
             tools=[lean_run_tool()],
             max_attempts=3,
             message_limit=30,
+            token_limit=10_000,
         ),
-        scorer=lean_runs_scorer(),
+        scorer=transpilation_scorer(),
     )
 
 
