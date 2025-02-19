@@ -1,6 +1,7 @@
 from inspect_ai.scorer import (
     CORRECT,
     INCORRECT,
+    PARTIAL,
     Score,
     Target,
     accuracy,
@@ -11,6 +12,7 @@ from inspect_ai.solver import TaskState
 from main import (
     DEFINITION_PAIRS,
     LeanFile,
+    check_translation,
     generate_and_prove_iso,
     import_to_coq,
     lean_to_coq,
@@ -53,28 +55,23 @@ def transpilation_scorer():
             if not answer:
                 raise ModelResponseError("Unable to find lean code in model response.")
 
-            # compile
-            result = run_lean_str(answer)
-            if result["status"] != 0:
-                raise LeanError(f"Error compiling Lean code: {result['stderr']}")
+            # TODO: extract identifiers rather than use sample
+            cl_identifiers = DEFINITION_PAIRS
 
-            # import to Coq
-            lean_file = LeanFile(answer)
-            success, cc_identifiers, error = lean_to_coq(
-                lean_file,
-                DEFINITION_PAIRS,  # TODO: Replace?
-            )
-            if not success:
-                raise LeanError(f"Error importing lean to Coq: {error}")
+            result, error_code, error = check_translation(answer, cl_identifiers)
 
-            # generate and prove isos - (still being worked on)
-            result, errors = generate_and_prove_iso(cc_identifiers)
-            if not result:
-                raise LeanError(f"Error generating and proving iso: {errors}")
+            if result:
+                return Score(value=CORRECT)
 
-            return Score(
-                value=CORRECT,
-            )
+            elif error_code in {
+                "compilation_failure",
+                "export_import_failure",
+                "isomorphism_failure",
+            }:
+                return Score(value=PARTIAL)
+
+            else:
+                return Score(value=INCORRECT)
         except Exception as e:
             return Score(value=INCORRECT, explanation=str(e))
 

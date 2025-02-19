@@ -1,18 +1,19 @@
 #!/usr/bin/env python
-from utils import run_cmd, logging
-from dataclasses import dataclass
 import os
 import re
 import sys
+from dataclasses import dataclass
+from typing import Optional
+
 from config import (
     BUILD_DIR,
-    SOURCE_DIR,
-    EXPORT_DIR,
-    ISO_RETRIES,
-    ISO_HEADER,
     EXAMPLE_STATEMENTS,
+    EXPORT_DIR,
+    ISO_HEADER,
+    ISO_RETRIES,
+    SOURCE_DIR,
 )
-from typing import Optional
+from utils import logging, run_cmd
 
 
 class Project:
@@ -278,8 +279,7 @@ def generate_and_prove_iso(
             result, errors = make_isos()
             if not result:
                 # Should feed all errors for iso repair
-                logging.info(
-                    f"Isomorphism proof failed on attempt {attempt}:")
+                logging.info(f"Isomorphism proof failed on attempt {attempt}:")
                 if attempt < ISO_RETRIES - 1:
                     logging.debug(errors)
                     logging.info("Retrying...")
@@ -353,32 +353,49 @@ def translate_and_prove(
         # TBD by all of us, with varying degrees of handholding
         lean_statements, cl_identifiers = translate(coq_statements, error_code, error)
 
-        # Verify that the Lean code compiles
-        compile_success, error = check_compilation(lean_statements)
-        if not compile_success:
-            assert False, "Lean code does not compile!"
-            # TODO: Kick this back to the translator
-            error_code = "compilation_failure"
-            continue
+        success, error_code, error = check_translation(lean_statements, cl_identifiers)
 
-        # Import statements back into Coq
-        reimport_success, cc_identifiers, error = lean_to_coq(
-            lean_statements, cl_identifiers
-        )
-        # TODO: Kick this back to the translator (if export failed) or end user (if import failed)
-        if not reimport_success:
-            assert False, "Importing from Lean to Coq failed!"
-            error_code = "export_import_failure"
-            continue
-
-        # Generate and prove isomorphism
-        iso_success, error = generate_and_prove_iso(cc_identifiers)
-        if not iso_success:
+        # TODO: we might retry this (or control retries from inspect, TBD)
+        if error_code == "isomorphism_failure":
             assert False, "Failed to prove isomorphisms!"
-            error_code = "isomorphism_failure"
-            continue
-        success = True
+        elif error_code == "export_import_failure":
+            assert False, "Importing from Lean to Coq failed!"
+        elif error_code == "compilation_failure":
+            assert False, "Lean code does not compile!"
+
     return success, lean_statements, cl_identifiers
+
+
+# TODO: Move this (and called functions) to a different file
+def check_translation(
+    lean_statements: LeanFile,
+    cl_identifiers: list[tuple[CoqIdentifier, LeanIdentifier]],
+) -> tuple[bool, Optional[str], Optional[str]]:
+    success, error_code = False, None
+    # Verify that the Lean code compiles
+    compile_success, error = check_compilation(lean_statements)
+    # TODO: Use a class derived from Enum or StrEnum
+    if not compile_success:
+        # TODO: Kick this back to the translator
+        error_code = "compilation_failure"
+        return success, error_code, error
+
+    # Import statements back into Coq
+    reimport_success, cc_identifiers, error = lean_to_coq(
+        lean_statements, cl_identifiers
+    )
+    # TODO: Kick this back to the translator (if export failed) or end user (if import failed)
+    if not reimport_success:
+        error_code = "export_import_failure"
+        return success, error_code, error
+
+    # Generate and prove isomorphism
+    iso_success, error = generate_and_prove_iso(cc_identifiers)
+    if not iso_success:
+        error_code = "isomorphism_failure"
+        return success, error_code, error
+    success = True
+    return success, error_code, error
 
 
 if __name__ == "__main__":
