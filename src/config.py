@@ -1,7 +1,7 @@
 BUILD_DIR = "/root/build"
 SOURCE_DIR = "/root/autoformalization"
 EXPORT_DIR = "/root/lean4export"
-ISO_RETRIES = 3
+ISO_RETRIES = 30  # TODO: change back to 3 when we make this per-iso
 ISO_HEADER = """From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
 Import IsoEq.
 From LeanImport Require Import Lean.

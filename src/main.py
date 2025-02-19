@@ -94,6 +94,11 @@ DEFINITION_PAIRS = list(
     )
 )
 
+KNOWN_PAIRS = [
+    ("Nat.add", "Imported.Nat_add"),
+    ("Nat.mul", "Imported.Nat_mul"),
+]
+
 
 def extract_definitions(file_name: str) -> list[LeanIdentifier]:
     # TODO: Actually do something with Origin.lean
@@ -344,17 +349,15 @@ def parse_iso_errors(errors: str) -> str:
         return "missing_type_iso"
     elif bool(re.search(r"Error:.*?constructor", errors, re.IGNORECASE)):
         return "disordered_constr"
-    elif re.search(
-        r"Error:.*?(iso_statement|isomorphism for statement)", errors, re.IGNORECASE
-    ):
-        return "missing_stmnt_iso"
+    elif "Unfolding unknown" in errors or "Reducing unknown" in errors:
+        return "maybe_missing_stmnt_iso"
     else:
         return "other_iso_issue"
 
 
-def desigil(s):
+def desigil(s, prefix: str = ""):
     if s[0] == "$":
-        return s[1:]
+        return prefix + s[1:]
     return s
 
 
@@ -370,7 +373,7 @@ def repair_isos_interface(
     )
     assert result is not None, re.sub(r"\s+", " ", errors)
     orig_source, source = result.groups()
-    coq_identifiers_str = [f"Original.{desigil(str(s))}" for s in coq_identifiers]
+    coq_identifiers_str = [desigil(str(s), "Original.") for s in coq_identifiers]
     assert orig_source in coq_identifiers_str, (
         orig_source,
         coq_identifiers_str,
@@ -398,7 +401,7 @@ def repair_isos(
             assert result is not None, errors
             orig_source, orig_target, source, target = result.groups()
             cc_identifiers_str = [
-                (f"Original.{desigil(str(s))}", f"Imported.{desigil(str(t))}")
+                (desigil(str(s), "Original."), desigil(str(t), "Imported."))
                 for s, t in cc_identifiers
             ]
             assert (orig_source, orig_target) in cc_identifiers_str, (
@@ -415,18 +418,51 @@ def repair_isos(
                 iso_file,
                 f"Constructors are out of order, please reorder the goals - the error is {error}",
             )
-        case "missing_stmnt_iso":
-            # Heuristically add missing statement (via LLM)
-            statement = re.search(
-                r"Error:.*?(iso_statement|isomorphism for statement).*?for (\w+)",
+        case "maybe_missing_stmnt_iso":
+            csts = re.findall(
+                r"(Unfolding|Reducing) unknown \w+ on (lhs|rhs)\s*:\s*([^ $]+)$",
                 errors,
-                re.IGNORECASE,
-            ).group(
-                2
-            )  # type: ignore
-            llm_repair(
-                iso_file, f"We are missing a statement for {statement}, please fix"
+                flags=re.MULTILINE,
             )
+            last_proving_instance = re.findall(
+                r"Proving iso_statement ([\w\.]+) ([\w\.]+)", errors
+            )
+            if last_proving_instance:
+                last_proving_statement = last_proving_instance[-1]
+                logging.info("Last proving statement found: %s", last_proving_statement)
+            else:
+                logging.info("No proving statement found in the errors.")
+                assert False, errors
+            orig_source, orig_target = last_proving_statement
+            cc_identifiers_str = [
+                (desigil(str(s), "Original."), desigil(str(t), "Imported."))
+                for s, t in cc_identifiers
+            ]
+            assert (orig_source, orig_target) in cc_identifiers_str, (
+                (orig_source, orig_target),
+                cc_identifiers_str,
+            )
+            cc_lhs = [s for s, _ in cc_identifiers]
+            cc_rhs = [t for _, t in cc_identifiers]
+            lhs = []
+            rhs = []
+            for _, side, statement in csts:
+                if side == "lhs" and statement not in lhs and statement not in cc_lhs and statement != orig_source:
+                    lhs.append(statement)
+                elif side == "rhs" and statement not in rhs and statement not in cc_rhs and statement != orig_target:
+                    rhs.append(statement)
+            new_pair = llm_suggest_paired_identifier(lhs, rhs)
+            if new_pair:
+                logging.info(
+                    f"Adding iso_statement {str(new_pair[0])}, {str(new_pair[1])} for {orig_source}, {orig_target}"
+                )
+                index = cc_identifiers_str.index((orig_source, orig_target))
+                cc_identifiers.insert(index, new_pair)
+                generate_isos(cc_identifiers)
+            else:
+                # TODO: rewrite with Nat.add_comm or w/e
+                logging.info((lhs, rhs))
+                assert False, errors
         case "other_iso_issue":
             # Heuristically rewrite to account for Lean vs Coq differences (via LLM / COPRA)
             llm_repair(iso_file, f"Please fix this error in our isomorphisms: {error}")
@@ -435,6 +471,15 @@ def repair_isos(
 
 def llm_repair(file, prompt: str) -> None:
     # Call out to the LLM
+    return None
+
+
+def llm_suggest_paired_identifier(
+    lhs: list[str], rhs: list[str]
+) -> tuple[CoqIdentifier, CoqIdentifier] | None:
+    for coq_id, imported_id in KNOWN_PAIRS:
+        if coq_id in lhs and imported_id in rhs:
+            return (CoqIdentifier(coq_id), CoqIdentifier(imported_id))
     return None
 
 
