@@ -1,21 +1,11 @@
 #!/usr/bin/env python
+import contextlib
 import re
 import sys
-from typing import Optional
-import contextlib
 import tempfile
 from enum import StrEnum
 from pathlib import Path
-from project_util import (
-    CoqFile,
-    CoqIdentifier,
-    CoqProject,
-    LeanProject,
-    LeanFile,
-    LeanIdentifier,
-    ExportFile,
-)
-
+from typing import Optional
 
 from config import (
     EXAMPLE_STATEMENTS,
@@ -26,9 +16,17 @@ from config import (
     ISO_RETRIES,
     SOURCE_DIR,
 )
+from project_util import (
+    CoqFile,
+    CoqIdentifier,
+    CoqProject,
+    ExportFile,
+    LeanFile,
+    LeanIdentifier,
+    LeanProject,
+)
 from utils import logging, run_cmd
 from utils.memoshelve import cache
-
 
 DEFINITION_PAIRS = list(
     map(
@@ -337,6 +335,7 @@ class IsoError(StrEnum):
     DISORDERED_CONSTR = "disordered_constr"
     MAYBE_MISSING_STMNT_ISO = "maybe_missing_stmnt_iso"
     OTHER_ISO_ISSUE = "other_iso_issue"
+    MISSING_IMPORT = "missing_import"
 
 
 def parse_iso_errors(errors: str) -> IsoError:
@@ -345,6 +344,8 @@ def parse_iso_errors(errors: str) -> IsoError:
         return IsoError.MISSING_TYPE_ISO
     elif bool(re.search(r"Error:.*?constructor", errors, re.IGNORECASE)):
         return IsoError.DISORDERED_CONSTR
+    elif "was not found in the current environment." in errors:
+        return IsoError.MISSING_IMPORT
     elif "Unfolding unknown" in errors or "Reducing unknown" in errors:
         return IsoError.MAYBE_MISSING_STMNT_ISO
     else:
@@ -396,6 +397,8 @@ def repair_isos(
     project = project.copy()
     # Look at the errors, attempt to fix the isos
     error = parse_iso_errors(errors)
+    iso_file = f"{SOURCE_DIR}/iso-checker/Isomorphisms.v"
+    logging.info(f"Current error type is {error}")
 
     match error:
         case IsoError.MISSING_TYPE_ISO:
@@ -434,6 +437,24 @@ def repair_isos(
                 iso_file,
                 f"Constructors are out of order, please reorder the goals - the error is {error}",
             )
+
+        case IsoError.MISSING_IMPORT:
+            known_imports = {"Nat.add_comm": "From Coq Require Import Arith."}
+            import_str = re.search(
+                r"Error: The reference ([^\s]+) was not found in the current environment.",
+                errors,
+            ).group(1)
+            if import_str in known_imports:
+                # Add the import to the top of the file
+                run_cmd(
+                    f"sed -i '1i\\{known_imports[import_str]}' {SOURCE_DIR}/iso-checker/Isomorphisms.v"
+                )
+
+            llm_repair(
+                iso_file,
+                f"We are missing an import, please add the correct one - the missing reference is {import_str}",
+            )
+
         case IsoError.MAYBE_MISSING_STMNT_ISO:
             csts = re.findall(
                 r"(Unfolding|Reducing) unknown \w+ on (lhs|rhs)\s*:\s*([^ $]+)$",
@@ -500,23 +521,31 @@ def repair_isos(
                     errors,
                     flags=re.DOTALL,
                 )
+                known_proofs = {
+                    "Nat.add": "iso_no_debug. iso_rel_rewrite Nat.add_comm."
+                }
                 if result:
                     lhs, rhs, errors = result.groups()
-                    assert cc_identifiers_str[index][:2] == (
-                        lhs,
-                        rhs,
-                    ), cc_identifiers_str[index]
-                    new_proof = llm_repair_proof(
-                        "Please fix proof", errors, *cc_identifiers[index]
-                    )
-                    logging.info(f"Setting proof for {lhs}, {rhs} to {new_proof} (from {cc_identifiers[index][2]})")
-                    cc_identifiers[index] = cc_identifiers[index][:2] + (new_proof,)
-                    project = generate_isos(
-                        project,
-                        cc_identifiers,
-                        original_name=original_name,
-                        imported_name=imported_name,
-                    )
+                    if lhs in known_proofs:
+                        insert_proof(lhs, known_proofs[lhs])
+                    else:
+                        assert cc_identifiers_str[index][:2] == (
+                            lhs,
+                            rhs,
+                        ), cc_identifiers_str[index]
+                        new_proof = llm_repair_proof(
+                            "Please fix proof", errors, *cc_identifiers[index]
+                        )
+                        logging.info(
+                            f"Setting proof for {lhs}, {rhs} to {new_proof} (from {cc_identifiers[index][2]})"
+                        )
+                        cc_identifiers[index] = cc_identifiers[index][:2] + (new_proof,)
+                        project = generate_isos(
+                            project,
+                            cc_identifiers,
+                            original_name=original_name,
+                            imported_name=imported_name,
+                        )
                 else:
                     logging.info((lhs, rhs, result))
                     assert False, errors
@@ -533,7 +562,9 @@ def llm_repair_proof(
     rhs: CoqIdentifier,
     cur_proof: str | None,
 ) -> str:
-    if cur_proof is None and re.search(r"rel_iso nat_iso .[\w\.\d]+ \+ [\w\.\d]+.", errors):
+    if cur_proof is None and re.search(
+        r"rel_iso nat_iso .[\w\.\d]+ \+ [\w\.\d]+.", errors
+    ):
         return "iso_no_debug. iso_rel_rewrite Nat.add_comm. iso."
     # Call out to the LLM
     assert False, (lhs, rhs, errors, cur_proof)
@@ -542,6 +573,12 @@ def llm_repair_proof(
 def llm_repair(file, prompt: str) -> None:
     # Call out to the LLM
     assert False, (file, prompt)
+
+
+def insert_proof(identifier: str, proof: str) -> None:
+    iso_file = f"{SOURCE_DIR}/iso-checker/Isomorphisms.v"
+    cmd = f'grep -n "iso_statement {identifier}" {iso_file} | cut -d: -f1 | xargs -I{{}} bash -c \'sed -i "$(({{}}+1))s/.*/Proof. {proof} iso. Defined./" {iso_file}\''
+    run_cmd(cmd)
 
 
 def llm_suggest_paired_identifier(
