@@ -136,7 +136,9 @@ Redirect "{coq_file}.log" Lean Import "{coq_file}.out"."""
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
-    result, project = project.run_cmd(["coqc", f"{coq_file}.v"], check=False, shell=False)
+    result, project = project.run_cmd(
+        ["coqc", f"{coq_file}.v"], check=False, shell=False
+    )
     if result.returncode == 0:
         return project, True, ""
     else:
@@ -163,7 +165,6 @@ def check_compilation(
 ) -> tuple[LeanProject, bool, str]:
     if project is None:
         project = new_lake_project(name="lean-build")
-    assert isinstance(project, LeanProject)  # dumb typechecker around @cache()
 
     # Clear existing code, if any
     if "LeanBuild/Basic.lean" in project:
@@ -803,7 +804,6 @@ def check_translation(
     lean_project, compile_success, error = check_compilation(
         lean_statements, project=lean_project
     )
-    assert isinstance(lean_project, LeanProject)  # dumb typechecker around @cache()
     # TODO: Use a class derived from Enum or StrEnum
     if not compile_success:
         # TODO: Kick this back to the translator
