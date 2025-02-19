@@ -366,6 +366,7 @@ def translate_and_prove(
     return success, lean_statements, cl_identifiers
 
 
+# TODO: Move this (and called functions) to a different file
 def check_translation(
     lean_statements: LeanFile,
     cl_identifiers: list[tuple[CoqIdentifier, LeanIdentifier]],
@@ -373,6 +374,7 @@ def check_translation(
     success, error_code = False, None
     # Verify that the Lean code compiles
     compile_success, error = check_compilation(lean_statements)
+    # TODO: Use a class derived from Enum or StrEnum
     if not compile_success:
         # TODO: Kick this back to the translator
         error_code = "compilation_failure"
