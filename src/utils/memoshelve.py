@@ -3,7 +3,7 @@ import shelve
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union, TypeVar
 
 from dill import Pickler, Unpickler
 
@@ -16,6 +16,7 @@ shelve.Pickler = Pickler
 shelve.Unpickler = Unpickler
 
 memoshelve_cache: Dict[str, Dict[str, Any]] = {}
+T = TypeVar("T")
 
 
 def compact(filename: Union[Path, str], backup: bool = True):
@@ -43,6 +44,7 @@ def memoshelve(
     get_hash: Callable = repr,  # get_hash_ascii,
     get_hash_mem: Optional[Callable] = None,
     print_cache_miss: bool = False,
+    copy: Callable[[T], T] = lambda x: x,
 ):
     """Lightweight memoziation using shelve + in-memory cache"""
     filename = str(Path(filename).absolute())
@@ -74,7 +76,7 @@ def memoshelve(
                             print(f"Error {e} in {filename} with key {key}")
                         if not isinstance(e, (KeyError, AttributeError)):
                             raise e
-                        mem_db[mkey] = db[key] = value(*args, **kwargs)
+                        mem_db[mkey] = db[key] = copy(value(*args, **kwargs))
                     return mem_db[mkey]
 
             yield delegate
@@ -113,6 +115,7 @@ def cache(
     get_hash_mem: Optional[Callable] = None,
     print_cache_miss: bool = False,
     disable: bool = False,
+    copy: Callable[[T], T] = lambda x: x,
 ):
     def wrap(value: Callable):
         path = Path(filename or f".cache/{value.__name__}.shelve")
@@ -130,6 +133,7 @@ def cache(
                     get_hash=get_hash,
                     get_hash_mem=get_hash_mem,
                     print_cache_miss=print_cache_miss,
+                    copy=copy,
                 )() as f:
                     return f(*args, **kwargs)
 
