@@ -136,17 +136,15 @@ Redirect "{coq_file}.log" Lean Import "{coq_file}.out"."""
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
-    with project.tempdir():
-        result = run_cmd(f"coqc {coq_file}.v", check=False)
-        project = CoqProject.read(".")
-        if result.returncode == 0:
-            return project, True, ""
-        else:
-            logging.error("Coq compilation failed")
-            # TODO: Actually retrieve error, for example look at result.stderr, search for the last
-            # instance of 'File "[^"]+", line ([0-9]+), characters ([0-9]+)-([0-9]+):\n', pick out the
-            #  line numbers from the file, so the LLM doesn't have to do arithmetic
-            return project, False, "Coq compilation failed"
+    result, project = project.run_cmd(["coqc", f"{coq_file}.v"], check=False, shell=False)
+    if result.returncode == 0:
+        return project, True, ""
+    else:
+        logging.error("Coq compilation failed")
+        # TODO: Actually retrieve error, for example look at result.stderr, search for the last
+        # instance of 'File "[^"]+", line ([0-9]+), characters ([0-9]+)-([0-9]+):\n', pick out the
+        #  line numbers from the file, so the LLM doesn't have to do arithmetic
+        return project, False, "Coq compilation failed"
 
 
 @cache()

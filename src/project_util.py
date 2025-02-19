@@ -5,6 +5,7 @@ import contextlib
 import tempfile
 from typing import Self
 from subprocess import CompletedProcess
+from copy import deepcopy
 
 from utils import logging, run_cmd
 from utils.memoshelve import cache
@@ -74,23 +75,25 @@ class Project:
         for name, file in self.files.items():
             file.write(directory / name)
 
-    @classmethod
-    def read(cls, directory: str | Path):
+    def reread(self: Self, directory: str | Path) -> None:
         directory = Path(directory)
-        files = OrderedDict()
+        self.files = OrderedDict()
         for file in sorted(directory.iterdir(), key=lambda f: f.stat().st_mtime_ns):
             if file.is_file():
                 relative_path = file.relative_to(directory)
-                files[str(relative_path)] = File.read(file)
-        return cls(files)
+                self.files[str(relative_path)] = File.read(file)
 
-    def reread(self: Self, directory: str | Path) -> Self:
-        project = self.copy()
-        project.files = self.__class__.read(directory).files
-        return project
+    @classmethod
+    def read(cls, directory: str | Path):
+        result = cls()
+        result.reread(directory)
+        return result
 
     def keys(self):
         return self.files.keys()
+
+    def items(self):
+        return self.files.items()
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(files={self.files!r})"
@@ -110,12 +113,24 @@ class Project:
     def __getitem__(self, name: str):
         return self.files[name]
 
-    def __setitem__(self, name: str, file: File | None = None) -> None:
+    def __setitem__(self, name: str, file: File | None | str | bytes = None) -> None:
         if file is None:
             file = self.files[name]
         if name in self.files:
             del self.files[name]
+        if not isinstance(file, File):
+            file = File(file)
         self.files[name] = file
+
+    def __ior__(self: Self, other: Self | dict[str, File | bytes | str]) -> Self:
+        for name, file in other.items():
+            self[name] = file
+        return self
+
+    def __or__(self: Self, other: Self | dict[str, File | bytes | str]) -> Self:
+        result = self.copy()
+        result |= other
+        return result
 
     def __delitem__(self, name: str):
         del self.files[name]
@@ -124,17 +139,28 @@ class Project:
         return self.__class__(self.files.copy())
 
     @contextlib.contextmanager
-    def tempdir(self):
+    def tempdir(self, read_on_exit: bool = True, read_on_error: bool = True):
         with tempfile.TemporaryDirectory(delete=True) as tempdir:
             self.write(tempdir)
             with contextlib.chdir(tempdir):
-                yield Path(".").absolute()
+                try:
+                    yield Path(".").absolute()
+                except Exception as e:
+                    if read_on_error and read_on_exit:
+                        self.reread(".")
+                    raise e
+                if read_on_exit:
+                    self.reread(".")
 
-    @cache()
-    def run_cmd(self: Self, *args, **kwargs) -> tuple[CompletedProcess[str], Self]:
+    def irun_cmd(self: Self, *args, **kwargs) -> CompletedProcess[str]:
         with self.tempdir():
-            result = run_cmd(*args, **kwargs)
-            return result, self.reread(".")
+            return run_cmd(*args, **kwargs)
+
+    @cache(copy=deepcopy)
+    def run_cmd(self: Self, *args, **kwargs) -> tuple[CompletedProcess[str], Self]:
+        project = self.copy()
+        result = project.irun_cmd(*args, **kwargs)
+        return result, project
 
     def make(self: Self, *targets: str, check: bool = False) -> tuple[CompletedProcess[str], Self]:
         return self.run_cmd(["make", *targets], shell=False, check=check)
