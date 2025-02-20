@@ -13,7 +13,7 @@ Typeclasses Opaque rel_iso. (* for speed *)
 """
 ISO_INTERFACE_HEADER = """From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefinitions.
 Import IsoEq.
-#[local] Set Universe Polymorphism.
+#[local] Unset Universe Polymorphism.
 #[local] Set Implicit Arguments.
 Import KnownConstantHints.
 From IsomorphismChecker Require Original.

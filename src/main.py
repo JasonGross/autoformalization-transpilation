@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 import contextlib
 import re
+from dataclasses import dataclass
 import sys
 import tempfile
 from enum import StrEnum
 from pathlib import Path
 from typing import Optional
+from functools import lru_cache
 
 from config import (
     EXAMPLE_STATEMENTS,
@@ -49,7 +51,10 @@ DEFINITION_PAIRS = list(
 KNOWN_PAIRS = [
     ("Nat.add", "Imported.Nat_add"),
     ("Nat.mul", "Imported.Nat_mul"),
+    ("app", "Imported.List_append_inst1"),
 ]
+
+KNOWN_IMPORTS = {"Nat.add_comm": "From Stdlib Require Import Arith."}
 
 
 def extract_definitions(file: LeanFile) -> list[LeanIdentifier]:
@@ -183,7 +188,6 @@ def main : IO Unit :=
     )
 
     # Then build
-    project.write(Path(__file__).parent.parent / "temp_debug")
     _result, project = project.run_cmd(["lake", "update"], shell=False)
     result, project = project.run_cmd(["lake", "build"], shell=False)
     if result.returncode != 0:
@@ -215,13 +219,19 @@ def generate_interface(
         first_id = str(coq_name)
         coq_id = str(coq_name).replace(".", "_")
         iso_name = f"{coq_id}_iso"
-        if str(coq_name)[0] == "$":
+        if coq_id[0] == "$":
             # Python is dynamically typed for a reason
             coq_name = str(coq_name)[1:]
             coq_id = coq_id[1:]
             first_id = f"{original_name}.{coq_name}"
             iso_name = f"{coq_id}_iso"
             iso_names.append(iso_name)
+        elif coq_id[0] == "(":
+            assert coq_id[-1] == ")", coq_id
+            coq_id = coq_id[1:-1]
+            if coq_id[0] == "@":
+                coq_id = coq_id[1:]
+            iso_name = f"{coq_id}_iso"
         iso_interface_block = f"""Parameter imported_{coq_id} : import_of {first_id}.
 Parameter {iso_name} : iso_statement {first_id} imported_{coq_id}.
 Existing Instance {iso_name}."""
@@ -269,7 +279,7 @@ Definition everything := ({" :: ".join(iso_names)} :: [])%hlist."""
 
 def generate_isos(
     project: CoqProject,
-    cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
@@ -285,31 +295,39 @@ def generate_isos(
     # Generate the isomorphism checks for each definition pair
     iso_checks = []
     iso_names = []
-    for coq_name, coq_lean_name, proof in cc_identifiers:
-        proof = proof or "iso."
-        first_id = coq_name
-        second_id = coq_lean_name
-        coq_id = str(coq_name).replace(".", "_")
-        iso_name = f"{coq_id}_iso"
-        if str(coq_name)[0] == "$":
-            # Python is dynamically typed for a reason
-            coq_name = str(coq_name)[1:]  # type: ignore
-            coq_id = coq_id[1:]
-            first_id = f"{original_name}.{coq_name}"  # type: ignore
+    for block in cc_identifiers_blocks:
+        if isinstance(block, str):
+            iso_checks.append(block)
+        else:
+            coq_name, coq_lean_name, proof = block
+            proof = proof or "iso."
+            first_id = coq_name
+            second_id = coq_lean_name
+            coq_id = str(coq_name).replace(".", "_")
             iso_name = f"{coq_id}_iso"
-            iso_names.append(iso_name)
-        if str(coq_lean_name)[0] == "$":
-            coq_lean_name = str(coq_lean_name)[1:]  # type: ignore
-            second_id = imported_name + "." + coq_lean_name  # type: ignore
+            if coq_id[0] == "$":
+                # Python is dynamically typed for a reason
+                coq_name = str(coq_name)[1:]  # type: ignore
+                coq_id = coq_id[1:]
+                first_id = f"{original_name}.{coq_name}"  # type: ignore
+                iso_name = f"{coq_id}_iso"
+                iso_names.append(iso_name)
+            elif coq_id[0] == "(":
+                assert coq_id[-1] == ")", coq_id
+                coq_id = coq_id[1:-1]
+                if coq_id[0] == "@":
+                    coq_id = coq_id[1:]
+                iso_name = f"{coq_id}_iso"
+            if str(coq_lean_name)[0] == "$":
+                coq_lean_name = str(coq_lean_name)[1:]  # type: ignore
+                second_id = imported_name + "." + coq_lean_name  # type: ignore
 
-        iso_names.append(iso_name)
-
-        iso_block = f"""Instance {iso_name} : iso_statement {first_id} {second_id}.
+            iso_block = f"""Instance {iso_name} : iso_statement {first_id} {second_id}.
 Proof. {proof} Defined.
 Instance: KnownConstant {first_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)
 Instance: KnownConstant {second_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)"""
 
-        iso_checks.append(iso_block)
+            iso_checks.append(iso_block)
 
     # Generate a `Print Assumptions` check for dependencies
     print_assumptions_block = f"""Import IsomorphismChecker.Automation.HList.HListNotations.
@@ -328,26 +346,124 @@ Print Assumptions everything."""
     return project
 
 
-class IsoError(StrEnum):
-    MISSING_TYPE_ISO = "missing_type_iso"
-    DISORDERED_CONSTR = "disordered_constr"
-    MAYBE_MISSING_STMNT_ISO = "maybe_missing_stmnt_iso"
-    OTHER_ISO_ISSUE = "other_iso_issue"
-    MISSING_IMPORT = "missing_import"
+@dataclass
+class IsoError:
+    orig_source: str
+    orig_target: str
+
+
+@dataclass
+class MissingTypeIso(IsoError):
+    source: str
+    target: str
+
+
+@dataclass
+class MissingImport(IsoError):
+    import_str: str
+
+
+@dataclass
+class GenericIsoError(IsoError):
+    unknown_lhs: list[str]
+    unknown_rhs: list[str]
+    prefix: str
+    ngoals: int
+    goals: str
+
+    def __str__(self):
+        return f"GenericIsoError(orig_source={self.orig_source}, orig_target={self.orig_target}, unknown_lhs={self.unknown_lhs}, unknown_rhs={self.unknown_rhs}, ngoals={self.ngoals},\n prefix='''{self.prefix}''',\n goals='''{self.goals}''')"
+
+
+@dataclass
+class DisorderedConstr(IsoError):
+    hint: str
+    prefix: str
+    extra_hints: list[str]
+    suffix: str
+
+
+# class IsoErrorKind(StrEnum, IsoError):
+#     DISORDERED_CONSTR = "disordered_constr"
+#     MAYBE_MISSING_STMNT_ISO = "maybe_missing_stmnt_iso"
+#     OTHER_ISO_ISSUE = "other_iso_issue"
 
 
 def parse_iso_errors(errors: str) -> IsoError:
-    # Yes I know this should probably return an enum or something
-    if "Could not find iso" in errors:
-        return IsoError.MISSING_TYPE_ISO
-    elif bool(re.search(r"Error:.*?constructor", errors, re.IGNORECASE)):
-        return IsoError.DISORDERED_CONSTR
-    elif "was not found in the current environment." in errors:
-        return IsoError.MISSING_IMPORT
-    elif "Unfolding unknown" in errors or "Reducing unknown" in errors:
-        return IsoError.MAYBE_MISSING_STMNT_ISO
-    else:
-        return IsoError.OTHER_ISO_ISSUE
+    assert "Proving iso_statement " in errors, errors
+    errors = errors.split("Proving iso_statement ")[-1]
+    last_proving_instance = re.match(
+        r"^([\w\.]+) ([\w\.]+)[\s\n]+(.*)$", errors, flags=re.DOTALL
+    )
+    assert last_proving_instance, errors
+    orig_source, orig_target, errors = last_proving_instance.groups()
+    result = re.search(
+        # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
+        r"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ([\w\.]+|\(@[\w\.]+\)) (?:-> )?([\w\.]+|\(@[\w\.]+\))",
+        errors,
+    )
+    if result:
+        source, target = result.groups()
+        if (orig_source, orig_target) != (source, target):
+            return MissingTypeIso(orig_source, orig_target, source, target)
+    result = re.search(
+        r"Error: The reference ([^\s]+) was not found in the current environment.",
+        errors,
+    )
+    if result:
+        return MissingImport(orig_source, orig_target, result.group(1))
+    if (
+        "Warning: The argument lengths don't match, perhaps the constructors were defined in different orders?"
+        in errors
+    ):
+        blocks = errors.split(
+            "Warning: The argument lengths don't match, perhaps the constructors were defined in different orders?"
+        )
+        hints = [v.strip() for v in dict.fromkeys(blocks[1:-1])]
+        prefix, suffix = blocks[0], blocks[-1]
+        return DisorderedConstr(
+            orig_source, orig_target, hints[0], prefix, hints[1:], suffix
+        )
+
+    result = re.match(
+        # r"^(.*)[\n\s]*While proving iso_statement ([\w\.]+) ([\w\.]+): (\d+) goals? not fully solved:[\s\n]*(.*)",
+        r"^(.*)[\n\s]*Warning:[\s\n]*(\d+) goals? not fully solved:[\s\n]*(.*)",
+        errors,
+        flags=re.DOTALL,
+    )
+    assert result, errors
+    prefix, ngoals, goals = result.groups()
+    csts = list(
+        dict.fromkeys(
+            re.findall(
+                r"(?:Unfolding unknown|Reducing unknown|Skipping the unfolding of) \w+ on (lhs|rhs)\s*:\s*([^ \n$]+)$",
+                prefix,
+                flags=re.MULTILINE,
+            )
+        )
+    )
+    unknown_lhs = [cst for side, cst in csts if side == "lhs" and cst != orig_source]
+    unknown_rhs = [cst for side, cst in csts if side == "rhs" and cst != orig_target]
+    prefix = re.sub(
+        r"(?:Unfolding unknown|Reducing unknown|Skipping the unfolding of) \w+ on (lhs|rhs)\s*:\s*([^ \n$]+)$",
+        "",
+        prefix,
+        flags=re.MULTILINE,
+    ).strip()
+    prefix = re.sub(
+        r"(?:Unfolding|Reducing) unknown \w+ on (lhs|rhs)\s*.missing.$",
+        "",
+        prefix,
+        flags=re.MULTILINE,
+    ).strip()
+    prefix = re.sub(
+        "\n+",
+        "\n",
+        prefix,
+    ).strip()
+    return GenericIsoError(
+        orig_source, orig_target, unknown_lhs, unknown_rhs, prefix, int(ngoals), goals
+    )
 
 
 def desigil(s: str, prefix: str = "") -> str:
@@ -383,200 +499,357 @@ def repair_isos_interface(
     return project, coq_identifiers
 
 
-def repair_isos(
+@lru_cache()
+def make_identifiers_str_helper(
+    cc_identifiers_blocks: tuple[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> list[tuple[str | None, str | None]]:
+    cc_identifiers = [
+        (None, None, None) if isinstance(v, str) else v for v in cc_identifiers_blocks
+    ]
+    return [
+        (
+            desigil(str(s), f"{original_name}.") if s is not None else None,
+            desigil(str(t), f"{imported_name}.") if t is not None else None,
+        )
+        for s, t, _ in cc_identifiers
+    ]
+
+
+def make_identifiers_str(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> list[tuple[str | None, str | None]]:
+    return make_identifiers_str_helper(
+        tuple(cc_identifiers_blocks),
+        original_name=original_name,
+        imported_name=imported_name,
+    )
+
+
+def find_iso_index(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    orig_source: str,
+    orig_target: str | None = None,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> int:
+    cc_identifiers_str = make_identifiers_str(
+        cc_identifiers_blocks, original_name=original_name, imported_name=imported_name
+    )
+    if orig_target is not None:
+        return cc_identifiers_str.index((orig_source, orig_target))
+    else:
+        c_identifiers_str = [s for s, _ in cc_identifiers_str]
+        return c_identifiers_str.index(orig_source)
+
+
+def has_iso(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    orig_source: str,
+    orig_target: str | None = None,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> bool:
+    try:
+        find_iso_index(
+            cc_identifiers_blocks,
+            orig_source,
+            orig_target,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
+        return True
+    except ValueError:
+        return False
+
+
+def has_iso_from(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    orig_source: str,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> bool:
+    cc_identifiers_str = make_identifiers_str(
+        cc_identifiers_blocks, original_name=original_name, imported_name=imported_name
+    )
+    c_identifiers_str = [s for s, _ in cc_identifiers_str]
+    return orig_source in c_identifiers_str
+
+
+def has_iso_to(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    orig_target: str,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> bool:
+    cc_identifiers_str = make_identifiers_str(
+        cc_identifiers_blocks, original_name=original_name, imported_name=imported_name
+    )
+    c_identifiers_str = [t for _, t in cc_identifiers_str]
+    return orig_target in c_identifiers_str
+
+
+def repair_missing_type_iso(
     project: CoqProject,
-    errors: str,
-    cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    error: MissingTypeIso,
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-) -> tuple[CoqProject, list[tuple[CoqIdentifier, CoqIdentifier, str | None]]]:
+) -> tuple[CoqProject, list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]]:
+    index = find_iso_index(
+        cc_identifiers_blocks,
+        error.orig_source,
+        error.orig_target,
+        original_name=original_name,
+        imported_name=imported_name,
+    )
+    logging.info(
+        f"Adding iso_statement {error.source} {error.target} for {error.orig_source} {error.orig_target}"
+    )
+    assert not has_iso(cc_identifiers_blocks, error.source, error.target), (
+        error,
+        cc_identifiers_blocks,
+    )
+    cc_identifiers_blocks.insert(
+        index, (CoqIdentifier(error.source), CoqIdentifier(error.target), None)
+    )
+    project = generate_isos(
+        project,
+        cc_identifiers_blocks,
+        original_name=original_name,
+        imported_name=imported_name,
+        output_file=iso_file,
+    )
+    return project, cc_identifiers_blocks
+
+
+def can_autofix_disordered_constr(
+    error: DisorderedConstr,
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> bool:
+    index = find_iso_index(
+        cc_identifiers_blocks,
+        error.orig_source,
+        error.orig_target,
+        original_name=original_name,
+        imported_name=imported_name,
+    )
+    block = cc_identifiers_blocks[index]
+    assert not isinstance(block, str), block
+    return block[2] is None
+
+
+def autofix_disordered_constr(
+    project: CoqProject,
+    error: DisorderedConstr,
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> tuple[CoqProject, list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]]:
+    index = find_iso_index(
+        cc_identifiers_blocks,
+        error.orig_source,
+        error.orig_target,
+        original_name=original_name,
+        imported_name=imported_name,
+    )
+    block = cc_identifiers_blocks[index]
+    assert not isinstance(block, str), block
+    new_proof = r"""start_iso.
+{ start_step_iso. all: revgoals. all: finish_step_iso. }
+{ symmetrize_rel_iso; start_step_iso. all: revgoals. all: finish_step_iso. }
+{ start_iso_proof; step_iso_proof_full. }
+{ symmetrize_rel_iso; start_iso_proof; step_iso_proof_full. }"""
+    logging.info(
+        f"Updating iso_statement {error.orig_source} {error.orig_target} with proof {new_proof}"
+    )
+    cc_identifiers_blocks[index] = (block[0], block[1], new_proof)
+    project = generate_isos(
+        project,
+        cc_identifiers_blocks,
+        original_name=original_name,
+        imported_name=imported_name,
+        output_file=iso_file,
+    )
+    return project, cc_identifiers_blocks
+
+
+def repair_isos(
+    project: CoqProject,
+    errors: str,
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> tuple[CoqProject, list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]]:
     project = project.copy()
     # Look at the errors, attempt to fix the isos
     error = parse_iso_errors(errors)
-    iso_file = f"{SOURCE_DIR}/iso-checker/Isomorphisms.v"
-    logging.info(f"Current error type is {error}")
+    logging.info(f"Current error type is {type(error)}")
 
-    match error:
-        case IsoError.MISSING_TYPE_ISO:
-            # Add the missing iso and regenerate
-            result = re.search(
-                r"While proving iso_statement ([\w\.]+) ([\w\.]+): Could not find iso for ([\w\.]+) -> ([\w\.]+)",
-                errors,
+    if isinstance(error, MissingTypeIso):
+        project, cc_identifiers_blocks = repair_missing_type_iso(
+            project,
+            error,
+            cc_identifiers_blocks,
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+        )
+    elif isinstance(error, MissingImport):
+        if error.import_str in KNOWN_IMPORTS:
+            logging.info(
+                f"Adding import {KNOWN_IMPORTS[error.import_str]} for iso_statement {error.orig_source} {error.orig_target}"
             )
-            assert result is not None, errors
-            orig_source, orig_target, source, target = result.groups()
-            cc_identifiers_str = [
-                (
-                    desigil(str(s), f"{original_name}."),
-                    desigil(str(t), f"{imported_name}."),
-                )
-                for s, t, _ in cc_identifiers
-            ]
-            assert (orig_source, orig_target) in cc_identifiers_str, (
-                (orig_source, orig_target),
-                cc_identifiers_str,
-            )
-            index = cc_identifiers_str.index((orig_source, orig_target))
-            cc_identifiers.insert(
-                index, (CoqIdentifier(source), CoqIdentifier(target), None)
+            cc_identifiers_blocks.insert(
+                0,
+                KNOWN_IMPORTS[error.import_str],
             )
             project = generate_isos(
                 project,
-                cc_identifiers,
+                cc_identifiers_blocks,
                 original_name=original_name,
                 imported_name=imported_name,
+                output_file=iso_file,
             )
-        case IsoError.DISORDERED_CONSTR:
+        else:
+            assert (
+                False
+            ), f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+    elif isinstance(error, DisorderedConstr):
+        if can_autofix_disordered_constr(
+            error,
+            cc_identifiers_blocks,
+            original_name=original_name,
+            imported_name=imported_name,
+        ):
+            project, cc_identifiers_blocks = autofix_disordered_constr(
+                project,
+                error,
+                cc_identifiers_blocks,
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+            )
+        else:
+            assert False, error
+            # Reorder goals (via LLM) and update proof
             # Reorder goals (via LLM) and update proof
             # TODO: Should just define prompts in a dict somewhere
             llm_repair(
                 iso_file,
                 f"Constructors are out of order, please reorder the goals - the error is {error}",
             )
-
-        case IsoError.MISSING_IMPORT:
-            known_imports = {"Nat.add_comm": "From Coq Require Import Arith."}
-            import_str = re.search(
-                r"Error: The reference ([^\s]+) was not found in the current environment.",
-                errors,
-            ).group(1)
-            if import_str in known_imports:
-                # Add the import to the top of the file
-                run_cmd(
-                    f"sed -i '1i\\{known_imports[import_str]}' {SOURCE_DIR}/iso-checker/Isomorphisms.v"
-                )
-
-            llm_repair(
-                iso_file,
-                f"We are missing an import, please add the correct one - the missing reference is {import_str}",
+    elif isinstance(error, GenericIsoError):
+        index = find_iso_index(
+            cc_identifiers_blocks,
+            error.orig_source,
+            error.orig_target,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
+        unknown_lhs = [
+            cst
+            for cst in error.unknown_lhs
+            if not has_iso_from(
+                cc_identifiers_blocks,
+                cst,
+                original_name=original_name,
+                imported_name=imported_name,
             )
-
-        case IsoError.MAYBE_MISSING_STMNT_ISO:
-            csts = re.findall(
-                r"(Unfolding|Reducing) unknown \w+ on (lhs|rhs)\s*:\s*([^ $]+)$",
-                errors,
-                flags=re.MULTILINE,
+        ]
+        unknown_rhs = [
+            cst
+            for cst in error.unknown_rhs
+            if not has_iso_to(
+                cc_identifiers_blocks,
+                cst,
+                original_name=original_name,
+                imported_name=imported_name,
             )
-            last_proving_instance = re.findall(
-                r"Proving iso_statement ([\w\.]+) ([\w\.]+)", errors
+        ]
+        new_pair = llm_suggest_paired_identifier(unknown_lhs, unknown_rhs)
+        if new_pair:
+            logging.info(
+                f"Adding iso_statement {str(new_pair[0])}, {str(new_pair[1])} for {error.orig_source}, {error.orig_target}"
             )
-            if last_proving_instance:
-                last_proving_statement = last_proving_instance[-1]
-                logging.info("Last proving statement found: %s", last_proving_statement)
-            else:
-                logging.info("No proving statement found in the errors.")
-                assert False, errors
-            orig_source, orig_target = last_proving_statement
-            cc_identifiers_str = [
-                (
-                    desigil(str(s), f"{original_name}."),
-                    desigil(str(t), f"{imported_name}."),
-                )
-                for s, t, _ in cc_identifiers
-            ]
-            assert (orig_source, orig_target) in cc_identifiers_str, (
-                (orig_source, orig_target),
-                cc_identifiers_str,
+            cc_identifiers_blocks.insert(index, (*new_pair, None))
+            project = generate_isos(
+                project,
+                cc_identifiers_blocks,
+                original_name=original_name,
+                imported_name=imported_name,
+                output_file=iso_file,
             )
-            cc_lhs = [s for s, _, _ in cc_identifiers]
-            cc_rhs = [t for _, t, _ in cc_identifiers]
-            lhs = []
-            rhs = []
-            for _, side, statement in csts:
-                if (
-                    side == "lhs"
-                    and statement not in lhs
-                    and statement not in cc_lhs
-                    and statement != orig_source
-                ):
-                    lhs.append(statement)
-                elif (
-                    side == "rhs"
-                    and statement not in rhs
-                    and statement not in cc_rhs
-                    and statement != orig_target
-                ):
-                    rhs.append(statement)
-            index = cc_identifiers_str.index((orig_source, orig_target))
-            new_pair = llm_suggest_paired_identifier(lhs, rhs)
-            if new_pair:
+        else:
+            block = cc_identifiers_blocks[index]
+            assert not isinstance(block, str), block
+            new_proof = llm_repair_proof(error, block[2])
+            if new_proof:
                 logging.info(
-                    f"Adding iso_statement {str(new_pair[0])}, {str(new_pair[1])} for {orig_source}, {orig_target}"
+                    f"Updating iso_statement {error.orig_source} {error.orig_target} with proof {new_proof}"
                 )
-                cc_identifiers.insert(index, (*new_pair, None))
+                cc_identifiers_blocks[index] = (block[0], block[1], new_proof)
                 project = generate_isos(
                     project,
-                    cc_identifiers,
+                    cc_identifiers_blocks,
                     original_name=original_name,
                     imported_name=imported_name,
+                    output_file=iso_file,
                 )
             else:
-                # TODO: rewrite with Nat.add_comm or w/e
-                result = re.search(
-                    r"While proving iso_statement ([\w\.]+) ([\w\.]+): \d+ goals? not fully solved:(.*)",
-                    errors,
-                    flags=re.DOTALL,
-                )
-                known_proofs = {
-                    "Nat.add": "iso_no_debug. iso_rel_rewrite Nat.add_comm."
-                }
-                if result:
-                    lhs, rhs, errors = result.groups()
-                    if lhs in known_proofs:
-                        insert_proof(lhs, known_proofs[lhs])
-                    else:
-                        assert cc_identifiers_str[index][:2] == (
-                            lhs,
-                            rhs,
-                        ), cc_identifiers_str[index]
-                        new_proof = llm_repair_proof(
-                            "Please fix proof", errors, *cc_identifiers[index]
-                        )
-                        logging.info(
-                            f"Setting proof for {lhs}, {rhs} to {new_proof} (from {cc_identifiers[index][2]})"
-                        )
-                        cc_identifiers[index] = cc_identifiers[index][:2] + (new_proof,)
-                        project = generate_isos(
-                            project,
-                            cc_identifiers,
-                            original_name=original_name,
-                            imported_name=imported_name,
-                        )
-                else:
-                    logging.info((lhs, rhs, result))
-                    assert False, errors
-        case IsoError.OTHER_ISO_ISSUE:
-            # Heuristically rewrite to account for Lean vs Coq differences (via LLM / COPRA)
-            llm_repair(iso_file, f"Please fix this error in our isomorphisms: {errors}")
-    return project, cc_identifiers
+                assert False, error
+            # case IsoError.OTHER_ISO_ISSUE:
+            #     # Heuristically rewrite to account for Lean vs Coq differences (via LLM / COPRA)
+            #     llm_repair(
+            #         iso_file, f"Please fix this error in our isomorphisms: {errors}"
+            #     )
+    return project, cc_identifiers_blocks
 
 
 def llm_repair_proof(
-    prompt: str,
-    errors: str,
-    lhs: CoqIdentifier,
-    rhs: CoqIdentifier,
+    error: GenericIsoError,
     cur_proof: str | None,
 ) -> str:
-    if cur_proof is None and re.search(
-        r"rel_iso nat_iso .[\w\.\d]+ \+ [\w\.\d]+.", errors
+    if cur_proof is None:
+        if re.search(r"rel_iso nat_iso .[\w\.\d]+ \+ [\w\.\d]+.", error.goals):
+            return "iso_no_debug_init. iso_rel_rewrite Nat.add_comm. iso_continue."
+        if re.search(r"rel_iso nat_iso .[\w\.\d]+ \* [\w\.\d]+.", error.goals):
+            return "iso_no_debug_init. iso_rel_rewrite Nat.mul_comm. iso_continue."
+        if " ++ " in error.goals:
+            return "iso_no_debug_init. iso_rel_rewrite List.app_assoc. iso_continue."
+    elif (
+        re.search(r"rel_iso nat_iso .[\w\.\d]+ \+ [\w\.\d]+ \* [\w\.\d]+.", error.goals)
+        and cur_proof
+        == "iso_no_debug_init. iso_rel_rewrite Nat.mul_comm. iso_continue."
     ):
-        return "iso_no_debug. iso_rel_rewrite Nat.add_comm. iso."
+        return "iso_no_debug_init. iso_rel_rewrite Nat.mul_comm. iso_no_debug. iso_rel_rewrite Nat.add_comm. iso_continue."
+
     # Call out to the LLM
-    assert False, (lhs, rhs, errors, cur_proof)
+    logging.info(error)
+    assert False, (error, cur_proof)
 
 
 def llm_repair(file, prompt: str) -> None:
     # Call out to the LLM
     assert False, (file, prompt)
-
-
-def insert_proof(identifier: str, proof: str) -> None:
-    iso_file = f"{SOURCE_DIR}/iso-checker/Isomorphisms.v"
-    cmd = f'grep -n "iso_statement {identifier}" {iso_file} | cut -d: -f1 | xargs -I{{}} bash -c \'sed -i "$(({{}}+1))s/.*/Proof. {proof} iso. Defined./" {iso_file}\''
-    run_cmd(cmd)
 
 
 def llm_suggest_paired_identifier(
@@ -617,10 +890,10 @@ def generate_and_prove_iso_interface(
 
 def generate_and_prove_iso(
     project: CoqProject,
-    cc_identifiers: list[tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
 ) -> tuple[CoqProject, bool, Optional[str]]:
     # Make demo file
-    project = generate_isos(project, cc_identifiers)
+    project = generate_isos(project, cc_identifiers_blocks)
 
     # Check that the iso proof compiles
     project, result, errors = make_isos(project, "Checker.vo")
@@ -633,7 +906,9 @@ def generate_and_prove_iso(
         # That is, we should be able to add as many missing isomorphisms as are required, and we shouldn't quit early if we are
         # making progress towards proving more and more isomorphisms.
         while attempt < ISO_RETRIES and errors:
-            project, cc_identifiers = repair_isos(project, errors, cc_identifiers)
+            project, cc_identifiers_blocks = repair_isos(
+                project, errors, cc_identifiers_blocks
+            )
             # Check that the iso proof compiles
             project, result, errors = make_isos(project, "Checker.vo")
             if not result:
@@ -832,7 +1107,7 @@ def check_translation(
 
     # Generate and prove isomorphism
     coq_project, iso_success, error = generate_and_prove_iso(
-        coq_project, cc_identifiers
+        coq_project, list(cc_identifiers)
     )
     if not iso_success:
         error_code = ErrorCode.ISOMORPHISM_FAILURE

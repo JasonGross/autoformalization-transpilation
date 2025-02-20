@@ -172,12 +172,10 @@ class Project:
         return self.make("clean")
 
 
-@dataclass
 class LeanProject(Project):
     pass
 
 
-@dataclass
 class CoqProject(Project):
     pass
 
@@ -189,12 +187,13 @@ class Identifier:
     def __str__(self) -> str:
         return self.name
 
+    def __hash__(self) -> int:
+        return hash(self.name)
 
-@dataclass
+
 class LeanIdentifier(Identifier):
     pass
 
 
-@dataclass
 class CoqIdentifier(Identifier):
     pass
