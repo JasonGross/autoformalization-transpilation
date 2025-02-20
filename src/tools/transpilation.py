@@ -1,54 +1,60 @@
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, Sequence, TypedDict
-from enum import StrEnum
-from sympy.combinatorics.permutations import Permutation
+
+import inspect_ai.util
+from inspect_ai.solver import TaskState
 from inspect_ai.tool import (
-    tool,
-    Tool,
-    ToolError,
-    ToolResult,
     ContentText,
+    Tool,
     ToolError,
     ToolResult,
     tool,
 )
-import inspect_ai.util
 from inspect_ai.util import Store
-from inspect_ai.solver import TaskState
+from sympy.combinatorics.permutations import Permutation
 
-from config import EXPORT_DIR, SOURCE_DIR
-from main import (
-    DEFINITION_PAIRS,
-    KNOWN_IMPORTS,
-    DisorderedConstr,
-    GenericIsoError,
-    IsoError,
-    LeanFile,
-    MissingImport,
-    MissingTypeIso,
+from config import DEFINITION_PAIRS, EXPORT_DIR, KNOWN_IMPORTS, SOURCE_DIR
+from isomorphism_prover import (
     autofix_disordered_constr,
     can_autofix_disordered_constr,
-    check_compilation,
-    check_translation,
-    desigil,
-    extract_coq_identifiers,
     find_iso_index,
     generate_and_prove_iso,
     generate_and_prove_iso_interface,
     generate_isos,
     has_iso_from,
     has_iso_to,
-    import_to_coq,
-    lean_to_coq,
     llm_suggest_paired_identifier,
     make_identifiers_str,
     make_isos,
     parse_iso_errors,
     repair_missing_type_iso,
+)
+from main import (
+    extract_coq_identifiers,
+)
+from project_util import (
+    CoqFile,
+    CoqIdentifier,
+    CoqProject,
+    DisorderedConstr,
+    GenericIsoError,
+    IsoError,
+    LeanFile,
+    LeanIdentifier,
+    LeanProject,
+    MissingImport,
+    MissingTypeIso,
+    desigil,
     sigil,
 )
-from project_util import CoqFile, CoqIdentifier, CoqProject, LeanIdentifier, LeanProject
 from tools.itp import run_lean_str
+from translation_checker import (
+    check_compilation,
+    check_translation,
+    import_to_coq,
+    lean_to_coq,
+)
 from utils import logging
 
 
@@ -564,7 +570,6 @@ def transpilation_tool(
     init_coq_targets: str | Sequence[str] | None = "Automation.vo",
     lean_export_directory: str | Path = EXPORT_DIR,
 ) -> Tool:
-
     coq_statements_file = None if coq_statements is None else CoqFile(coq_statements)
 
     _, init_coq_project = CoqProject.read(iso_checker_path).clean()
@@ -576,9 +581,9 @@ def transpilation_tool(
         if isinstance(init_coq_targets, str):
             init_coq_targets = [init_coq_targets]
         result, coq_project = init_coq_project.make(*init_coq_targets)
-        assert (
-            result.returncode == 0
-        ), f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
+        assert result.returncode == 0, (
+            f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
+        )
     init_lean_export_project = LeanProject.read(lean_export_directory)
 
     coq_identifiers = extract_coq_identifiers(coq_statements_file, sigil=False)
@@ -630,7 +635,7 @@ def transpilation_tool(
             result["failure_phase"] = CompilationPhase.LEAN_COMPILATION
             return ContentText(
                 text=f"""Lean code failed to compile:
-{result['stderr']}"""
+{result["stderr"]}"""
             )
 
         state["cl_identifiers"] = [
@@ -662,7 +667,7 @@ def transpilation_tool(
         if not result["status"]:
             raise ToolError(
                 f"""Lean code failed to import to Coq (please summon a wizard):
-{result['stderr']}"""
+{result["stderr"]}"""
             )
 
         return await generate_and_autorepair_isos()

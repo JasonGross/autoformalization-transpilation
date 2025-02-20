@@ -1,11 +1,11 @@
-from dataclasses import dataclass, field
-from pathlib import Path
-from collections import OrderedDict
 import contextlib
 import tempfile
-from typing import Self
-from subprocess import CompletedProcess
+from collections import OrderedDict
 from copy import deepcopy
+from dataclasses import dataclass, field
+from pathlib import Path
+from subprocess import CompletedProcess
+from typing import Self, TypeVar
 
 from utils import logging, run_cmd
 from utils.memoshelve import cache
@@ -165,7 +165,9 @@ class Project:
         result = project.irun_cmd(*args, **kwargs)
         return result, project
 
-    def make(self: Self, *targets: str, check: bool = False) -> tuple[CompletedProcess[str], Self]:
+    def make(
+        self: Self, *targets: str, check: bool = False
+    ) -> tuple[CompletedProcess[str], Self]:
         return self.run_cmd(["make", *targets], shell=False, check=check)
 
     def clean(self):
@@ -197,3 +199,61 @@ class LeanIdentifier(Identifier):
 
 class CoqIdentifier(Identifier):
     pass
+
+
+@dataclass
+class IsoError:
+    orig_source: str
+    orig_target: str
+
+
+@dataclass
+class MissingTypeIso(IsoError):
+    source: str
+    target: str
+
+
+@dataclass
+class MissingImport(IsoError):
+    import_str: str
+
+
+@dataclass
+class GenericIsoError(IsoError):
+    unknown_lhs: list[str]
+    unknown_rhs: list[str]
+    prefix: str
+    ngoals: int
+    goals: str
+
+    def __str__(self):
+        return f"GenericIsoError(orig_source={self.orig_source}, orig_target={self.orig_target}, unknown_lhs={self.unknown_lhs}, unknown_rhs={self.unknown_rhs}, ngoals={self.ngoals},\n prefix='''{self.prefix}''',\n goals='''{self.goals}''')"
+
+
+@dataclass
+class DisorderedConstr(IsoError):
+    hint: str
+    prefix: str
+    extra_hints: list[str]
+    suffix: str
+
+
+# class IsoErrorKind(StrEnum, IsoError):
+#     DISORDERED_CONSTR = "disordered_constr"
+#     MAYBE_MISSING_STMNT_ISO = "maybe_missing_stmnt_iso"
+#     OTHER_ISO_ISSUE = "other_iso_issue"
+
+
+IDT = TypeVar("IDT", CoqIdentifier, LeanIdentifier, str)
+
+
+def sigil(s: IDT) -> IDT:
+    if isinstance(s, str):
+        return "$" + s
+    return s.__class__(f"${str(s)}")
+
+
+def desigil(s: str, prefix: str = "") -> str:
+    if s[0] == "$":
+        return prefix + s[1:]
+    return s
