@@ -246,38 +246,6 @@ There remain {error.ngoals} goals unsolved:
         raise ToolError(f"Unknown error type {type(error)}: {error}")
 
 
-async def generate_isos_with_admits(*args, **kwargs) -> ToolResult:
-    """keeps admitting iso proofs until the file compiles"""
-    state: ProjectState = inspect_ai.util.store().get("translation_state")
-    result = await generate_and_autorepair_isos(*args, **kwargs)
-
-    if isinstance(result, ContentText) and not result.text.startswith("Success"):
-        error = state["result"]["error"]
-        if error is None:
-            return result
-
-        try:
-            index = find_iso_index(
-                state["cc_identifiers_blocks"],
-                error.orig_source,
-                error.orig_target,
-                original_name=kwargs.get("original_name", "Original"),
-                imported_name=kwargs.get("imported_name", "Imported"),
-            )
-            block = state["cc_identifiers_blocks"][index]
-            if not isinstance(block, str):
-                state["cc_identifiers_blocks"][index] = (
-                    block[0],
-                    block[1],
-                    "start_iso. Admitted.",
-                )
-                logging.info(f"Admitted iso proof for {error.orig_source} to {error.orig_target}")
-                return await generate_isos_with_admits(*args, **kwargs)
-        except:
-            return result
-    return result
-
-
 @tool
 def add_import(
     *,
