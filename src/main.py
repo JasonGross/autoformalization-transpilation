@@ -1,21 +1,24 @@
 #!/usr/bin/env python
 import contextlib
 import re
-from dataclasses import dataclass
 import sys
 import tempfile
+from dataclasses import dataclass
 from enum import StrEnum
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional, TypeVar
-from functools import lru_cache
 
 from config import (
+    DEFINITION_PAIRS,
     EXAMPLE_STATEMENTS,
     EXPORT_DIR,
     ISO_CHECKER_HEADER,
     ISO_HEADER,
     ISO_INTERFACE_HEADER,
     ISO_RETRIES,
+    KNOWN_IMPORTS,
+    KNOWN_PAIRS,
     SOURCE_DIR,
 )
 from project_util import (
@@ -29,32 +32,6 @@ from project_util import (
 )
 from utils import logging, run_cmd
 from utils.memoshelve import cache
-
-DEFINITION_PAIRS = list(
-    map(
-        lambda x: (CoqIdentifier(x[0]), LeanIdentifier(x[1])),
-        [  # TODO: Resolve https://github.com/JasonGross/autoformalization/pull/47#issuecomment-2655085138
-            ("$binop", "$Binop"),
-            ("$exp", "$Exp"),
-            ("$stack", "$Stack"),
-            ("$instr", "$Instr"),
-            ("$binopDenote", "$binopDenote"),
-            ("$instrDenote", "$instrDenote"),
-            ("$prog", "$Prog"),
-            ("$expDenote", "$expDenote"),
-            ("$progDenote", "$progDenote"),
-            ("$compile", "$compile"),
-        ],
-    )
-)
-
-KNOWN_PAIRS = [
-    ("Nat.add", "Imported.Nat_add"),
-    ("Nat.mul", "Imported.Nat_mul"),
-    ("app", "Imported.List_append_inst1"),
-]
-
-KNOWN_IMPORTS = {"Nat.add_comm": "From Stdlib Require Import Arith."}
 
 
 def extract_definitions(file: LeanFile) -> list[LeanIdentifier]:
@@ -212,9 +189,7 @@ def generate_interface(
     # Should also be generating these programmatically, for now these are manual
     # TODO: This should happen in the reimport step!
     # Generate the isomorphism checks for each definition pair
-    iso_interface_checks = []
-    iso_checks = []
-    iso_names = []
+    iso_interface_checks, iso_checks, iso_names = [], [], []
     for coq_name in coq_identifiers:
         first_id = str(coq_name)
         coq_id = str(coq_name).replace(".", "_")
@@ -735,9 +710,9 @@ def repair_isos(
                 output_file=iso_file,
             )
         else:
-            assert (
-                False
-            ), f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+            assert False, (
+                f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+            )
     elif isinstance(error, DisorderedConstr):
         if can_autofix_disordered_constr(
             error,
