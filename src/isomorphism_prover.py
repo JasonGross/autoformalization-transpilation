@@ -1,6 +1,6 @@
-from pathlib import Path
 import re
 from functools import lru_cache
+from pathlib import Path
 from typing import Iterable, Optional
 
 from config import (
@@ -188,7 +188,7 @@ def repair_isos(
     project = project.copy()
     # Look at the errors, attempt to fix the isos
     error = parse_iso_errors(errors)
-    logging.info(f"Current error type is {type(error)}")
+    logging.info(f"Current error type is {type(error).__name__}")
 
     if isinstance(error, MissingTypeIso):
         project, cc_identifiers_blocks = repair_missing_type_iso(
@@ -216,9 +216,9 @@ def repair_isos(
                 output_file=iso_file,
             )
         else:
-            assert (
-                False
-            ), f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+            assert False, (
+                f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+            )
     elif isinstance(error, DisorderedConstr):
         if can_autofix_disordered_constr(
             error,
