@@ -322,8 +322,11 @@ def generate_isos(
                 coq_lean_name = str(coq_lean_name)[1:]  # type: ignore
                 second_id = imported_name + "." + coq_lean_name  # type: ignore
 
+            if not proof.endswith("Admitted."):
+                proof = f"Proof. {proof} Defined."
+
             iso_block = f"""Instance {iso_name} : iso_statement {first_id} {second_id}.
-Proof. {proof} Defined.
+{proof}
 Instance: KnownConstant {first_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)
 Instance: KnownConstant {second_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)"""
 
