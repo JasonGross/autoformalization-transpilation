@@ -8,6 +8,8 @@ from inspect_ai.scorer import (
     scorer,
 )
 from inspect_ai.solver import TaskState
+from inspect_ai.util import Store
+import inspect_ai.util
 
 from main import (
     DEFINITION_PAIRS,
@@ -18,6 +20,7 @@ from main import (
     lean_to_coq,
 )
 from tools.itp import run_lean_str
+from tools.transpilation import CompilationPhase, ProjectState
 
 
 class LeanError(Exception):
@@ -75,4 +78,17 @@ def transpilation_scorer():
         except Exception as e:
             return Score(value=INCORRECT, explanation=str(e))
 
+    return score
+
+@scorer(metrics=[accuracy()])
+def lean_compiles_scorer():
+    """Checks if lean code compiles from the translation state taken from inspect store"""
+    async def score(state: TaskState, target: Target | None):
+        store = inspect_ai.util.store()
+        p_state: ProjectState = store.get("translation_state")
+        if p_state is None:
+            return Score(value=INCORRECT, explanation="No translation state found")
+        if p_state["result"]["failure_phase"] == CompilationPhase.COMPILATION:
+            return Score(value=INCORRECT, explanation="Lean code does not compile")
+        return Score(value=CORRECT)
     return score
