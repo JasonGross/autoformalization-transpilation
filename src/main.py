@@ -476,14 +476,16 @@ def repair_isos_interface(
     project: CoqProject,
     errors: str,
     coq_identifiers: list[CoqIdentifier],
+    *,
     original_name: str = "Original",
+    interface_file: str = "Interface.v",
 ) -> tuple[CoqProject, list[CoqIdentifier]]:
     # Look at the errors, attempt to fix the isos
     result = re.search(
         r"While importing ([\w\.]+): Consider adding iso_statement ([\w\.]+) ",
         re.sub(r"\s+", " ", errors),
     )
-    assert result is not None, re.sub(r"\s+", " ", errors)
+    assert result is not None, (project[interface_file], re.sub(r"\s+", " ", errors))
     orig_source, source = result.groups()
     coq_identifiers_str = [
         desigil(str(s), f"{original_name}.") for s in coq_identifiers
