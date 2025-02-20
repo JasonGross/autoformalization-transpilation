@@ -255,6 +255,7 @@ def transpilation_tool(
     # set some dummy files so that the makefile doesn't fail
     init_coq_project["Isomorphisms.v"] = CoqFile("")
     init_coq_project["Interface.v"] = CoqFile("")
+    init_coq_project["Checker.v"] = CoqFile("")
     if init_coq_targets is not None:
         if isinstance(init_coq_targets, str):
             init_coq_targets = [init_coq_targets]
