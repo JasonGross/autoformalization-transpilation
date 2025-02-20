@@ -43,6 +43,7 @@ from main import (
     make_isos,
     parse_iso_errors,
     repair_missing_type_iso,
+    sigil,
 )
 from project_util import CoqFile, CoqIdentifier, CoqProject, LeanIdentifier, LeanProject
 from tools.itp import run_lean_str
@@ -267,7 +268,7 @@ def transpilation_tool(
 
     coq_identifiers = extract_coq_identifiers(coq_statements_file, sigil=False)
     init_coq_project, interface_success, error = generate_and_prove_iso_interface(
-        init_coq_project, coq_identifiers
+        init_coq_project, list(map(sigil, coq_identifiers))
     )
     assert interface_success, f"Failed to generate and prove interface:\n{error}"
 

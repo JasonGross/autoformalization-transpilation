@@ -6,7 +6,7 @@ import sys
 import tempfile
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TypeVar
 from functools import lru_cache
 
 from config import (
@@ -984,6 +984,15 @@ def extract_coq_identifiers(
     else:
         # extract things
         assert False
+
+
+IDT = TypeVar("IDT", CoqIdentifier, LeanIdentifier, str)
+
+
+def sigil(s: IDT) -> IDT:
+    if isinstance(s, str):
+        return "$" + s
+    return s.__class__(f"${str(s)}")
 
 
 def translate(
