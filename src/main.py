@@ -970,11 +970,16 @@ def preprocess_source(src) -> CoqFile | None:  # Optional[CoqProject]) -> CoqFil
     # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
 
-def extract_coq_identifiers(coq: CoqFile | None) -> list[CoqIdentifier]:
+def extract_coq_identifiers(
+    coq: CoqFile | None, sigil: bool = True
+) -> list[CoqIdentifier]:
     # Extract identifiers from Coq statements
     if not coq:
         # TODO: Have the actual identifier pairs
-        return [coq_id for coq_id, _ in DEFINITION_PAIRS]
+        result = [coq_id for coq_id, _ in DEFINITION_PAIRS]
+        if not sigil:
+            result = [CoqIdentifier(desigil(str(coq_id))) for coq_id in result]
+        return result
 
     else:
         # extract things
