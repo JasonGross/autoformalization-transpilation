@@ -10,3 +10,4 @@ class OpenAIModel(StrEnum):
     DEBUG: str = "openai/gpt-4o-mini-2024-07-18"
     O1PREVIEW: str = "openai/o1-preview-2024-09-12"
     BEST: str = "openai/o3-mini-2025-01-31"
+    O1: str = "openai/o1-2024-12-17"

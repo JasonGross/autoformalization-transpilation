@@ -23,7 +23,7 @@ Rules:
 
     - Do not write any comments in the Lean 4 code.
     - Respond only with the required analysis and code translation.
-    - Provide your analysis and code translation in the exact format specified below so that it can be immediately parsed into a json file. 
+    - Provide your analysis and code translation in the exact format specified below so that it can be immediately parsed into a json file.
 
 Return Schema:
 
@@ -99,9 +99,9 @@ end.
 ```
 
 ```json
-{
+{{
     "identifiers" = ["binopDenote"]
-}
+}}
 ```
 
 Example Output:
@@ -113,11 +113,11 @@ def binopDenote : Binop → Nat → Nat → Nat
 ```
 
 ```json
-{
-    "identifiers": {
+{{
+    "identifiers": {{
         "binopDenote": "binopDenote",
-    }
-}
+    }}
+}}
 ```
 
 Important: Remember to return your response in the exact format specified above so it can be run using a Lean compiler without any changes.

@@ -11,9 +11,10 @@ from prompts.transpilation import (
 )
 from scorers.transpilation import checker_compiles_scorer, isos_proven_scorer
 from tools.itp import lean_run_tool
+from tools.transpilation import transpilation_tool
 
 EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
-    Path(__file__).parent.parent / "simple-tests" / "proof.v"
+    Path(__file__).parent.parent / "simple-tests" / "incomplete.v"
 )
 
 
@@ -31,7 +32,7 @@ def coq_to_lean():
         dataset=dataset,
         solver=basic_agent(
             init=system_message(ALTERNATIVE_SYSTEM_MESSAGE),
-            tools=[lean_run_tool()],
+            tools=[lean_run_tool(), transpilation_tool()],
             max_attempts=3,
             message_limit=30,
             token_limit=10_000,
@@ -44,6 +45,7 @@ if __name__ == "__main__":
     eval(
         coq_to_lean(),
         # model=OpenAIModel.BEST,
-        model=AnthropicModel.BEST,
+        model=OpenAIModel.O1,
+        token_limit=50000,
     )
     pass
