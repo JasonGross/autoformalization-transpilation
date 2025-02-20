@@ -251,7 +251,7 @@ def add_import(
         Adds an import to the Coq project.
 
         Args:
-            import_str (str): The import to be added, for example, "From Coq Require Import List."
+            import_str: The import to be added, for example, "From Coq Require Import List." (str)
         """
         state: ProjectState = inspect_ai.util.store().get("translation_state")
         state["cc_identifiers_blocks"].insert(0, import_str)
@@ -274,7 +274,7 @@ def remove_import(
         Removes an import or other custom added code from the Coq isomorphism file.
 
         Args:
-            code_str (str): The line of code to be removed.
+            code_str: The line of code to be removed. (str)
         """
         state: ProjectState = inspect_ai.util.store().get("translation_state")
         if code_str not in state["cc_identifiers_blocks"]:
@@ -332,9 +332,9 @@ def add_lemma(
         Adds a Coq lemma to the Coq project isomorphism file.
 
         Args:
-            code_str (str): The Coq code to be added.
-            before_source (str): The source identifier before which the lemma should be added.
-            before_target (str|None): The target identifier before which the lemma should be added. Optional.
+            code_str: The Coq code to be added. (str)
+            before_source: The source identifier before which the lemma should be added. (str)
+            before_target: The target identifier before which the lemma should be added. Optional. (str|None)
         """
         state: ProjectState = inspect_ai.util.store().get("translation_state")
         try:
@@ -375,9 +375,9 @@ def add_iso(
         Adds an isomorphism statement to the Coq project.
 
         Args:
-            source (str): The source identifier for the isomorphism.
-            target (str): The target identifier for the isomorphism.
-            before_source (str): The source identifier before which the isomorphism should be added.
+            source: The source identifier for the isomorphism. (str)
+            target: The target identifier for the isomorphism. (str)
+            before_source: The source identifier before which the isomorphism should be added. (str)
         """
         state: ProjectState = inspect_ai.util.store().get("translation_state")
 
@@ -425,9 +425,9 @@ async def edit_proof_higher_order(
     Reorders the constructors of an isomorphism proof based on a given permutation.
 
     Args:
-        iso_source (str): The source identifier for the isomorphism block to be reordered.
-        new_proof (Callable): The new proof for the isomorphism block, taking in the old source, target, and proof and returning the new proof.
-        iso_target (str|None): The target identifier for the isomorphism block to be reordered. Optional.
+        iso_source: The source identifier for the isomorphism block to be reordered. (str)
+        new_proof: The new proof for the isomorphism block, taking in the old source, target, and proof and returning the new proof. (Callable)
+        iso_target: The target identifier for the isomorphism block to be reordered. Optional. (str|None)
     """
     state = inspect_ai.util.store().get("translation_state")
     try:
@@ -490,9 +490,9 @@ def edit_proof(
         Reorders the constructors of an isomorphism proof based on a given permutation.
 
         Args:
-            iso_source (str): The source identifier for the isomorphism block to be reordered.
-            new_proof (str): The new proof for the isomorphism block.
-            iso_target (str|None): The target identifier for the isomorphism block to be reordered. Optional.
+            iso_source: The source identifier for the isomorphism block to be reordered. (str)
+            new_proof: The new proof for the isomorphism block. (str)
+            iso_target: The target identifier for the isomorphism block to be reordered. Optional. (str|None)
         """
         return await edit_proof_higher_order(
             iso_source,
@@ -520,8 +520,8 @@ def repair_iso_by_reorder_constructors(
         Reorders the constructors of an isomorphism proof based on a given permutation.
 
         Args:
-            permutation (list[int]): The new order for the constructors.
-            source (str): The source identifier for the isomorphism block to be reordered.
+            permutation: The new order for the constructors. (list[int])
+            source: The source identifier for the isomorphism block to be reordered. (str)
         """
 
         def new_proof(block: tuple[CoqIdentifier, CoqIdentifier, str | None]):
@@ -592,8 +592,8 @@ def transpilation_tool(
         Submits the given Lean 4 code as the result of translation, with paired identifiers between the Coq and Lean code.
 
         Args:
-            lean_code (str): Lean code to be run
-            coq_lean_identifiers (dict[str, str]): Mapping of Coq identifiers to the corresponding translated Lean identifier
+            lean_code: Lean code to be run (str)
+            coq_lean_identifiers: Mapping of Coq identifiers to the corresponding translated Lean identifier (dict[str, str])
 
         Returns:
             ToolResult: Messages that came up during execution
