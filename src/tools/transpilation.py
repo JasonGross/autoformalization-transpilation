@@ -289,6 +289,80 @@ def remove_import(
     return remove_import
 
 
+def handle_value_error(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    iso_source: str,
+    iso_target: str | None = None,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> ContentText:
+    cc_ids_str = [
+        (s, t)
+        for s, t in make_identifiers_str(
+            cc_identifiers_blocks,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
+        if s is not None
+    ]
+    if iso_target is not None:
+        valid_identifiers = ", ".join(v for v, _ in cc_ids_str)
+        return ContentText(
+            text=f"Failed to find identifier {iso_source} in the isomorphism list; valid identifiers are: {valid_identifiers}"
+        )
+    else:
+        valid_identifiers = "; ".join(f"({s}, {t})" for s, t in cc_ids_str)
+        return ContentText(
+            text=f"Failed to find isomorphism for {iso_source} to {iso_target} in the isomorphism list; valid pairs are: {valid_identifiers}"
+        )
+
+
+@tool
+def add_lemma(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> Tool:
+    async def add_lemma(
+        code_str: str, before_source: str, before_target: str | None = None
+    ) -> ToolResult:
+        """
+        Adds a Coq lemma to the Coq project isomorphism file.
+
+        Args:
+            code_str (str): The Coq code to be added.
+            before_source (str): The source identifier before which the lemma should be added.
+            before_target (str|None): The target identifier before which the lemma should be added. Optional.
+        """
+        state: ProjectState = inspect_ai.util.store().get("translation_state")
+        try:
+            index = find_iso_index(
+                state["cc_identifiers_blocks"],
+                before_source,
+                before_target,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+        except ValueError:
+            return handle_value_error(
+                state["cc_identifiers_blocks"],
+                before_source,
+                before_target,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+
+        state["cc_identifiers_blocks"].insert(index, code_str)
+
+        return await generate_and_autorepair_isos(
+            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+        )
+
+    return add_lemma
+
+
 @tool
 def add_iso(
     *,
@@ -315,17 +389,11 @@ def add_iso(
                 imported_name=imported_name,
             )
         except ValueError:
-            valid_identifiers = ", ".join(
-                v
-                for v, _ in make_identifiers_str(
-                    state["cc_identifiers_blocks"],
-                    original_name=original_name,
-                    imported_name=imported_name,
-                )
-                if v is not None
-            )
-            return ContentText(
-                text=f"Failed to find identifier {before_source} in the isomorphism list; valid identifiers are: {valid_identifiers}"
+            return handle_value_error(
+                state["cc_identifiers_blocks"],
+                before_source,
+                original_name=original_name,
+                imported_name=imported_name,
             )
 
         new_soruce = CoqIdentifier(source)
@@ -371,25 +439,13 @@ async def edit_proof_higher_order(
             imported_name=imported_name,
         )
     except ValueError:
-        cc_ids_str = [
-            (s, t)
-            for s, t in make_identifiers_str(
-                state["cc_identifiers_blocks"],
-                original_name=original_name,
-                imported_name=imported_name,
-            )
-            if s is not None
-        ]
-        if iso_target is not None:
-            valid_identifiers = ", ".join(v for v, _ in cc_ids_str)
-            return ContentText(
-                text=f"Failed to find identifier {iso_source} in the isomorphism list; valid identifiers are: {valid_identifiers}"
-            )
-        else:
-            valid_identifiers = "; ".join(f"({s}, {t})" for s, t in cc_ids_str)
-            return ContentText(
-                text=f"Failed to find isomorphism for {iso_source} to {iso_target} in the isomorphism list; valid pairs are: {valid_identifiers}"
-            )
+        return handle_value_error(
+            state["cc_identifiers_blocks"],
+            iso_source,
+            iso_target,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
 
     block = state["cc_identifiers_blocks"][index]
     assert not isinstance(block, str), block
