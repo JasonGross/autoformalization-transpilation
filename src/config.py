@@ -107,3 +107,28 @@ Exp.const n = e → e = Exp.const n""",
     """def constCmpl (n : Nat) (b : Binop) (e1 e2 : Exp) : Prop :=
 compile e2 ++ compile e1 ++ [Instr.iBinop b] ≠ [Instr.iConst n]""",
 ]
+from project_util import CoqIdentifier, LeanIdentifier
+
+DEFINITION_PAIRS = list(
+    map(
+        lambda x: (CoqIdentifier(x[0]), LeanIdentifier(x[1])),
+        [  # TODO: Resolve https://github.com/JasonGross/autoformalization/pull/47#issuecomment-2655085138
+            ("$binop", "$Binop"),
+            ("$exp", "$Exp"),
+            ("$stack", "$Stack"),
+            ("$instr", "$Instr"),
+            ("$binopDenote", "$binopDenote"),
+            ("$instrDenote", "$instrDenote"),
+            ("$prog", "$Prog"),
+            ("$expDenote", "$expDenote"),
+            ("$progDenote", "$progDenote"),
+            ("$compile", "$compile"),
+        ],
+    )
+)
+KNOWN_PAIRS = [
+    ("Nat.add", "Imported.Nat_add"),
+    ("Nat.mul", "Imported.Nat_mul"),
+    ("app", "Imported.List_append_inst1"),
+]
+KNOWN_IMPORTS = {"Nat.add_comm": "From Stdlib Require Import Arith."}
