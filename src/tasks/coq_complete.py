@@ -24,7 +24,13 @@ def coq_completion():
         dataset=dataset,
         solver=[
             system_message(ALTERNATE_SYSTEM_MESSAGE),
-            use_tools(coq_run_tool(), coq_submit_tool(interface_file_contents=sample_interface, definitions=sample_definitions)),
+            use_tools(
+                coq_run_tool(),
+                coq_submit_tool(
+                    interface_file_contents=sample_interface,
+                    definitions=sample_definitions,
+                ),
+            ),
             generate(),
         ],
         scorer=coq_proven_scorer(),

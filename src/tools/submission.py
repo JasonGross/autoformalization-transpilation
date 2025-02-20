@@ -7,21 +7,24 @@ import shutil
 import asyncio
 from pathlib import Path
 
+
 def store_result(result):
     cur_index = inspect_ai.util.store().get("cur_index", 0)
     inspect_ai.util.store().set(f"result_{cur_index}", result)
     inspect_ai.util.store().set("cur_index", cur_index + 1)
 
+
 @tool
-def coq_submit_tool (
+def coq_submit_tool(
     project_root: str = "",
     extra_files: dict[str, bytes] = {},
     setup_cmds: list = [],
     coq_flags: list[str] = [],
+    project_name: str | None = None,
     definitions: list[str] = [],
     interface_file_contents: str = "",
     file_name: str = "submission.v",
-    white_list: list[str] = ['Closed under the global context']
+    white_list: list[str] = ["Closed under the global context"],
 ):
     temp_dir = tempfile.mkdtemp()
     if project_root:
@@ -30,28 +33,28 @@ def coq_submit_tool (
         file_path = Path(temp_dir) / extra_filename
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_bytes(content)
-    
+
     for cmd in setup_cmds:
         subprocess.run(cmd, shell=True, cwd=temp_dir, check=True)
 
     interface_file = Path(temp_dir) / "Interface.v"
     interface_file.write_text(interface_file_contents)
 
-    #assuming directory name is project_name
-    project_name = Path(temp_dir).name
+    # assuming directory name is project_name
+    project_name = project_name or Path(temp_dir).name
     checker_file = Path(temp_dir) / "Checker.v"
     checker_content = [
         f"From {project_name} Require Import Interface {Path(file_name).stem}.",
         f"Module DoesItCheck <: Interface.Interface := {Path(file_name).stem}.",
-        '\n'.join(f"Print Assumptions DoesItCheck.{name}." for name in definitions)
+        "\n".join(f"Print Assumptions DoesItCheck.{name}." for name in definitions),
     ]
-    checker_file.write_text('\n'.join(checker_content))
-    #remove
+    checker_file.write_text("\n".join(checker_content))
+    # remove
     # print(checker_file.read_text())
 
     async def submit(coq_code: str):
         """
-        Submits the given Coq code in the project environment. Code needs to submitted using this tool to be considered for evaluation. The tool ensures that all definitions from the input file have been written in the submission and there are no assumptions in the given code. It then returns a dictionary containing the status, stdout, stderr, submission status and any assumptions given from the execution of the code. 
+        Submits the given Coq code in the project environment. Code needs to submitted using this tool to be considered for evaluation. The tool ensures that all definitions from the input file have been written in the submission and there are no assumptions in the given code. It then returns a dictionary containing the status, stdout, stderr, submission status and any assumptions given from the execution of the code.
 
         Args:
             coq_code (str): Coq code to be run
@@ -61,23 +64,71 @@ def coq_submit_tool (
         """
         file_path = Path(temp_dir) / file_name
         file_path.write_text(coq_code)
-        command = f"coqc -q -Q . {project_name} Interface.v && coqc -q -Q . {project_name} {file_name} && coqc -q -Q . {project_name} Checker.v"
-        # print(command)
-        process = subprocess.run(command, shell=True, text=True, cwd=temp_dir, capture_output=True)
-        result = {"status": process.returncode, "stdout": process.stdout, "stderr": process.stderr,"submission_status": False, "assumptions": []}
-        if process.returncode == 0:
-            assumptions = process.stdout.strip().split('\n')
-            # print(assumptions)
+
+        command_1 = f"coqc -q -Q . {project_name} Interface.v"
+        process_1 = subprocess.run(
+            command_1, shell=True, text=True, cwd=temp_dir, capture_output=True
+        )
+        if process_1.returncode != 0:
+            return {
+                "status": process_1.returncode,
+                "stdout": process_1.stdout,
+                "stderr": process_1.stderr,
+                "submission_status": False,
+                "assumptions": [],
+                "error_message": f"Failed to compile Interface.v",
+                "interface_file_contents": interface_file_contents,
+            }
+
+        command_2 = f"coqc -q -Q . {project_name} {file_name}"
+        process_2 = subprocess.run(
+            command_2, shell=True, text=True, cwd=temp_dir, capture_output=True
+        )
+        if process_2.returncode != 0:
+            return {
+                "status": process_2.returncode,
+                "stdout": process_2.stdout,
+                "stderr": process_2.stderr,
+                "submission_status": False,
+                "assumptions": [],
+                "error_message": "Failed to compile submission file",
+                "interface_file_contents": interface_file_contents,
+            }
+
+        command_3 = f"coqc -q -Q . {project_name} Checker.v"
+        process_3 = subprocess.run(
+            command_3, shell=True, text=True, cwd=temp_dir, capture_output=True
+        )
+        if process_3.returncode != 0:
+            return {
+                "status": process_3.returncode,
+                "stdout": process_3.stdout,
+                "stderr": process_3.stderr,
+                "submission_status": False,
+                "assumptions": [],
+                "error_message": "Failed to compile Checker.v",
+                "checker_file_contents": checker_content,
+            }
+        print(process_3.stdout)
+        result = {
+            "status": process_3.returncode,
+            "stdout": process_3.stdout,
+            "stderr": process_3.stderr,
+            "submission_status": False,
+            "assumptions": [],
+        }
+        if process_3.returncode == 0:
+            assumptions = process_3.stdout.strip().split("\n")
             result["assumptions"] = assumptions
             if all(assumption in white_list for assumption in assumptions):
                 result["submission_status"] = True
         store_result(result)
         return result
+
     return submit
 
 
-sample_interface = \
-"""
+sample_interface = """
 Module Type Interface.
 
 From Coq Require Import Arith.
@@ -93,8 +144,7 @@ Admitted.
 End Interface.
 """
 
-my_submission = \
-"""
+my_submission = """
 (* First prove the helper lemma plus_0_r *)
 Theorem plus_0_r : forall n : nat, n + 0 = n.
 Proof.
@@ -118,7 +168,9 @@ sample_definitions = ["plus_0_r", "plus_comm"]
 
 if __name__ == "__main__":
     # Example usage
-    submit = coq_submit_tool(definitions=sample_definitions, interface_file_contents=sample_interface)
+    submit = coq_submit_tool(
+        definitions=sample_definitions, interface_file_contents=sample_interface
+    )
     result = asyncio.run(submit(my_submission))
     print(result)
     pass

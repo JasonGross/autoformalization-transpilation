@@ -37,7 +37,7 @@ def coq_run_tool(
             Dict: Compilation status (0 if it worked, 1 if there was an error), stdout (str), and stderr (str)
         """
         result = run_coq_str(coq_code, temp_dir, {}, [], coq_flags)
-        return result
+        return result, coq_code
 
     return run
 
