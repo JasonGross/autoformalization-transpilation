@@ -1,6 +1,7 @@
 from pathlib import Path
-from typing import Any, Sequence, TypedDict
+from typing import Any, Callable, Sequence, TypedDict
 from enum import StrEnum
+from sympy.combinatorics.permutations import Permutation
 from inspect_ai.tool import (
     tool,
     Tool,
@@ -40,6 +41,7 @@ from main import (
     import_to_coq,
     lean_to_coq,
     llm_suggest_paired_identifier,
+    make_identifiers_str,
     make_isos,
     parse_iso_errors,
     repair_missing_type_iso,
@@ -237,9 +239,266 @@ There remain {error.ngoals} goals unsolved:
         raise ToolError(f"Unknown error type {type(error)}: {error}")
 
 
-# TODO: add_import tool
-# TODO: add_iso tool
-# TODO: repair_iso_by_reorder_constructors tool
+@tool
+def add_import(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> Tool:
+    async def add_import(import_str: str) -> ToolResult:
+        """
+        Adds an import to the Coq project.
+
+        Args:
+            import_str (str): The import to be added, for example, "From Coq Require Import List."
+        """
+        state: ProjectState = inspect_ai.util.store().get("translation_state")
+        state["cc_identifiers_blocks"].insert(0, import_str)
+        return await generate_and_autorepair_isos(
+            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+        )
+
+    return add_import
+
+
+@tool
+def remove_import(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> Tool:
+    async def remove_import(code_str: str) -> ToolResult:
+        """
+        Removes an import or other custom added code from the Coq isomorphism file.
+
+        Args:
+            code_str (str): The line of code to be removed.
+        """
+        state: ProjectState = inspect_ai.util.store().get("translation_state")
+        if code_str not in state["cc_identifiers_blocks"]:
+            return ContentText(
+                text=f"Invalid code to remove: {code_str!r}\nValid codes to remove are: {'\n'.join(repr(v) for v in state['cc_identifiers_blocks'] if isinstance(v, str))}"
+            )
+        state["cc_identifiers_blocks"].remove(code_str)
+        return await generate_and_autorepair_isos(
+            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+        )
+
+    return remove_import
+
+
+@tool
+def add_iso(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> Tool:
+    async def add_iso(source: str, target: str, before_source: str) -> ToolResult:
+        """
+        Adds an isomorphism statement to the Coq project.
+
+        Args:
+            source (str): The source identifier for the isomorphism.
+            target (str): The target identifier for the isomorphism.
+            before_source (str): The source identifier before which the isomorphism should be added.
+        """
+        state: ProjectState = inspect_ai.util.store().get("translation_state")
+
+        try:
+            index = find_iso_index(
+                state["cc_identifiers_blocks"],
+                before_source,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+        except ValueError:
+            valid_identifiers = ", ".join(
+                v
+                for v, _ in make_identifiers_str(
+                    state["cc_identifiers_blocks"],
+                    original_name=original_name,
+                    imported_name=imported_name,
+                )
+                if v is not None
+            )
+            return ContentText(
+                text=f"Failed to find identifier {before_source} in the isomorphism list; valid identifiers are: {valid_identifiers}"
+            )
+
+        new_soruce = CoqIdentifier(source)
+        new_target = CoqIdentifier(target)
+        block = state["cc_identifiers_blocks"][index]
+        assert not isinstance(block, str), block
+        logging.info(
+            f"Adding iso_statement {source}, {target} for {str(block[0])}, {str(block[1])}"
+        )
+        state["cc_identifiers_blocks"].insert(index, (new_soruce, new_target, None))
+
+        return await generate_and_autorepair_isos(
+            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+        )
+
+    return add_iso
+
+
+async def edit_proof_higher_order(
+    iso_source: str,
+    new_proof: Callable[[tuple[CoqIdentifier, CoqIdentifier, str | None]], str],
+    iso_target: str | None = None,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> ToolResult:
+    """
+    Reorders the constructors of an isomorphism proof based on a given permutation.
+
+    Args:
+        iso_source (str): The source identifier for the isomorphism block to be reordered.
+        new_proof (Callable): The new proof for the isomorphism block, taking in the old source, target, and proof and returning the new proof.
+        iso_target (str|None): The target identifier for the isomorphism block to be reordered. Optional.
+    """
+    state = inspect_ai.util.store().get("translation_state")
+    try:
+        index = find_iso_index(
+            state["cc_identifiers_blocks"],
+            iso_source,
+            iso_target,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
+    except ValueError:
+        cc_ids_str = [
+            (s, t)
+            for s, t in make_identifiers_str(
+                state["cc_identifiers_blocks"],
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+            if s is not None
+        ]
+        if iso_target is not None:
+            valid_identifiers = ", ".join(v for v, _ in cc_ids_str)
+            return ContentText(
+                text=f"Failed to find identifier {iso_source} in the isomorphism list; valid identifiers are: {valid_identifiers}"
+            )
+        else:
+            valid_identifiers = "; ".join(f"({s}, {t})" for s, t in cc_ids_str)
+            return ContentText(
+                text=f"Failed to find isomorphism for {iso_source} to {iso_target} in the isomorphism list; valid pairs are: {valid_identifiers}"
+            )
+
+    block = state["cc_identifiers_blocks"][index]
+    assert not isinstance(block, str), block
+    cur_proof = block[2]
+    new_proof_str = new_proof(block).strip()
+
+    # Be a bit more lenient with the proof string, and strip off the Proof. and Qed. parts
+    if new_proof_str.startswith("Proof."):
+        new_proof_str = new_proof_str[len("Proof.") :]
+    if new_proof_str.endswith("Qed."):
+        new_proof_str = new_proof_str[: -len("Qed.")]
+    if new_proof_str.endswith("Defined."):
+        new_proof_str = new_proof_str[: -len("Defined.")]
+    new_proof_str = new_proof_str.strip()
+
+    reordered_block = (
+        block[0],
+        block[1],
+        new_proof_str,
+    )
+    state["cc_identifiers_blocks"][index] = reordered_block
+    logging.info(
+        f"Reordered constructors for {iso_source} ({block[0]}) to {block[1]}, new proof is {new_proof_str}, old proof was {cur_proof}"
+    )
+
+    return await generate_and_autorepair_isos(
+        original_name=original_name, imported_name=imported_name, iso_file=iso_file
+    )
+
+
+@tool
+def edit_proof(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> Tool:
+    async def edit_proof(
+        iso_source: str, new_proof: str, iso_target: str | None = None
+    ) -> ToolResult:
+        """
+        Reorders the constructors of an isomorphism proof based on a given permutation.
+
+        Args:
+            iso_source (str): The source identifier for the isomorphism block to be reordered.
+            new_proof (str): The new proof for the isomorphism block.
+            iso_target (str|None): The target identifier for the isomorphism block to be reordered. Optional.
+        """
+        return await edit_proof_higher_order(
+            iso_source,
+            lambda block: new_proof,
+            iso_target=iso_target,
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+        )
+
+    return edit_proof
+
+
+@tool
+def repair_iso_by_reorder_constructors(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+) -> Tool:
+    async def repair_iso_by_reorder_constructors(
+        permutation: list[int], source: str
+    ) -> ToolResult:
+        """
+        Reorders the constructors of an isomorphism proof based on a given permutation.
+
+        Args:
+            permutation (list[int]): The new order for the constructors.
+            source (str): The source identifier for the isomorphism block to be reordered.
+        """
+
+        def new_proof(block: tuple[CoqIdentifier, CoqIdentifier, str | None]):
+            _, _, cur_proof = block
+            logging.info(f"Reordering constructors using permutation {permutation}")
+            permutation_obj: Permutation = Permutation(permutation)
+            if cur_proof is not None and "revgoals" in cur_proof:
+                permutation_obj = permutation_obj.inverse()
+            transpositions = permutation_obj.transpositions()
+
+            inverse_transpositions = permutation_obj.inverse().transpositions()
+            transpose_tactic = " ".join(
+                f"all: swap {i + 1} {j + 1}." for i, j in transpositions
+            )
+            inverse_transpose_tactic = " ".join(
+                f"all: swap {i + 1} {j + 1}." for i, j in inverse_transpositions
+            )
+
+            return f"""start_iso.
+    {{ start_step_iso. {transpose_tactic} finish_step_iso. }}
+    {{ symmetrize_rel_iso; start_step_iso. {inverse_transpose_tactic} all: finish_step_iso. }}
+    {{ start_iso_proof; step_iso_proof_full. }}
+    {{ symmetrize_rel_iso; start_iso_proof; step_iso_proof_full. }}"""
+
+        return await edit_proof_higher_order(
+            source,
+            new_proof,
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+        )
+
+    return repair_iso_by_reorder_constructors
 
 
 @tool
