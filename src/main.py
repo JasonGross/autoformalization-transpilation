@@ -8,7 +8,7 @@ from config import (
     EXPORT_DIR,
     SOURCE_DIR,
 )
-from isomorphism_prover import generate_and_prove_iso_interface
+from isomorphism_prover import generate_and_prove_iso_interface, init_coq_project
 from project_util import (
     CoqFile,
     CoqIdentifier,
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     #   | Binop.plus, x, y  => x + y
     #   | Binop.times, x, y => x * y"""])
     # We expect failures to be like "out of disk space" or "ran out of attempts to try", which should probably be raised rather than returned
-    _, coq_project = CoqProject.read(f"{SOURCE_DIR}/iso-checker").clean()
+    coq_project = init_coq_project()
     lean_export_project = LeanProject.read(EXPORT_DIR)
     (
         lean_export_project,

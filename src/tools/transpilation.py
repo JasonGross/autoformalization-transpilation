@@ -30,6 +30,7 @@ from isomorphism_prover import (
     parse_iso_errors,
     repair_missing_type_iso,
 )
+import isomorphism_prover
 from main import (
     extract_coq_identifiers,
 )
@@ -572,18 +573,14 @@ def transpilation_tool(
 ) -> Tool:
     coq_statements_file = None if coq_statements is None else CoqFile(coq_statements)
 
-    _, init_coq_project = CoqProject.read(iso_checker_path).clean()
-    # set some dummy files so that the makefile doesn't fail
-    init_coq_project["Isomorphisms.v"] = CoqFile("")
-    init_coq_project["Interface.v"] = CoqFile("")
-    init_coq_project["Checker.v"] = CoqFile("")
+    init_coq_project = isomorphism_prover.init_coq_project()
     if init_coq_targets is not None:
         if isinstance(init_coq_targets, str):
             init_coq_targets = [init_coq_targets]
         result, coq_project = init_coq_project.make(*init_coq_targets)
-        assert result.returncode == 0, (
-            f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
     init_lean_export_project = LeanProject.read(lean_export_directory)
 
     coq_identifiers = extract_coq_identifiers(coq_statements_file, sigil=False)

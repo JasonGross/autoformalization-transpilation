@@ -1,6 +1,7 @@
+from pathlib import Path
 import re
 from functools import lru_cache
-from typing import Optional
+from typing import Iterable, Optional
 
 from config import (
     ISO_CHECKER_HEADER,
@@ -9,6 +10,7 @@ from config import (
     ISO_RETRIES,
     KNOWN_IMPORTS,
     KNOWN_PAIRS,
+    SOURCE_DIR,
 )
 from project_util import (
     CoqFile,
@@ -214,9 +216,9 @@ def repair_isos(
                 output_file=iso_file,
             )
         else:
-            assert False, (
-                f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
-            )
+            assert (
+                False
+            ), f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
     elif isinstance(error, DisorderedConstr):
         if can_autofix_disordered_constr(
             error,
@@ -729,3 +731,21 @@ def generate_and_prove_iso_interface(
 
     # Eventually will want to feed back isos but for now just return result
     return project, result, errors
+
+
+def init_coq_project(
+    directory: str | Path = f"{SOURCE_DIR}/iso-checker",
+    initial_targets: Iterable[str] | None = (),
+    allow_build_failure: bool = True,
+    init_empty_files: Iterable[str] = ("Isomorphisms.v", "Checker.v", "Interface.v"),
+) -> CoqProject:
+    _, coq_project = CoqProject.read(directory).clean()
+    for f in init_empty_files:
+        coq_project[f] = CoqFile("")
+    if initial_targets is not None:
+        extra_flags = ["-k"] if allow_build_failure else []
+        result, coq_project = coq_project.make(
+            *initial_targets, *extra_flags, check=not allow_build_failure
+        )
+        assert allow_build_failure or result.returncode == 0, (result, coq_project)
+    return coq_project
