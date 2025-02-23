@@ -90,11 +90,11 @@ def lean_compiles_scorer():
     return score
 
 @scorer(metrics=[accuracy()])
-def checker_compiles_scorer(allow_uip: bool = True, allowed_axioms: list[str] = ["functional_extensionality_dep"]):
+def checker_compiles_scorer(*, allowed_flags: dict[str, Collection[str] | None] = {"definitional UIP": None}, allowed_axioms: Collection[str] = ["functional_extensionality_dep"]):
     """Checks if Checker.vo compiles and check print assumptions output
     
     Args:
-        allow_uip: Whether to allow axioms that rely on definitional UIP
+        allowed_flags: mapping of flags (such as 'definitional UIP') to constants that are allowed to depend on that flag; mapping to None means every constant
         allowed_axioms: List of axiom names that are allowed to appear in Print Assumptions
     """
     async def score(state: TaskState, target: Target | None):
@@ -133,11 +133,12 @@ def checker_compiles_scorer(allow_uip: bool = True, allowed_axioms: list[str] = 
             # Start of new axiom definition
             if line == line.lstrip():
                 if 'relies on' in line:
-                    if 'relies on definitional UIP' in line and allow_uip:
-                        continue
-                    current_axiom = line[:line.find("relies on")].strip()
-                    if current_axiom not in allowed_axioms:
-                        disallowed_axioms.append(current_axiom)
+                    current_axiom, current_flag = line.split("relies on")
+                    current_axiom, current_flag = current_axiom.strip(), current_flag.strip()
+                    if current_flag not in allowed_flags:
+                        disallowed_axioms.append(current_flag)
+                    elif allowed_flags[current_flag] and current_axiom not in allowed_flags[current_flag]:
+                        disallowed_axioms.append(line.strip().rstrip("."))
                 else:
                     current_axiom = line.split(":")[0].strip()
                     if current_axiom not in allowed_axioms:
