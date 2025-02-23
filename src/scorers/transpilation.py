@@ -90,8 +90,13 @@ def lean_compiles_scorer():
     return score
 
 @scorer(metrics=[accuracy()])
-def checker_compiles_scorer():
-    """Checks if Checker.vo compiles and check print assumptions output"""
+def checker_compiles_scorer(allow_uip: bool = True, allowed_axioms: list[str] = ["functional_extensionality_dep"]):
+    """Checks if Checker.vo compiles and check print assumptions output
+    
+    Args:
+        allow_uip: Whether to allow axioms that rely on definitional UIP
+        allowed_axioms: List of axiom names that are allowed to appear in Print Assumptions
+    """
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
         p_state: ProjectState = store.get("translation_state")
@@ -113,13 +118,43 @@ def checker_compiles_scorer():
                 explanation=f"Checker.vo failed to build:\n{compilation_result.stderr}",
                 metadata=metadata
             )
-        if "Axioms:" in compilation_result.stdout:
+        
+        stdout = compilation_result.stdout
+        if "Axioms:" not in stdout:
+            return Score(value=CORRECT, explanation=stdout, metadata=metadata)
+        
+        axioms_section = stdout[stdout.find("Axioms:"):stdout.find("End Print Assumptions")]
+        disallowed_axioms = []
+        
+        for line in axioms_section.split('\n'):
+            if not line or line.startswith("Axioms:"):
+                continue
+            
+            # Start of new axiom definition
+            if line == line.lstrip():
+                if 'relies on' in line:
+                    if 'relies on definitional UIP' in line and allow_uip:
+                        continue
+                    current_axiom = line[:line.find("relies on")].strip()
+                    if current_axiom not in allowed_axioms:
+                        disallowed_axioms.append(current_axiom)
+                else:
+                    current_axiom = line.split(":")[0].strip()
+                    if current_axiom not in allowed_axioms:
+                        disallowed_axioms.append(current_axiom)
+        
+        if disallowed_axioms:
             return Score(
                 value=PARTIAL,
-                explanation="Compilation succeeded but has axioms in assumptions",
+                explanation=f"Compilation succeeded but has disallowed axioms: {', '.join(disallowed_axioms)}\n\nFull Print Assumptions output:\n{stdout}",
                 metadata=metadata
             )
-        return Score(value=CORRECT, explanation="Checker.vo compiled successfully with no axioms", metadata=metadata)
+            
+        return Score(
+            value=CORRECT, 
+            explanation=f"Checker.vo compiled successfully with only allowed axioms.\n\nFull Print Assumptions output:\n{stdout}", 
+            metadata=metadata
+        )
 
     return score
 
