@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Self, TypeVar
+import base64
 
 from utils import logging, run_cmd
 from utils.memoshelve import cache
@@ -13,7 +14,25 @@ from utils.memoshelve import cache
 
 @dataclass
 class File:
-    contents: str | bytes
+    # we would like to use str | bytes, but inspect wants its store to be utf-8 only
+    _contents: str
+    contents_is_bytes: bool = False
+
+    def __init__(self, contents: str | bytes):
+        super().__init__()
+        if isinstance(contents, str):
+            self._contents = contents
+            self.contents_is_bytes = False
+        else:
+            self._contents = base64.b64encode(contents).decode("utf-8")
+            self.contents_is_bytes = True
+
+    @property
+    def contents(self) -> str | bytes:
+        if self.contents_is_bytes:
+            return base64.b64decode(self._contents)
+        else:
+            return self._contents
 
     def __str__(self) -> str:
         return str(self.contents)
@@ -29,6 +48,7 @@ class File:
         if isinstance(self.contents, bytes):
             Path(filepath).write_bytes(self.contents)
         else:
+            assert isinstance(self.contents, str), type(self.contents)
             Path(filepath).write_text(self.contents)
 
     @classmethod
