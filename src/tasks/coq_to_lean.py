@@ -14,7 +14,7 @@ from tools.itp import lean_run_tool
 from tools.transpilation import transpilation_tool
 
 EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
-    Path(__file__).parent.parent / "simple-tests" / "incomplete.v"
+    Path(__file__).parent.parent / "simple-tests" / "incomplete_statements.v"
 )
 
 
