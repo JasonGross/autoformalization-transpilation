@@ -81,11 +81,12 @@ def lean_compiles_scorer():
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
         p_state: ProjectState = store.get("translation_state")
+        metadata = {"translation_state": p_state}
         if p_state is None:
-            return Score(value=INCORRECT, explanation="No translation state found")
+            return Score(value=INCORRECT, explanation="No translation state found", metadata=metadata)
         if p_state["result"].get("failure_phase") == CompilationPhase.LEAN_COMPILATION:
-            return Score(value=INCORRECT, explanation="Lean code does not compile")
-        return Score(value=CORRECT)
+            return Score(value=INCORRECT, explanation="Lean code does not compile", metadata=metadata)
+        return Score(value=CORRECT, explanation="Lean code compiles", metadata=metadata)
     return score
 
 @scorer(metrics=[accuracy()])
@@ -94,29 +95,31 @@ def checker_compiles_scorer():
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
         p_state: ProjectState = store.get("translation_state")
+        metadata = {"translation_state": p_state}
         if p_state is None:
-            return Score(value=INCORRECT, explanation="No translation state found")
+            return Score(value=INCORRECT, explanation="No translation state found", metadata=metadata)
         result = p_state["result"]
         if result.get("failure_phase") == CompilationPhase.LEAN_COMPILATION:
-            return Score(value=INCORRECT, explanation="Lean code does not compile")
+            return Score(value=INCORRECT, explanation="Lean code does not compile", metadata=metadata)
 
         coq_project = p_state.get("coq_project")
         if not coq_project:
-            return Score(value=INCORRECT, explanation="No Coq project state found")
+            return Score(value=INCORRECT, explanation="No Coq project state found", metadata=metadata)
         compilation_result, _ = coq_project.make("Checker.vo", check=False)
 
         if compilation_result.returncode != 0:
             return Score(
                 value=INCORRECT,
-                explanation=f"Checker.vo failed to build:\n{compilation_result.stderr}"
+                explanation=f"Checker.vo failed to build:\n{compilation_result.stderr}",
+                metadata=metadata
             )
         if "Axioms:" in compilation_result.stdout:
             return Score(
-                # @Jason change to INCORRECT?
                 value=PARTIAL,
-                explanation="Compilation succeeded but has axioms in assumptions"
+                explanation="Compilation succeeded but has axioms in assumptions",
+                metadata=metadata
             )
-        return Score(value=CORRECT, explanation="Checker.vo compiled successfully with no axioms")
+        return Score(value=CORRECT, explanation="Checker.vo compiled successfully with no axioms", metadata=metadata)
 
     return score
 
@@ -126,14 +129,15 @@ def isos_proven_scorer():
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
         p_state: ProjectState = store.get("translation_state")
+        metadata = {"translation_state": p_state}
         if p_state is None:
-            return Score(value=INCORRECT, explanation="No translation state found")
+            return Score(value=INCORRECT, explanation="No translation state found", metadata=metadata)
         result = p_state["result"]
         if result.get("failure_phase") == CompilationPhase.LEAN_COMPILATION:
-            return Score(value=INCORRECT, explanation="Lean code does not compile")
+            return Score(value=INCORRECT, explanation="Lean code does not compile", metadata=metadata)
         blocks = p_state.get("cc_identifiers_blocks", [])
         if not blocks:
-            return Score(value=INCORRECT, explanation="No blocks found")
+            return Score(value=INCORRECT, explanation="No blocks found", metadata=metadata)
         total_isos, proven_isos = 0, 0
         for block in blocks:
             if isinstance(block, str):
@@ -145,9 +149,10 @@ def isos_proven_scorer():
                     proven_isos += 1
 
         if total_isos == 0:
-            return Score(value=INCORRECT, explanation="No isomorphism proofs found")
+            return Score(value=INCORRECT, explanation="No isomorphism proofs found", metadata=metadata)
         return Score(
             value=proven_isos / total_isos,
-            explanation=f"{proven_isos}/{total_isos} isomorphism proofs were proven"
+            explanation=f"{proven_isos}/{total_isos} isomorphism proofs were proven",
+            metadata=metadata
         )
     return score
