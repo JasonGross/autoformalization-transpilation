@@ -2,6 +2,7 @@ from pathlib import Path
 
 from inspect_ai import Task, eval, task
 from inspect_ai.solver import basic_agent, system_message
+from inspect_ai.model import CachePolicy
 
 from dataset.prepare import format_translation_input, prepare_dataset
 from models import AnthropicModel, OpenAIModel
@@ -19,7 +20,7 @@ EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
 
 
 @task
-def coq_to_lean():
+def coq_to_lean(cache: CachePolicy | bool = False):
     # dataset
     input_msg = format_translation_input(
         TRANSLATION_STATE_TEMPLATE, EXAMPLE_COQ_FILEPATH
@@ -32,10 +33,14 @@ def coq_to_lean():
         dataset=dataset,
         solver=basic_agent(
             init=system_message(ALTERNATIVE_SYSTEM_MESSAGE),
-            tools=[lean_run_tool(), transpilation_tool(EXAMPLE_COQ_FILEPATH.read_text())],
+            tools=[
+                lean_run_tool(),
+                transpilation_tool(EXAMPLE_COQ_FILEPATH.read_text()),
+            ],
             max_attempts=3,
             message_limit=30,
             token_limit=50_000,
+            cache=cache,
         ),
         scorer=[checker_compiles_scorer(), isos_proven_scorer()],
     )
@@ -43,7 +48,9 @@ def coq_to_lean():
 
 if __name__ == "__main__":
     eval(
-        coq_to_lean(),
+        coq_to_lean(
+            # cache=CachePolicy(expiry=None, per_epoch=False),
+        ),
         # model=OpenAIModel.BEST,
         model=OpenAIModel.O1PREVIEW,
         token_limit=128000,
