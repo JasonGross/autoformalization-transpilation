@@ -4,7 +4,7 @@ from inspect_ai import Task, eval, task
 from inspect_ai.solver import basic_agent, system_message
 
 from dataset.prepare import format_translation_input, prepare_dataset
-from models import AnthropicModel
+from models import AnthropicModel, OpenAIModel
 from prompts.transpilation import (
     ALTERNATIVE_SYSTEM_MESSAGE,
     TRANSLATION_STATE_TEMPLATE,
@@ -35,7 +35,7 @@ def coq_to_lean():
             tools=[lean_run_tool(), transpilation_tool()],
             max_attempts=3,
             message_limit=30,
-            token_limit=10_000,
+            token_limit=50_000,
         ),
         scorer=[checker_compiles_scorer(), isos_proven_scorer()],
     )
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     eval(
         coq_to_lean(),
         # model=OpenAIModel.BEST,
-        model=OpenAIModel.O1,
-        token_limit=50000,
+        model=OpenAIModel.O1PREVIEW,
+        token_limit=128000,
     )
     pass
