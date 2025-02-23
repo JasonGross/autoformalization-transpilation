@@ -145,7 +145,7 @@ def checker_compiles_scorer(allow_uip: bool = True, allowed_axioms: list[str] = 
         
         if disallowed_axioms:
             return Score(
-                value=PARTIAL,
+                value=INCORRECT,
                 explanation=f"Compilation succeeded but has disallowed axioms: {', '.join(disallowed_axioms)}\n\nFull Print Assumptions output:\n{stdout}",
                 metadata=metadata
             )
