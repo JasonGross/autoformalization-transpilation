@@ -150,8 +150,8 @@ def main : IO Unit :=
     )
 
     # Then build
-    _result, project = project.run_cmd(["lake", "update"], shell=False)
-    result, project = project.run_cmd(["lake", "build"], shell=False)
+    _result, project = project.run_cmd(["lake", "update"], shell=False, check=False)
+    result, project = project.run_cmd(["lake", "build"], shell=False, check=False)
     if result.returncode != 0:
         error_message = f"{result.stdout}\n{result.stderr}".strip()
         logging.error(f"Compilation failed: {error_message}")
