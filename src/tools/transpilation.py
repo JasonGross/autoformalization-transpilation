@@ -59,6 +59,8 @@ from translation_checker import (
 from utils import logging
 
 
+_DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR = Path(__file__).parent.parent.parent / "temp_transpilation_errors"
+
 class LeanError(Exception):
     pass
 
@@ -100,7 +102,7 @@ async def generate_and_autorepair_isos(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> ToolResult:
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     state["result"] = {
@@ -296,7 +298,7 @@ def add_import(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
     async def add_import(import_str: str) -> ToolResult:
         """
@@ -323,7 +325,7 @@ def remove_import(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
     async def remove_import(code_str: str) -> ToolResult:
         """
@@ -383,7 +385,7 @@ def add_lemma(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
     async def add_lemma(
         code_str: str, before_source: str, before_target: str | None = None
@@ -432,7 +434,7 @@ def add_iso(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
     async def add_iso(source: str, target: str, before_source: str) -> ToolResult:
         """
@@ -487,7 +489,7 @@ async def edit_proof_higher_order(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> ToolResult:
     """
     Reorders the constructors of an isomorphism proof based on a given permutation.
@@ -553,7 +555,7 @@ def edit_proof(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
     async def edit_proof(
         iso_source: str, new_proof: str, iso_target: str | None = None
@@ -585,7 +587,7 @@ def repair_iso_by_reorder_constructors(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
     async def repair_iso_by_reorder_constructors(
         permutation: list[int], source: str
@@ -642,7 +644,7 @@ def transpilation_tool(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: Path | str | None = None,
+    write_to_directory_on_error: Path | str | None = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
     coq_statements_file = None if coq_statements is None else CoqFile(coq_statements)
 
