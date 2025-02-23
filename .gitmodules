@@ -1,0 +1,6 @@
+[submodule "src/dataset/raw_data/CompCert"]
+	path = src/dataset/raw_data/CompCert
+	url = https://github.com/AbsInt/CompCert.git
+[submodule "src/dataset/raw_data/flocq"]
+	path = src/dataset/raw_data/flocq
+	url = https://gitlab.inria.fr/flocq/flocq
