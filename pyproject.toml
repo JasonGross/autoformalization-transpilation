@@ -13,6 +13,7 @@ dependencies = [
     "mypy>=1.15.0",
     "dill>=0.3.9",
     "sympy>=1.13.3",
+    "coq-tools>=0.0.4",
 ]
 
 [tool.uv]
