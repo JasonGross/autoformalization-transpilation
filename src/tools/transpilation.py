@@ -269,7 +269,7 @@ async def generate_isos_with_admits(*args, **kwargs) -> ToolResult:
                 state["cc_identifiers_blocks"][index] = (
                     block[0],
                     block[1],
-                    "start_iso. Admitted.",
+                    "Admitted.",
                 )
                 logging.info(f"Admitted iso proof for {error.orig_source} to {error.orig_target}")
                 return await generate_isos_with_admits(*args, **kwargs)
