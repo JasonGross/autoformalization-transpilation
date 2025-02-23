@@ -54,6 +54,7 @@ def memoshelve(
 
     @contextmanager
     def open_db():
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
         with shelve.open(filename) as db:
 
             def delegate(*args, **kwargs):
