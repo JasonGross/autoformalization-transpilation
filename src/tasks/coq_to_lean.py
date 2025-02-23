@@ -1,16 +1,15 @@
 from pathlib import Path
 
 from inspect_ai import Task, eval, task
-from inspect_ai.solver import basic_agent, generate, system_message, use_tools
+from inspect_ai.solver import basic_agent, system_message
 
 from dataset.prepare import format_translation_input, prepare_dataset
-from models import AnthropicModel, OpenAIModel
+from models import AnthropicModel
 from prompts.transpilation import (
     ALTERNATIVE_SYSTEM_MESSAGE,
-    SYSTEM_MESSAGE,
     TRANSLATION_STATE_TEMPLATE,
 )
-from scorers.transpilation import lean_runs_scorer, transpilation_scorer
+from scorers.transpilation import checker_compiles_scorer, isos_proven_scorer
 from tools.itp import lean_run_tool
 
 EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
@@ -37,7 +36,7 @@ def coq_to_lean():
             message_limit=30,
             token_limit=10_000,
         ),
-        scorer=transpilation_scorer(),
+        scorer=[checker_compiles_scorer(), isos_proven_scorer()],
     )
 
 
