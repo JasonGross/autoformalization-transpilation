@@ -15,7 +15,7 @@ ISO_INTERFACE_HEADER = """From IsomorphismChecker Require Import Automation Equa
 Import IsoEq.
 #[local] Unset Universe Polymorphism.
 #[local] Set Implicit Arguments.
-Import KnownConstantHints.
+Import KnownConstantHints RelIsoInterfaceHints.
 From IsomorphismChecker Require Original.
 Module Type Interface.
 """
@@ -24,7 +24,7 @@ From IsomorphismChecker Require Import Automation EqualityLemmas IsomorphismDefi
 Import IsoEq.
 #[local] Unset Universe Polymorphism.
 #[local] Set Implicit Arguments.
-Import KnownConstantHints.
+Import KnownConstantHints RelIsoInterfaceHints.
 From IsomorphismChecker Require Original Interface Isomorphisms.
 Module CheckAssumptions.
 Import Ltac2.Ltac2 Ltac2.Printf.

@@ -1,4 +1,5 @@
 import contextlib
+from copy import deepcopy
 import tempfile
 from enum import StrEnum
 from pathlib import Path
@@ -117,7 +118,7 @@ def check_translation(
     return lean_export_project, lean_project, coq_project, success, error_code, error
 
 
-@cache()
+@cache(copy=deepcopy)
 def new_lake_project(name: str = "lean-build") -> LeanProject:
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
@@ -127,7 +128,7 @@ def new_lake_project(name: str = "lean-build") -> LeanProject:
         return LeanProject.read(tempdir / name)
 
 
-@cache()
+@cache(copy=deepcopy)
 def check_compilation(
     lean_statements: LeanFile, project: LeanProject | None = None
 ) -> tuple[LeanProject, bool, str]:
@@ -154,6 +155,7 @@ def main : IO Unit :=
     # Then build
     _result, project = project.run_cmd(["lake", "update"], shell=False, check=False)
     result, project = project.run_cmd(["lake", "build"], shell=False, check=False)
+
     if result.returncode != 0:
         error_message = f"{result.stdout}\n{result.stderr}".strip()
         logging.error(f"Compilation failed: {error_message}")

@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Self, TypeVar
+from typing import Iterator, Self, TypeVar
 import base64
 
 from utils import logging, run_cmd
@@ -127,11 +127,14 @@ class Project:
             result.append(f"File: {name}\n```\n{file.contents}\n```\n")
         return "\n".join(result)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self.files)
 
     def __getitem__(self, name: str):
         return self.files[name]
+
+    def __contains__(self, name: str) -> bool:
+        return name in self.files
 
     def __setitem__(self, name: str, file: File | None | str | bytes = None) -> None:
         if file is None:

@@ -216,9 +216,9 @@ def repair_isos(
                 output_file=iso_file,
             )
         else:
-            assert False, (
-                f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
-            )
+            assert (
+                False
+            ), f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
     elif isinstance(error, DisorderedConstr):
         if can_autofix_disordered_constr(
             error,
@@ -495,9 +495,11 @@ def repair_isos_interface(
 ) -> tuple[CoqProject, list[CoqIdentifier]]:
     # Look at the errors, attempt to fix the isos
     result = re.search(
-        r"While importing ([\w\.]+): Consider adding iso_statement ([\w\.]+) ",
+        r"While importing ([\w\.]+): Consider adding iso_statement ([\w\.]+|\(@[\w\.]+\)) ",
         re.sub(r"\s+", " ", errors),
     )
+    if result is None:
+        project.write(Path(__file__).parent.parent / "temp_interface_errors")
     assert result is not None, (project[interface_file], re.sub(r"\s+", " ", errors))
     orig_source, source = result.groups()
     coq_identifiers_str = [

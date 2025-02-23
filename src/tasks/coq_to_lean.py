@@ -32,7 +32,7 @@ def coq_to_lean():
         dataset=dataset,
         solver=basic_agent(
             init=system_message(ALTERNATIVE_SYSTEM_MESSAGE),
-            tools=[lean_run_tool(), transpilation_tool()],
+            tools=[lean_run_tool(), transpilation_tool(EXAMPLE_COQ_FILEPATH.read_text())],
             max_attempts=3,
             message_limit=30,
             token_limit=50_000,

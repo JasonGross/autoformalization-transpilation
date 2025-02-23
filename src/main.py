@@ -43,6 +43,15 @@ def preprocess_source(src) -> CoqFile | None:  # Optional[CoqProject]) -> CoqFil
     # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
 
+def coq_identifiers_of_list(
+    coq_list: list[str], sigil: bool = True
+) -> list[CoqIdentifier]:
+    result = [CoqIdentifier(s) for s in coq_list]
+    if sigil:
+        result = [CoqIdentifier(f"${coq_id}") for coq_id in result]
+    return result
+
+
 def extract_coq_identifiers(
     coq: CoqFile | None, sigil: bool = True
 ) -> list[CoqIdentifier]:
@@ -57,11 +66,14 @@ def extract_coq_identifiers(
     else:
         # not perfect, but best-effort
         assert isinstance(coq.contents, str), "CoqFile contents must be a string"
-        result = re.findall(r"(?:Theorem|Lemma|Fact|Remark|Corollary|Proposition|Property|Definition|Example|SubClass|Inductive|CoInductive|Variant|Record|Structure|Class|Fixpoint|CoFixpoint)\s+([^\s\(]+)", coq.contents, flags=re.DOTALL)
-        result = [CoqIdentifier(s) for s in result]
-        if sigil:
-            result = [CoqIdentifier(f"${coq_id}") for coq_id in result]
-        return result
+        return coq_identifiers_of_list(
+            re.findall(
+                r"(?:Theorem|Lemma|Fact|Remark|Corollary|Proposition|Property|Definition|Example|SubClass|Inductive|CoInductive|Variant|Record|Structure|Class|Fixpoint|CoFixpoint)\s+([^\s\(]+)",
+                coq.contents,
+                flags=re.DOTALL,
+            ),
+            sigil=sigil,
+        )
 
 
 def translate(
