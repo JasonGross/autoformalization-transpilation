@@ -1,3 +1,4 @@
+from typing import Collection
 from inspect_ai.scorer import (
     CORRECT,
     INCORRECT,
