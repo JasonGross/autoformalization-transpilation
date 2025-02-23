@@ -100,6 +100,7 @@ async def generate_and_autorepair_isos(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> ToolResult:
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     state["result"] = {
@@ -146,7 +147,10 @@ async def generate_and_autorepair_isos(
             iso_file=iso_file,
         )
         return await generate_and_autorepair_isos(
-            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
         )
     elif isinstance(error, MissingImport):
         if error.import_str in KNOWN_IMPORTS:
@@ -161,8 +165,11 @@ async def generate_and_autorepair_isos(
                 original_name=original_name,
                 imported_name=imported_name,
                 iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
             )
         else:
+            if write_to_directory_on_error is not None:
+                state["coq_project"].write(write_to_directory_on_error)
             return ContentText(
                 text=f"Failed to prove isomorphisms because of missing import, please invoke the add_import tool with an import to make available the missing reference {error.import_str}"
             )
@@ -187,8 +194,11 @@ async def generate_and_autorepair_isos(
                 original_name=original_name,
                 imported_name=imported_name,
                 iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
             )
         else:
+            if write_to_directory_on_error is not None:
+                state["coq_project"].write(write_to_directory_on_error)
             return ContentText(
                 text=f"Failed to prove isomorphism between {error.orig_source} and {error.orig_target} because the constructors are out of order.  This can be fixed by invoking the repair_iso_by_reorder_constructors tool with a permutation. The constructor misalignment is: {error.hint}"
             )
@@ -228,6 +238,8 @@ This might be because we are missing an isomorphism between some identifier that
 left: {unknown_lhs}
 right: {unknown_rhs}
 """
+        if write_to_directory_on_error is not None:
+            state["coq_project"].write(write_to_directory_on_error)
         return ContentText(
             text=f"""Failed to prove isomorphism between {error.orig_source} and {error.orig_target}.
 {missing_iso_text}
@@ -284,6 +296,7 @@ def add_import(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> Tool:
     async def add_import(import_str: str) -> ToolResult:
         """
@@ -295,7 +308,10 @@ def add_import(
         state: ProjectState = inspect_ai.util.store().get("translation_state")
         state["cc_identifiers_blocks"].insert(0, import_str)
         return await generate_and_autorepair_isos(
-            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
         )
 
     return add_import
@@ -307,6 +323,7 @@ def remove_import(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> Tool:
     async def remove_import(code_str: str) -> ToolResult:
         """
@@ -322,7 +339,10 @@ def remove_import(
             )
         state["cc_identifiers_blocks"].remove(code_str)
         return await generate_and_autorepair_isos(
-            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
         )
 
     return remove_import
@@ -363,6 +383,7 @@ def add_lemma(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> Tool:
     async def add_lemma(
         code_str: str, before_source: str, before_target: str | None = None
@@ -396,7 +417,10 @@ def add_lemma(
         state["cc_identifiers_blocks"].insert(index, code_str)
 
         return await generate_and_autorepair_isos(
-            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
         )
 
     return add_lemma
@@ -408,6 +432,7 @@ def add_iso(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> Tool:
     async def add_iso(source: str, target: str, before_source: str) -> ToolResult:
         """
@@ -445,7 +470,10 @@ def add_iso(
         state["cc_identifiers_blocks"].insert(index, (new_soruce, new_target, None))
 
         return await generate_and_autorepair_isos(
-            original_name=original_name, imported_name=imported_name, iso_file=iso_file
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
         )
 
     return add_iso
@@ -459,6 +487,7 @@ async def edit_proof_higher_order(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> ToolResult:
     """
     Reorders the constructors of an isomorphism proof based on a given permutation.
@@ -511,7 +540,10 @@ async def edit_proof_higher_order(
     )
 
     return await generate_and_autorepair_isos(
-        original_name=original_name, imported_name=imported_name, iso_file=iso_file
+        original_name=original_name,
+        imported_name=imported_name,
+        iso_file=iso_file,
+        write_to_directory_on_error=write_to_directory_on_error,
     )
 
 
@@ -521,6 +553,7 @@ def edit_proof(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> Tool:
     async def edit_proof(
         iso_source: str, new_proof: str, iso_target: str | None = None
@@ -540,6 +573,7 @@ def edit_proof(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
         )
 
     return edit_proof
@@ -551,6 +585,7 @@ def repair_iso_by_reorder_constructors(
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> Tool:
     async def repair_iso_by_reorder_constructors(
         permutation: list[int], source: str
@@ -591,6 +626,7 @@ def repair_iso_by_reorder_constructors(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
         )
 
     return repair_iso_by_reorder_constructors
@@ -599,9 +635,14 @@ def repair_iso_by_reorder_constructors(
 @tool
 def transpilation_tool(
     coq_statements: str | None = None,
+    *,
     iso_checker_path: str | Path = f"{SOURCE_DIR}/iso-checker",
     init_coq_targets: str | Sequence[str] | None = "Automation.vo",
     lean_export_directory: str | Path = EXPORT_DIR,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = None,
 ) -> Tool:
     coq_statements_file = None if coq_statements is None else CoqFile(coq_statements)
 
@@ -660,6 +701,8 @@ def transpilation_tool(
             state["lean_statements"], project=None
         )
         if not result["status"]:
+            if write_to_directory_on_error is not None:
+                state["lean_project"].write(write_to_directory_on_error)
             result["suggestion"] = "Lean code failed to compile."
             result["failure_phase"] = CompilationPhase.LEAN_COMPILATION
             return ContentText(
@@ -694,11 +737,18 @@ def transpilation_tool(
         state["cc_identifiers_blocks"] = list(cc_identifiers_blocks)
 
         if not result["status"]:
+            if write_to_directory_on_error is not None:
+                state["coq_project"].write(write_to_directory_on_error)
             raise ToolError(
                 f"""Lean code failed to import to Coq (please summon a wizard):
 {result["stderr"]}"""
             )
 
-        return await generate_and_autorepair_isos()
+        return await generate_and_autorepair_isos(
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
+        )
 
     return translate
