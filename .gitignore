@@ -227,3 +227,5 @@ iso-checker/Interface.v
 iso-checker/Checker.v
 iso-checker/imported.out
 *.out
+
+._*
