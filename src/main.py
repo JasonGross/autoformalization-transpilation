@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import re
 from typing import Optional
 
 from config import (
@@ -54,8 +55,13 @@ def extract_coq_identifiers(
         return result
 
     else:
-        # extract things
-        assert False
+        # not perfect, but best-effort
+        assert isinstance(coq.contents, str), "CoqFile contents must be a string"
+        result = re.findall(r"(?:Theorem|Lemma|Fact|Remark|Corollary|Proposition|Property|Definition|Example|SubClass|Inductive|CoInductive|Variant|Record|Structure|Class|Fixpoint|CoFixpoint)\s+([^\s\(]+)", coq.contents, flags=re.DOTALL)
+        result = [CoqIdentifier(s) for s in result]
+        if sigil:
+            result = [CoqIdentifier(f"${coq_id}") for coq_id in result]
+        return result
 
 
 def translate(
