@@ -133,6 +133,8 @@ def check_compilation(
 ) -> tuple[LeanProject, bool, str]:
     if project is None:
         project = new_lake_project(name="lean-build")
+    else:
+        project = project.copy()
 
     # Clear existing code, if any
     if "LeanBuild/Basic.lean" in project:
