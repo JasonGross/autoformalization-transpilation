@@ -67,6 +67,7 @@ def memoshelve(
                     key = get_hash((args, kwargs))
                     try:
                         mem_db[mkey] = db[key]
+                        return mem_db[mkey]
                     except Exception as e:
                         if isinstance(e, KeyError):
                             if print_cache_miss:
@@ -77,7 +78,7 @@ def memoshelve(
                             print(f"Error {e} in {filename} with key {key}")
                         if not isinstance(e, (KeyError, AttributeError)):
                             raise e
-                        mem_db[mkey] = db[key] = copy(value(*args, **kwargs))
+                    mem_db[mkey] = db[key] = copy(value(*args, **kwargs))
                     return mem_db[mkey]
 
             yield delegate
