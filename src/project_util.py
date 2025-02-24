@@ -11,6 +11,9 @@ import base64
 from utils import logging, run_cmd
 from utils.memoshelve import cache, hash_as_tuples
 
+full_repr: bool = False
+full_repr_threshold: int = 100
+
 
 @dataclass
 class File:
@@ -46,8 +49,12 @@ class File:
         begin, end = self.contents[:10], self.contents[-10:]
         return f"{begin}...{end}"
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.contents!r})"
+    def __repr__(self, full: bool | None = False) -> str:
+        full = full if full is not None else full_repr
+        if full or len(self.contents) <= full_repr_threshold:
+            return f"{self.__class__.__name__}({self.contents!r})"
+        else:
+            return f"{self.__class__.__name__}({self.contents[:full_repr_threshold//2]}...(hash={hash(self.contents)})...{self.contents[-full_repr_threshold//2:]})"
 
     def write(self, filepath: str | Path) -> None:
         logging.debug(
