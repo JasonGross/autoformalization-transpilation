@@ -130,6 +130,9 @@ class Project:
     def __iter__(self) -> Iterator[str]:
         return iter(self.files)
 
+    def get(self, name: str, default: File | None = None) -> File | None:
+        return self.files.get(name, default)
+
     def __getitem__(self, name: str):
         return self.files[name]
 

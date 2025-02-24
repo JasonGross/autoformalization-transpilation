@@ -50,6 +50,14 @@ Redirect "{coq_file}.log" Lean Import "{coq_file}.out"."""
     if result.returncode == 0:
         return project, True, ""
     else:
+        if f"{coq_file}.log" in project:
+            coq_log = f"""Log:
+```
+{project[f"{coq_file}.log"].contents}
+```
+"""
+        else:
+            coq_log = ""
         msg = f"""Coq compilation failed, summon a wizard:
 Lean export:
 ```
@@ -59,6 +67,7 @@ Coq project:
 ```coq
 {coq_import_file.contents}
 ```
+{coq_log}
 retcode: {result.returncode}
 stdout:
 ```
