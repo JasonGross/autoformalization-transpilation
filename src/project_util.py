@@ -35,7 +35,13 @@ class File:
             return self._contents
 
     def __str__(self) -> str:
-        return str(self.contents)
+        contents = self.contents
+        if isinstance(contents, str):
+            return contents
+        if len(contents) <= 100:
+            return str(contents)
+        begin, end = self.contents[:10], self.contents[-10:]
+        return f"{begin}...{end}"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.contents!r})"
@@ -98,7 +104,7 @@ class Project:
     def reread(self: Self, directory: str | Path) -> None:
         directory = Path(directory)
         self.files = OrderedDict()
-        for file in sorted(directory.rglob('*'), key=lambda f: f.stat().st_mtime_ns):
+        for file in sorted(directory.rglob("*"), key=lambda f: f.stat().st_mtime_ns):
             if file.is_file():
                 relative_path = file.relative_to(directory)
                 self.files[str(relative_path)] = File.read(file)
