@@ -209,7 +209,7 @@ def lean_to_coq(
     lean_project["Origin.lean"] = statements
 
     # Export statements from Lean
-    lean_project, export_success, lean_export = export_from_lean(lean_project)
+    lean_project, export_success, lean_export = export_from_lean(lean_project, [d for _, d in identifiers])
     assert export_success, "Lean export failed!"
     # Import statements back into Coq
     cc_identifiers = []
@@ -219,17 +219,8 @@ def lean_to_coq(
     coq_project, success, error = import_to_coq(coq_project, lean_export)
     return lean_project, coq_project, success, cc_identifiers, error
 
-
-def extract_definitions(file: LeanFile) -> list[LeanIdentifier]:
-    # TODO: Actually do something with Origin.lean
-    # For now, just do this
-    lst = "Binop Exp Instr Prog Stack binopDenote expDenote instrDenote progDenote compile compileOneInstrStatement compileCorrect binOpComm reverseMerge compileOpComm constEq constInsEq constOnlyConst listEq constCmpl"
-    definitions = lst.split()
-    return list(map(LeanIdentifier, definitions))
-
-
 @cache()
-def export_from_lean(project: LeanProject) -> tuple[LeanProject, bool, ExportFile]:
+def export_from_lean(project: LeanProject, definitions: list[LeanIdentifier]) -> tuple[LeanProject, bool, ExportFile]:
     project = project.copy()
     with project.tempdir():
         # Mangle files
@@ -247,7 +238,6 @@ def export_from_lean(project: LeanProject) -> tuple[LeanProject, bool, ExportFil
         run_cmd(f"lake update && lake build")
 
         # Run Lake exe export to get the exported code
-        definitions = extract_definitions(LeanFile.read_text("Origin.lean"))
         cmd = f"lake exe lean4export Main --"
         for definition in definitions:
             cmd += f" {definition}"

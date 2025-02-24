@@ -187,7 +187,7 @@ def repair_isos(
 ) -> tuple[CoqProject, list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]]:
     project = project.copy()
     # Look at the errors, attempt to fix the isos
-    error = parse_iso_errors(errors)
+    error = parse_iso_errors(errors, project[iso_file].contents)
     logging.info(f"Current error type is {type(error).__name__}")
 
     if isinstance(error, MissingTypeIso):
@@ -310,8 +310,8 @@ def repair_isos(
     return project, cc_identifiers_blocks
 
 
-def parse_iso_errors(errors: str) -> IsoError:
-    assert "Proving iso_statement " in errors, errors
+def parse_iso_errors(errors: str, iso_file: str | None = None) -> IsoError:
+    assert "Proving iso_statement " in errors, f"{errors}\nIso file:\n```coq\n{iso_file}\n```"
     errors = errors.split("Proving iso_statement ")[-1]
     last_proving_instance = re.match(
         r"^([\w\.]+) ([\w\.]+)[\s\n]+(.*)$", errors, flags=re.DOTALL
