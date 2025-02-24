@@ -48,7 +48,7 @@ class File:
 
     def write(self, filepath: str | Path) -> None:
         logging.debug(
-            f"Writing {self.__class__.__name__} to {filepath}\nContents:\n{self.contents}"
+            f"Writing {self.__class__.__name__} to {filepath}\nContents:\n{self}"
         )
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
         if isinstance(self.contents, bytes):
@@ -130,7 +130,7 @@ class Project:
     def format(self):
         result = []
         for name, file in self.files.items():
-            result.append(f"File: {name}\n```\n{file.contents}\n```\n")
+            result.append(f"File: {name}\n```\n{file}\n```\n")
         return "\n".join(result)
 
     def __iter__(self) -> Iterator[str]:
