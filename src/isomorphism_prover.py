@@ -187,7 +187,7 @@ def repair_isos(
 ) -> tuple[CoqProject, list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]]:
     project = project.copy()
     # Look at the errors, attempt to fix the isos
-    error = parse_iso_errors(errors, project[iso_file].contents)
+    error = parse_iso_errors(errors, iso_file=str(project[iso_file].contents), project=project)
     logging.info(f"Current error type is {type(error).__name__}")
 
     if isinstance(error, MissingTypeIso):
@@ -310,12 +310,22 @@ def repair_isos(
     return project, cc_identifiers_blocks
 
 
-def parse_iso_errors(errors: str, iso_file: str | None = None) -> IsoError:
-    assert "Proving iso_statement " in errors, f"{errors}\nIso file:\n```coq\n{iso_file}\n```"
+def parse_iso_errors(
+    errors: str, *, iso_file: str | None = None, project: CoqProject | None = None
+) -> IsoError:
+    def assert_or_error(condition):
+        msg = f"{errors}\nIso file:\n```coq\n{iso_file}\n```" if iso_file else errors
+        if not condition:
+            assert project is not None, (project, msg)
+            project.write(Path(__file__).parent.parent / "temp_iso_errors")
+        assert condition, msg
+
+    assert_or_error("Proving iso_statement " in errors)
     errors = errors.split("Proving iso_statement ")[-1]
     last_proving_instance = re.match(
         r"^([\w\.]+) ([\w\.]+)[\s\n]+(.*)$", errors, flags=re.DOTALL
     )
+    assert_or_error(last_proving_instance)
     assert last_proving_instance, errors
     orig_source, orig_target, errors = last_proving_instance.groups()
     result = re.search(

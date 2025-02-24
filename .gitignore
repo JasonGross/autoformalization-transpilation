@@ -230,4 +230,4 @@ iso-checker/imported.out
 
 ._*
 
-temp_transpilation_errors/
+temp_*_errors/

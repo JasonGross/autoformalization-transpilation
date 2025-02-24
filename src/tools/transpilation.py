@@ -142,7 +142,7 @@ async def generate_and_autorepair_isos(
 
     logging.info("Isomorphism proof failed to compile, attempting to repair...")
 
-    error = result["error"] = parse_iso_errors(result["stderr"])
+    error = result["error"] = parse_iso_errors(result["stderr"], iso_file=str(state["coq_project"][iso_file].contents), project=state["coq_project"])
     logging.info(f"Current error type is {type(error).__name__}")
 
     if isinstance(error, MissingTypeIso):

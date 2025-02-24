@@ -14,6 +14,7 @@ from project_util import (
     LeanFile,
     LeanIdentifier,
     LeanProject,
+    desigil,
 )
 from utils import logging, run_cmd
 from utils.memoshelve import cache
@@ -239,9 +240,12 @@ def export_from_lean(project: LeanProject, definitions: list[LeanIdentifier]) ->
 
         # Run Lake exe export to get the exported code
         cmd = f"lake exe lean4export Main --"
-        for definition in definitions:
+        raw_definitions = [desigil(str(definition)) for definition in definitions]
+        for definition in raw_definitions:
             cmd += f" {definition}"
 
         # # Produce .out file
+        logging.info(f"Exporting: {raw_definitions}")
         export_file = ExportFile(run_cmd(cmd).stdout)
+        logging.debug(f"Export file: {export_file.contents}")
         return LeanProject.read("."), True, export_file
