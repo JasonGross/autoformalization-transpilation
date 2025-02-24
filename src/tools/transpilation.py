@@ -87,9 +87,11 @@ class LeanCompilationResult(TypedDict):
     unknown_lhs_identifiers: list[str]
     unknown_rhs_identifiers: list[str]
 
+
 _coq_project_map: list[CoqProject] = []
 _lean_export_project_map: list[LeanProject] = []
 _lean_project_map: list[LeanProject] = []
+
 
 class ProjectState(TypedDict):
     result: LeanCompilationResult
@@ -103,32 +105,39 @@ class ProjectState(TypedDict):
     missing_identifiers: list[CoqIdentifier]
     excess_identifiers: list[tuple[str, str]]
 
+
 def get_coq_project() -> CoqProject:
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     return _coq_project_map[state["coq_project_id"]]
+
 
 def set_coq_project(coq_project: CoqProject):
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     state["coq_project_id"] = len(_coq_project_map)
     _coq_project_map.append(coq_project)
 
+
 def get_lean_export_project() -> LeanProject:
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     return _lean_export_project_map[state["lean_export_project_id"]]
+
 
 def set_lean_export_project(lean_export_project: LeanProject):
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     state["lean_export_project_id"] = len(_lean_export_project_map)
     _lean_export_project_map.append(lean_export_project)
 
+
 def get_lean_project() -> LeanProject:
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     return _lean_project_map[state["lean_project_id"]]
+
 
 def set_lean_project(lean_project: LeanProject):
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     state["lean_project_id"] = len(_lean_project_map)
     _lean_project_map.append(lean_project)
+
 
 async def generate_and_autorepair_isos(
     *,
@@ -172,7 +181,11 @@ async def generate_and_autorepair_isos(
 
     logging.info("Isomorphism proof failed to compile, attempting to repair...")
 
-    error = result["error"] = parse_iso_errors(result["stderr"], iso_file=str(coq_project[iso_file].contents), project=coq_project)
+    error = result["error"] = parse_iso_errors(
+        result["stderr"],
+        iso_file=str(coq_project[iso_file].contents),
+        project=coq_project,
+    )
     logging.info(f"Current error type is {type(error).__name__}")
 
     if isinstance(error, MissingTypeIso):
@@ -219,15 +232,13 @@ async def generate_and_autorepair_isos(
             original_name=original_name,
             imported_name=imported_name,
         ):
-            coq_project, state["cc_identifiers_blocks"] = (
-                autofix_disordered_constr(
-                    coq_project,
-                    error,
-                    state["cc_identifiers_blocks"],
-                    original_name=original_name,
-                    imported_name=imported_name,
-                    iso_file=iso_file,
-                )
+            coq_project, state["cc_identifiers_blocks"] = autofix_disordered_constr(
+                coq_project,
+                error,
+                state["cc_identifiers_blocks"],
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
             )
             set_coq_project(coq_project)
             return await generate_and_autorepair_isos(
@@ -659,10 +670,10 @@ def repair_iso_by_reorder_constructors(
             logging.info(f"Reordering constructors using permutation {permutation}")
             permutation_obj: Permutation = Permutation(permutation)
             if cur_proof is not None and "revgoals" in cur_proof:
-                permutation_obj = permutation_obj.inverse()
+                permutation_obj = ~permutation_obj
             transpositions = permutation_obj.transpositions()
 
-            inverse_transpositions = permutation_obj.inverse().transpositions()
+            inverse_transpositions = (~permutation_obj).transpositions()
             transpose_tactic = " ".join(
                 f"all: swap {i + 1} {j + 1}." for i, j in transpositions
             )
@@ -671,10 +682,10 @@ def repair_iso_by_reorder_constructors(
             )
 
             return f"""start_iso.
-    {{ start_step_iso. {transpose_tactic} finish_step_iso. }}
-    {{ symmetrize_rel_iso; start_step_iso. {inverse_transpose_tactic} all: finish_step_iso. }}
-    {{ start_iso_proof; step_iso_proof_full. }}
-    {{ symmetrize_rel_iso; start_iso_proof; step_iso_proof_full. }}"""
+{{ start_step_iso. {transpose_tactic} finish_step_iso. }}
+{{ symmetrize_rel_iso; start_step_iso. {inverse_transpose_tactic} all: finish_step_iso. }}
+{{ start_iso_proof; step_iso_proof_full. }}
+{{ symmetrize_rel_iso; start_iso_proof; step_iso_proof_full. }}"""
 
         return await edit_proof_higher_order(
             source,
