@@ -98,7 +98,7 @@ class Project:
     def reread(self: Self, directory: str | Path) -> None:
         directory = Path(directory)
         self.files = OrderedDict()
-        for file in sorted(directory.iterdir(), key=lambda f: f.stat().st_mtime_ns):
+        for file in sorted(directory.rglob('*'), key=lambda f: f.stat().st_mtime_ns):
             if file.is_file():
                 relative_path = file.relative_to(directory)
                 self.files[str(relative_path)] = File.read(file)
