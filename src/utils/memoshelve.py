@@ -120,7 +120,13 @@ def cache(
     copy: Callable[[T], T] = lambda x: x,
 ):
     def wrap(value):
-        path = Path(filename or f".cache/{value.__name__}.shelve")
+        path = (
+            Path(filename)
+            if filename
+            else Path(__file__).parent.parent.parent
+            / ".cache"
+            / f"{value.__name__}.shelve"
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
 
         @wraps(value)
