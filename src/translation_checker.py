@@ -36,7 +36,7 @@ def import_to_coq(
     project = project.copy()
     project[f"{coq_file}.out"] = lean_export
 
-    project[f"{coq_file}.v"] = CoqFile(
+    project[f"{coq_file}.v"] = coq_import_file = CoqFile(
         f"""From LeanImport Require Import Lean.
 Redirect "{coq_file}.log" Lean Import "{coq_file}.out"."""
     )
@@ -50,11 +50,21 @@ Redirect "{coq_file}.log" Lean Import "{coq_file}.out"."""
     if result.returncode == 0:
         return project, True, ""
     else:
-        logging.error("Coq compilation failed")
+        msg = f"""Coq compilation failed, summon a wizard:
+Lean export:
+```
+{lean_export.contents}
+```
+Coq project:
+```coq
+{coq_import_file.contents}
+```
+"""
+        logging.error(msg)
         # TODO: Actually retrieve error, for example look at result.stderr, search for the last
         # instance of 'File "[^"]+", line ([0-9]+), characters ([0-9]+)-([0-9]+):\n', pick out the
         #  line numbers from the file, so the LLM doesn't have to do arithmetic
-        return project, False, "Coq compilation failed"
+        return project, False, msg
 
 
 def check_translation(
