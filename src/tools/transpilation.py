@@ -730,8 +730,10 @@ def transpilation_tool(
 
     if coq_names is None:
         coq_identifiers = extract_coq_identifiers(coq_statements_file, sigil=False)
+        assert coq_identifiers, f"No Coq identifiers found in {coq_statements}"
     else:
         coq_identifiers = coq_identifiers_of_list(coq_names, sigil=False)
+        assert coq_identifiers, f"No Coq identifiers found in {coq_names}"
 
     init_coq_project, interface_success, error = generate_and_prove_iso_interface(
         init_coq_project, list(map(sigil, coq_identifiers))
@@ -771,6 +773,9 @@ def transpilation_tool(
         if "coq_identifiers" not in state:
             state["coq_identifiers"] = coq_identifiers
 
+        if not coq_lean_identifiers:
+            raise ToolError("coq_lean_identifiers must not be empty")
+
         state["lean_statements"] = LeanFile(lean_code)
         # Verify that the Lean code compiles
         lean_project, result["status"], result["stderr"] = check_compilation(
@@ -800,6 +805,14 @@ def transpilation_tool(
         ]
         lean_export_project = get_lean_export_project()
         coq_project = get_coq_project()
+
+        if not state["cl_identifiers"]:
+            msg = f"No known Coq identifiers found in coq_lean_identifiers ({coq_lean_identifiers!r})"
+            if state["missing_identifiers"]:
+                msg += f"\nMissing identifiers for {', '.join(map(str, state['missing_identifiers']))}"
+            if state["excess_identifiers"]:
+                msg += f"\nUnrecognized identifiers: {', '.join(f'{k} -> {v}' for k, v in state['excess_identifiers'])}"
+            raise ToolError(msg)
 
         (
             lean_export_project,
