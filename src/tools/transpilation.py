@@ -716,7 +716,7 @@ def transpilation_tool(
 ) -> Tool:
     coq_statements_file = None if coq_statements is None else CoqFile(coq_statements)
 
-    init_coq_project = isomorphism_prover.init_coq_project()
+    init_coq_project = isomorphism_prover.init_coq_project(iso_checker_path)
     if coq_statements_file is not None:
         init_coq_project[f"{original_name}.v"] = coq_statements_file
     if init_coq_targets is not None:
