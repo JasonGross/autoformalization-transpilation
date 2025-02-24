@@ -10,7 +10,11 @@ from prompts.transpilation import (
     ALTERNATIVE_SYSTEM_MESSAGE,
     TRANSLATION_STATE_TEMPLATE,
 )
-from scorers.transpilation import checker_compiles_scorer, isos_proven_scorer
+from scorers.transpilation import (
+    checker_compiles_scorer,
+    isos_proven_scorer,
+    lean_compiles_scorer,
+)
 from tools.itp import lean_run_tool
 from tools.transpilation import (
     add_import_tool,
@@ -56,7 +60,11 @@ def coq_to_lean(cache: CachePolicy | bool = False):
             token_limit=50_000,
             cache=cache,
         ),
-        scorer=[checker_compiles_scorer(), isos_proven_scorer()],
+        scorer=[
+            lean_compiles_scorer(),
+            checker_compiles_scorer(),
+            isos_proven_scorer(),
+        ],
     )
 
 

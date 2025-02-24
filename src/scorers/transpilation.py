@@ -6,6 +6,7 @@ from inspect_ai.scorer import (
     Score,
     Target,
     accuracy,
+    mean,
     scorer,
 )
 from inspect_ai.solver import TaskState
@@ -81,7 +82,7 @@ def lean_compiles_scorer():
     """Checks if lean code compiles from the translation state taken from inspect store"""
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
-        p_state: ProjectState = store.get("translation_state")
+        p_state: ProjectState | None = store.get("translation_state")
         metadata = {"translation_state": p_state}
         if p_state is None:
             return Score(value=INCORRECT, explanation="No translation state found", metadata=metadata)
@@ -100,7 +101,7 @@ def checker_compiles_scorer(*, allowed_flags: dict[str, Collection[str] | None] 
     """
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
-        p_state: ProjectState = store.get("translation_state")
+        p_state: ProjectState | None = store.get("translation_state")
         metadata = {"translation_state": p_state}
         if p_state is None:
             return Score(value=INCORRECT, explanation="No translation state found", metadata=metadata)
@@ -136,9 +137,10 @@ def checker_compiles_scorer(*, allowed_flags: dict[str, Collection[str] | None] 
                 if 'relies on' in line:
                     current_axiom, current_flag = line.split("relies on")
                     current_axiom, current_flag = current_axiom.strip(), current_flag.strip()
+                    cur_allowed_flags = allowed_flags.get(current_flag)
                     if current_flag not in allowed_flags:
                         disallowed_axioms.append(current_flag)
-                    elif allowed_flags[current_flag] and current_axiom not in allowed_flags[current_flag]:
+                    elif cur_allowed_flags and current_axiom not in cur_allowed_flags:
                         disallowed_axioms.append(line.strip().rstrip("."))
                 else:
                     current_axiom = line.split(":")[0].strip()
@@ -160,12 +162,12 @@ def checker_compiles_scorer(*, allowed_flags: dict[str, Collection[str] | None] 
 
     return score
 
-@scorer(metrics=[accuracy()])
+@scorer(metrics=[accuracy(), mean()])
 def isos_proven_scorer():
     """score based on how many isos were proven"""
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
-        p_state: ProjectState = store.get("translation_state")
+        p_state: ProjectState | None = store.get("translation_state")
         metadata = {"translation_state": p_state}
         if p_state is None:
             return Score(value=INCORRECT, explanation="No translation state found", metadata=metadata)
