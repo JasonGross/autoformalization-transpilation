@@ -223,7 +223,7 @@ async def generate_and_autorepair_isos(
             if write_to_directory_on_error is not None:
                 coq_project.write(write_to_directory_on_error)
             return ContentText(
-                text=f"Failed to prove isomorphisms because of missing import, please invoke the add_import tool with an import to make available the missing reference {error.import_str}"
+                text=f"Failed to prove isomorphisms because of missing import, please invoke `add_import_tool` with an import to make available the missing reference {error.import_str}"
             )
     elif isinstance(error, DisorderedConstr):
         if can_autofix_disordered_constr(
@@ -251,7 +251,7 @@ async def generate_and_autorepair_isos(
             if write_to_directory_on_error is not None:
                 coq_project.write(write_to_directory_on_error)
             return ContentText(
-                text=f"Failed to prove isomorphism between {error.orig_source} and {error.orig_target} because the constructors are out of order.  This can be fixed by invoking the repair_iso_by_reorder_constructors tool with a permutation. The constructor misalignment is: {error.hint}"
+                text=f"Failed to prove isomorphism between {error.orig_source} and {error.orig_target} because the constructors are out of order.  This can be fixed by invoking `repair_iso_by_reorder_constructors_tool` with a permutation. The constructor misalignment is: {error.hint}"
             )
     elif isinstance(error, GenericIsoError):
         index = find_iso_index(
@@ -285,7 +285,7 @@ async def generate_and_autorepair_isos(
         if unknown_lhs and unknown_rhs:
             missing_iso_text = f"""
 
-This might be because we are missing an isomorphism between some identifier that we unfolded on the left and some identifier we unfolded on the right.  If this is the case, you can invoke the add_iso tool with the pair of identifiers, indicating that it should come before the isomorphism for {error.orig_source}. The candidates for missing isomorphisms are:
+This might be because we are missing an isomorphism between some identifier that we unfolded on the left and some identifier we unfolded on the right.  If this is the case, you can invoke `add_iso_tool` with the pair of identifiers, indicating that it should come before the isomorphism for {error.orig_source}. The candidates for missing isomorphisms are:
 left: {unknown_lhs}
 right: {unknown_rhs}
 """
@@ -295,7 +295,7 @@ right: {unknown_rhs}
             text=f"""Failed to prove isomorphism between {error.orig_source} and {error.orig_target}.
 {missing_iso_text}
 
-You might need to adjust the isomorphism proof of the isomorphism using the update_iso_proof tool with the new proof. Here is some information that might help diagnose the rewriting:
+You might need to adjust the isomorphism proof of the isomorphism using the `edit_proof_tool` with the new proof. Here is some information that might help diagnose the rewriting:
 ```
 {error.prefix}
 ```
@@ -344,7 +344,7 @@ async def generate_isos_with_admits(*args, **kwargs) -> ToolResult:
 
 
 @tool
-def add_import(
+def add_import_tool(
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
@@ -373,7 +373,7 @@ def add_import(
 
 
 @tool
-def remove_import(
+def remove_import_tool(
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
@@ -435,7 +435,7 @@ def handle_value_error(
 
 
 @tool
-def add_lemma(
+def add_lemma_tool(
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
@@ -486,7 +486,7 @@ def add_lemma(
 
 
 @tool
-def add_iso(
+def add_iso_tool(
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
@@ -611,7 +611,7 @@ async def edit_proof_higher_order(
 
 
 @tool
-def edit_proof(
+def edit_proof_tool(
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
@@ -645,7 +645,7 @@ def edit_proof(
 
 
 @tool
-def repair_iso_by_reorder_constructors(
+def repair_iso_by_reorder_constructors_tool(
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
