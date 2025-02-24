@@ -187,7 +187,9 @@ def repair_isos(
 ) -> tuple[CoqProject, list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]]:
     project = project.copy()
     # Look at the errors, attempt to fix the isos
-    error = parse_iso_errors(errors, iso_file=str(project[iso_file].contents), project=project)
+    error = parse_iso_errors(
+        errors, iso_file=str(project[iso_file].contents), project=project
+    )
     logging.info(f"Current error type is {type(error).__name__}")
 
     if isinstance(error, MissingTypeIso):
@@ -311,7 +313,15 @@ def repair_isos(
 
 
 def parse_iso_errors(
-    errors: str, *, iso_file: str | None = None, project: CoqProject | None = None
+    errors: str,
+    *,
+    iso_file: str | None = None,
+    project: CoqProject | None = None,
+    cc_identifiers_blocks: (
+        list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]] | None
+    ) = None,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
 ) -> IsoError:
     def assert_or_error(condition):
         msg = f"{errors}\nIso file:\n```coq\n{iso_file}\n```" if iso_file else errors
@@ -373,8 +383,36 @@ def parse_iso_errors(
             )
         )
     )
-    unknown_lhs = [cst for side, cst in csts if side == "lhs" and cst != orig_source]
-    unknown_rhs = [cst for side, cst in csts if side == "rhs" and cst != orig_target]
+    unknown_lhs = [
+        cst
+        for side, cst in csts
+        if side == "lhs"
+        and cst != orig_source
+        and (
+            cc_identifiers_blocks is None
+            or not has_iso_from(
+                cc_identifiers_blocks,
+                cst,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+        )
+    ]
+    unknown_rhs = [
+        cst
+        for side, cst in csts
+        if side == "rhs"
+        and cst != orig_target
+        and (
+            cc_identifiers_blocks is None
+            or not has_iso_to(
+                cc_identifiers_blocks,
+                cst,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+        )
+    ]
     prefix = re.sub(
         r"(?:Unfolding unknown|Reducing unknown|Skipping the unfolding of) \w+ on (lhs|rhs)\s*:\s*([^ \n$]+)$",
         "",
@@ -761,3 +799,196 @@ def init_coq_project(
         )
         assert allow_build_failure or result.returncode == 0, (result, coq_project)
     return coq_project
+
+
+def admit_failing_iso(
+    project: CoqProject,
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    orig_source: str,
+    orig_target: str | None = None,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> tuple[CoqProject, list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]]:
+    index = find_iso_index(
+        cc_identifiers_blocks,
+        orig_source,
+        orig_target,
+        original_name=original_name,
+        imported_name=imported_name,
+    )
+    block = cc_identifiers_blocks[index]
+    assert not isinstance(block, str), (
+        orig_source,
+        orig_target,
+        block,
+        index,
+        cc_identifiers_blocks,
+    )
+    cc_identifiers_blocks[index] = (
+        block[0],
+        block[1],
+        "Admitted.",
+    )
+    logging.info(f"Admitted iso proof for {orig_source} to {orig_target}")
+    return project, cc_identifiers_blocks
+
+
+def generate_and_autorepair_isos(
+    project: CoqProject,
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    admit_failing_isos: bool = False,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: Path | str | None = Path(__file__).parent.parent
+    / "generate_and_autorepair_isos_errors",
+) -> tuple[
+    CoqProject,
+    list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    bool,
+    IsoError | None,
+]:
+
+    project = generate_isos(
+        project,
+        cc_identifiers_blocks,
+        original_name=original_name,
+        imported_name=imported_name,
+        output_file=iso_file,
+    )
+
+    # Check that the iso proof compiles
+    project, result, errors = make_isos(project, "Checker.vo")
+    if result:
+        return project, cc_identifiers_blocks, True, None
+
+    assert errors is not None, project
+
+    logging.info("Isomorphism proof failed to compile, attempting to repair...")
+
+    error = parse_iso_errors(
+        errors,
+        iso_file=str(project[iso_file].contents),
+        project=project,
+        cc_identifiers_blocks=cc_identifiers_blocks,
+        original_name=original_name,
+        imported_name=imported_name,
+    )
+    logging.info(f"Current error type is {type(error).__name__}")
+
+    if isinstance(error, MissingTypeIso):
+        project, cc_identifiers_blocks = repair_missing_type_iso(
+            project,
+            error,
+            cc_identifiers_blocks,
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+        )
+        return generate_and_autorepair_isos(
+            project,
+            cc_identifiers_blocks,
+            admit_failing_isos=admit_failing_isos,
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
+        )
+    elif isinstance(error, MissingImport):
+        if error.import_str in KNOWN_IMPORTS or admit_failing_isos:
+            if error.import_str in KNOWN_IMPORTS:
+                logging.info(
+                    f"Adding import {KNOWN_IMPORTS[error.import_str]} for iso_statement {error.orig_source} {error.orig_target}"
+                )
+                cc_identifiers_blocks.insert(
+                    0,
+                    KNOWN_IMPORTS[error.import_str],
+                )
+            else:
+                project, cc_identifiers_blocks = admit_failing_iso(
+                    project,
+                    cc_identifiers_blocks,
+                    error.orig_source,
+                    error.orig_target,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                )
+            return generate_and_autorepair_isos(
+                project,
+                cc_identifiers_blocks,
+                admit_failing_isos=admit_failing_isos,
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
+            )
+        else:
+            if write_to_directory_on_error is not None:
+                project.write(write_to_directory_on_error)
+            return project, cc_identifiers_blocks, False, error
+    elif isinstance(error, DisorderedConstr):
+        can_autofix = can_autofix_disordered_constr(
+            error,
+            cc_identifiers_blocks,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
+        if can_autofix or admit_failing_isos:
+            if can_autofix:
+                project, cc_identifiers_blocks = autofix_disordered_constr(
+                    project,
+                    error,
+                    cc_identifiers_blocks,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                    iso_file=iso_file,
+                )
+            else:
+                project, cc_identifiers_blocks = admit_failing_iso(
+                    project,
+                    cc_identifiers_blocks,
+                    error.orig_source,
+                    error.orig_target,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                )
+            return generate_and_autorepair_isos(
+                project,
+                cc_identifiers_blocks,
+                admit_failing_isos=admit_failing_isos,
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
+            )
+        else:
+            if write_to_directory_on_error is not None:
+                project.write(write_to_directory_on_error)
+            return project, cc_identifiers_blocks, False, error
+    elif isinstance(error, GenericIsoError):
+        if admit_failing_isos:
+            project, cc_identifiers_blocks = admit_failing_iso(
+                project,
+                cc_identifiers_blocks,
+                error.orig_source,
+                error.orig_target,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+            return generate_and_autorepair_isos(
+                project,
+                cc_identifiers_blocks,
+                admit_failing_isos=admit_failing_isos,
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
+            )
+        else:
+            if write_to_directory_on_error is not None:
+                project.write(write_to_directory_on_error)
+            return project, cc_identifiers_blocks, False, error
+    else:
+        assert False, f"Unknown error type {type(error)}: {error}"

@@ -29,6 +29,7 @@ from isomorphism_prover import (
     make_isos,
     parse_iso_errors,
     repair_missing_type_iso,
+    generate_and_autorepair_isos,
 )
 import isomorphism_prover
 from main import (
@@ -75,6 +76,7 @@ class ModelResponseError(Exception):
 
 class CompilationPhase(StrEnum):
     LEAN_COMPILATION = "lean compilation"
+    PROVING_ISOS = "proving isomorphisms"
 
 
 class LeanCompilationResult(TypedDict):
@@ -138,16 +140,15 @@ def set_lean_project(lean_project: LeanProject):
     state["lean_project_id"] = len(_lean_project_map)
     _lean_project_map.append(lean_project)
 
-
-async def generate_and_autorepair_isos(
+def generate_and_autorepair_isos_tool(
     *,
+    admit_failing_isos: bool = False,
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
     write_to_directory_on_error: (
         Path | str | None
-    ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
-) -> ToolResult:
+)) -> ToolResult:
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     state["result"] = {
         "status": False,
@@ -160,137 +161,47 @@ async def generate_and_autorepair_isos(
         "unknown_rhs_identifiers": [],
     }
     result = state["result"]
+    coq_project = get_coq_project()
 
-    coq_project = generate_isos(
-        get_coq_project(),
-        state["cc_identifiers_blocks"],
-        original_name=original_name,
-        imported_name=imported_name,
-        output_file=iso_file,
-    )
-
-    # Check that the iso proof compiles
-    coq_project, result["status"], result["stderr"] = make_isos(
-        coq_project, "Checker.vo"
-    )
-    set_coq_project(coq_project)
-    if result["status"]:
-        return ContentText(text="Success!")
-
-    assert result["stderr"] is not None, state
-
-    logging.info("Isomorphism proof failed to compile, attempting to repair...")
-
-    error = result["error"] = parse_iso_errors(
-        result["stderr"],
-        iso_file=str(coq_project[iso_file].contents),
-        project=coq_project,
-    )
-    logging.info(f"Current error type is {type(error).__name__}")
-
-    if isinstance(error, MissingTypeIso):
-        coq_project, state["cc_identifiers_blocks"] = repair_missing_type_iso(
+    try:
+        coq_project, state["cc_identifiers_blocks"], result["status"], result["error"] = generate_and_autorepair_isos(
             coq_project,
-            error,
             state["cc_identifiers_blocks"],
-            original_name=original_name,
-            imported_name=imported_name,
-            iso_file=iso_file,
-        )
-        set_coq_project(coq_project)
-        return await generate_and_autorepair_isos(
+            admit_failing_isos=admit_failing_isos,
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
         )
-    elif isinstance(error, MissingImport):
-        if error.import_str in KNOWN_IMPORTS:
-            logging.info(
-                f"Adding import {KNOWN_IMPORTS[error.import_str]} for iso_statement {error.orig_source} {error.orig_target}"
-            )
-            state["cc_identifiers_blocks"].insert(
-                0,
-                KNOWN_IMPORTS[error.import_str],
-            )
-            return await generate_and_autorepair_isos(
-                original_name=original_name,
-                imported_name=imported_name,
-                iso_file=iso_file,
-                write_to_directory_on_error=write_to_directory_on_error,
-            )
-        else:
-            if write_to_directory_on_error is not None:
-                coq_project.write(write_to_directory_on_error)
-            return ContentText(
+    except (AssertionError, ValueError) as e:
+        raise ToolError(str(e))
+
+    set_coq_project(coq_project)
+    if result["status"]:
+        return ContentText(text="Success!")
+
+    result["failure_phase"] = CompilationPhase.PROVING_ISOS
+    error = result["error"]
+    assert not result["status"], state
+    assert error is not None, state
+    assert not isinstance(error, MissingTypeIso), error
+    if isinstance(error, MissingImport):
+        return ContentText(
                 text=f"Failed to prove isomorphisms because of missing import, please invoke `add_import_tool` with an import to make available the missing reference {error.import_str}"
             )
     elif isinstance(error, DisorderedConstr):
-        if can_autofix_disordered_constr(
-            error,
-            state["cc_identifiers_blocks"],
-            original_name=original_name,
-            imported_name=imported_name,
-        ):
-            coq_project, state["cc_identifiers_blocks"] = autofix_disordered_constr(
-                coq_project,
-                error,
-                state["cc_identifiers_blocks"],
-                original_name=original_name,
-                imported_name=imported_name,
-                iso_file=iso_file,
-            )
-            set_coq_project(coq_project)
-            return await generate_and_autorepair_isos(
-                original_name=original_name,
-                imported_name=imported_name,
-                iso_file=iso_file,
-                write_to_directory_on_error=write_to_directory_on_error,
-            )
-        else:
-            if write_to_directory_on_error is not None:
-                coq_project.write(write_to_directory_on_error)
-            return ContentText(
+        return ContentText(
                 text=f"Failed to prove isomorphism between {error.orig_source} and {error.orig_target} because the constructors are out of order.  This can be fixed by invoking `repair_iso_by_reorder_constructors_tool` with a permutation. The constructor misalignment is: {error.hint}"
             )
     elif isinstance(error, GenericIsoError):
-        index = find_iso_index(
-            state["cc_identifiers_blocks"],
-            error.orig_source,
-            error.orig_target,
-            original_name=original_name,
-            imported_name=imported_name,
-        )
-        unknown_lhs = [
-            cst
-            for cst in error.unknown_lhs
-            if not has_iso_from(
-                state["cc_identifiers_blocks"],
-                cst,
-                original_name=original_name,
-                imported_name=imported_name,
-            )
-        ]
-        unknown_rhs = [
-            cst
-            for cst in error.unknown_rhs
-            if not has_iso_to(
-                state["cc_identifiers_blocks"],
-                cst,
-                original_name=original_name,
-                imported_name=imported_name,
-            )
-        ]
         missing_iso_text = ""
-        if unknown_lhs and unknown_rhs:
+        if error.unknown_lhs and error.unknown_rhs:
             missing_iso_text = f"""
 
 This might be because we are missing an isomorphism between some identifier that we unfolded on the left and some identifier we unfolded on the right.  If this is the case, you can invoke `add_iso_tool` with the pair of identifiers, indicating that it should come before the isomorphism for {error.orig_source}. The candidates for missing isomorphisms are:
-left: {unknown_lhs}
-right: {unknown_rhs}
+left: {error.unknown_lhs}
+right: {error.unknown_rhs}
 """
-        if write_to_directory_on_error is not None:
-            coq_project.write(write_to_directory_on_error)
         return ContentText(
             text=f"""Failed to prove isomorphism between {error.orig_source} and {error.orig_target}.
 {missing_iso_text}
@@ -307,40 +218,6 @@ There remain {error.ngoals} goals unsolved:
         )
     else:
         raise ToolError(f"Unknown error type {type(error)}: {error}")
-
-
-async def generate_isos_with_admits(*args, **kwargs) -> ToolResult:
-    """keeps admitting iso proofs until the file compiles"""
-    state: ProjectState = inspect_ai.util.store().get("translation_state")
-    result = await generate_and_autorepair_isos(*args, **kwargs)
-
-    if isinstance(result, ContentText) and not result.text.startswith("Success"):
-        error = state["result"]["error"]
-        if error is None:
-            return result
-
-        try:
-            index = find_iso_index(
-                state["cc_identifiers_blocks"],
-                error.orig_source,
-                error.orig_target,
-                original_name=kwargs.get("original_name", "Original"),
-                imported_name=kwargs.get("imported_name", "Imported"),
-            )
-            block = state["cc_identifiers_blocks"][index]
-            if not isinstance(block, str):
-                state["cc_identifiers_blocks"][index] = (
-                    block[0],
-                    block[1],
-                    "Admitted.",
-                )
-                logging.info(
-                    f"Admitted iso proof for {error.orig_source} to {error.orig_target}"
-                )
-                return await generate_isos_with_admits(*args, **kwargs)
-        except:
-            return result
-    return result
 
 
 @tool
@@ -362,7 +239,7 @@ def add_import_tool(
         """
         state: ProjectState = inspect_ai.util.store().get("translation_state")
         state["cc_identifiers_blocks"].insert(0, import_str)
-        return await generate_and_autorepair_isos(
+        return generate_and_autorepair_isos_tool(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
@@ -395,7 +272,7 @@ def remove_import_tool(
                 text=f"Invalid code to remove: {code_str!r}\nValid codes to remove are: {'\n'.join(repr(v) for v in state['cc_identifiers_blocks'] if isinstance(v, str))}"
             )
         state["cc_identifiers_blocks"].remove(code_str)
-        return await generate_and_autorepair_isos(
+        return generate_and_autorepair_isos_tool(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
@@ -475,7 +352,7 @@ def add_lemma_tool(
 
         state["cc_identifiers_blocks"].insert(index, code_str)
 
-        return await generate_and_autorepair_isos(
+        return generate_and_autorepair_isos_tool(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
@@ -530,7 +407,7 @@ def add_iso_tool(
         )
         state["cc_identifiers_blocks"].insert(index, (new_soruce, new_target, None))
 
-        return await generate_and_autorepair_isos(
+        return generate_and_autorepair_isos_tool(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
@@ -602,7 +479,7 @@ async def edit_proof_higher_order(
         f"Reordered constructors for {iso_source} ({block[0]}) to {block[1]}, new proof is {new_proof_str}, old proof was {cur_proof}"
     )
 
-    return await generate_and_autorepair_isos(
+    return generate_and_autorepair_isos_tool(
         original_name=original_name,
         imported_name=imported_name,
         iso_file=iso_file,
@@ -838,7 +715,7 @@ def transpilation_tool(
 {result["stderr"]}"""
             )
 
-        return await generate_and_autorepair_isos(
+        return generate_and_autorepair_isos_tool(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,

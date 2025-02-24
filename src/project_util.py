@@ -269,7 +269,7 @@ class GenericIsoError(IsoError):
     goals: str
 
     def __str__(self):
-        return f"GenericIsoError(orig_source={self.orig_source}, orig_target={self.orig_target}, unknown_lhs={self.unknown_lhs}, unknown_rhs={self.unknown_rhs}, ngoals={self.ngoals},\n prefix='''{self.prefix}''',\n goals='''{self.goals}''')"
+        return f"GenericIsoError(orig_source={self.orig_source}, orig_target={self.orig_target}, unknown_lhs={self.unknown_lhs}, unknown_rhs={self.unknown_rhs}, unknown_lhs_filtered={self.unknown_lhs_filtered}, unknown_rhs_filtered={self.unknown_rhs_filtered}, ngoals={self.ngoals},\n prefix='''{self.prefix}''',\n goals='''{self.goals}''')"
 
 
 @dataclass
