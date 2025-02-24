@@ -1,5 +1,6 @@
 import contextlib
 from copy import deepcopy
+from subprocess import CompletedProcess
 import tempfile
 from enum import StrEnum
 from pathlib import Path
@@ -17,7 +18,7 @@ from project_util import (
     desigil,
 )
 from utils import logging, run_cmd
-from utils.memoshelve import cache
+from utils.memoshelve import cache, hash_as_tuples
 
 
 class ErrorCode(StrEnum):
@@ -147,7 +148,7 @@ def check_translation(
     return lean_export_project, lean_project, coq_project, success, error_code, error
 
 
-@cache(copy=deepcopy)
+@cache(get_hash=hash_as_tuples, copy=deepcopy)
 def new_lake_project(name: str = "lean-build") -> LeanProject:
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
@@ -157,7 +158,7 @@ def new_lake_project(name: str = "lean-build") -> LeanProject:
         return LeanProject.read(tempdir / name)
 
 
-@cache(copy=deepcopy)
+@cache(get_hash=hash_as_tuples, copy=deepcopy)
 def check_compilation(
     lean_statements: LeanFile, project: LeanProject | None = None
 ) -> tuple[LeanProject, bool, str]:
@@ -165,12 +166,6 @@ def check_compilation(
         project = new_lake_project(name="lean-build")
     else:
         project = project.copy()
-
-    # Clear existing code, if any
-    if "LeanBuild/Basic.lean" in project:
-        del project["LeanBuild/Basic.lean"]
-    if "Main.lean" in project:
-        del project["Main.lean"]
 
     # Put new code in the right place
     project["LeanBuild/Basic.lean"] = lean_statements
@@ -210,18 +205,25 @@ def lean_to_coq(
     lean_project["Origin.lean"] = statements
 
     # Export statements from Lean
-    lean_project, export_success, lean_export = export_from_lean(lean_project, [d for _, d in identifiers])
-    assert export_success, "Lean export failed!"
-    # Import statements back into Coq
+    lean_project, export_success, lean_export, result = export_from_lean(
+        lean_project, [d for _, d in identifiers]
+    )
     cc_identifiers = []
+    if not export_success:
+        logging.error(f"Lean export failed: {result.stderr}")
+        return lean_project, coq_project, False, [], result.stderr
+    # Import statements back into Coq
     for coq_id, lean_id in identifiers:
         cc_identifiers.append((coq_id, lean_id_to_coq(lean_id), None))
 
     coq_project, success, error = import_to_coq(coq_project, lean_export)
     return lean_project, coq_project, success, cc_identifiers, error
 
-@cache()
-def export_from_lean(project: LeanProject, definitions: list[LeanIdentifier]) -> tuple[LeanProject, bool, ExportFile]:
+
+@cache(get_hash=hash_as_tuples, copy=deepcopy)
+def export_from_lean(
+    project: LeanProject, definitions: list[LeanIdentifier]
+) -> tuple[LeanProject, bool, ExportFile, CompletedProcess[str]]:
     project = project.copy()
     with project.tempdir():
         # Mangle files
@@ -236,7 +238,12 @@ def export_from_lean(project: LeanProject, definitions: list[LeanIdentifier]) ->
         )
 
         # Run lake build to verify it's valid code
-        run_cmd(f"lake update && lake build")
+        # we shouldn't have to rm -rf .lake, but it seems to be necessary
+        result = run_cmd(f"rm -rf .lake && lake update && lake build", shell=True, check=False)
+        if result.returncode != 0:
+            project.write(Path(__file__).parent.parent / "temp_export_lean")
+            logging.error(f"Compilation failed: {result.stderr}")
+            return project, False, ExportFile(""), result
 
         # Run Lake exe export to get the exported code
         cmd = f"lake exe lean4export Main --"
@@ -246,6 +253,12 @@ def export_from_lean(project: LeanProject, definitions: list[LeanIdentifier]) ->
 
         # # Produce .out file
         logging.info(f"Exporting: {raw_definitions}")
-        export_file = ExportFile(run_cmd(cmd).stdout)
+        result = run_cmd(cmd, shell=True, check=False)
+        if result.returncode != 0:
+            lean_files = {k: v for k, v in project.items() if k.endswith(".lean")}
+            project.write(Path(__file__).parent.parent / "temp_export_lean")
+            logging.error(f"Export failed on {cmd} on {lean_files}: {result.stderr}")
+            return project, False, ExportFile(""), result
+        export_file = ExportFile(result.stdout)
         logging.debug(f"Export file: {export_file.contents}")
-        return LeanProject.read("."), True, export_file
+        return LeanProject.read("."), True, export_file, result

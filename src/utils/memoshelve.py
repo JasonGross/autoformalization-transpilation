@@ -19,6 +19,20 @@ memoshelve_cache: Dict[str, Dict[str, Any]] = {}
 T = TypeVar("T")
 
 
+def to_tuples(arg: Any) -> Any:
+    """Converts a list or dict to an immutable version of itself."""
+    if isinstance(arg, list) or isinstance(arg, tuple):
+        return tuple(to_tuples(e) for e in arg)
+    elif isinstance(arg, dict):
+        return to_tuples((k, to_tuples(v)) for k, v in arg.items())
+    else:
+        return arg
+
+
+def hash_as_tuples(obj: Any) -> int:
+    return hash(to_tuples(obj))
+
+
 def compact(filename: Union[Path, str], backup: bool = True):
     entries = {}
     with shelve.open(filename) as db:
@@ -64,7 +78,7 @@ def memoshelve(
                 except KeyError:
                     if print_cache_miss:
                         print(f"Cache miss (mem): {mkey}")
-                    key = get_hash((args, kwargs))
+                    key = str(get_hash((args, kwargs)))
                     try:
                         mem_db[mkey] = db[key]
                         return mem_db[mkey]

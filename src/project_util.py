@@ -9,7 +9,7 @@ from typing import Iterator, Self, TypeVar
 import base64
 
 from utils import logging, run_cmd
-from utils.memoshelve import cache
+from utils.memoshelve import cache, hash_as_tuples
 
 
 @dataclass
@@ -26,6 +26,9 @@ class File:
         else:
             self._contents = base64.b64encode(contents).decode("utf-8")
             self.contents_is_bytes = True
+
+    def __hash__(self) -> int:
+        return hash(self.contents)
 
     @property
     def contents(self) -> str | bytes:
@@ -74,17 +77,14 @@ class File:
         return cls(contents)
 
 
-@dataclass
 class LeanFile(File):
     pass
 
 
-@dataclass
 class CoqFile(File):
     pass
 
 
-@dataclass
 class ExportFile(File):
     pass
 
@@ -93,6 +93,9 @@ class ExportFile(File):
 class Project:
     # See this comment (https://github.com/JasonGross/autoformalization/pull/27#discussion_r1942030347) by Jason for a suggestion of structure here
     files: OrderedDict[str, File] = field(default_factory=OrderedDict)
+
+    def __hash__(self) -> int:
+        return hash(tuple(self.files.items()))
 
     def write(self, directory: str | Path) -> None:
         logging.debug("Writing %s to %s", self.__class__.__name__, directory)
@@ -191,7 +194,7 @@ class Project:
         with self.tempdir():
             return run_cmd(*args, **kwargs)
 
-    @cache(copy=deepcopy)
+    @cache(get_hash=hash_as_tuples, copy=deepcopy)
     def run_cmd(self: Self, *args, **kwargs) -> tuple[CompletedProcess[str], Self]:
         project = self.copy()
         result = project.irun_cmd(*args, **kwargs)
