@@ -16,7 +16,7 @@ from main import (
     check_translation,
 )
 from tools.itp import run_lean_str
-from tools.transpilation import CompilationPhase, ProjectState
+from tools.transpilation import CompilationPhase, ProjectState, get_coq_project
 
 
 class LeanError(Exception):
@@ -93,7 +93,7 @@ def lean_compiles_scorer():
 @scorer(metrics=[accuracy()])
 def checker_compiles_scorer(*, allowed_flags: dict[str, Collection[str] | None] = {"definitional UIP": None}, allowed_axioms: Collection[str] = ["functional_extensionality_dep"]):
     """Checks if Checker.vo compiles and check print assumptions output
-    
+
     Args:
         allowed_flags: mapping of flags (such as 'definitional UIP') to constants that are allowed to depend on that flag; mapping to None means every constant
         allowed_axioms: List of axiom names that are allowed to appear in Print Assumptions
@@ -108,7 +108,7 @@ def checker_compiles_scorer(*, allowed_flags: dict[str, Collection[str] | None] 
         if result.get("failure_phase") == CompilationPhase.LEAN_COMPILATION:
             return Score(value=INCORRECT, explanation="Lean code does not compile", metadata=metadata)
 
-        coq_project = p_state.get("coq_project")
+        coq_project = get_coq_project()
         if not coq_project:
             return Score(value=INCORRECT, explanation="No Coq project state found", metadata=metadata)
         compilation_result, _ = coq_project.make("Checker.vo", check=False)
@@ -119,18 +119,18 @@ def checker_compiles_scorer(*, allowed_flags: dict[str, Collection[str] | None] 
                 explanation=f"Checker.vo failed to build:\n{compilation_result.stderr}",
                 metadata=metadata
             )
-        
+
         stdout = compilation_result.stdout
         if "Axioms:" not in stdout:
             return Score(value=CORRECT, explanation=stdout, metadata=metadata)
-        
+
         axioms_section = stdout[stdout.find("Axioms:"):stdout.find("End Print Assumptions")]
         disallowed_axioms = []
-        
+
         for line in axioms_section.split('\n'):
             if not line or line.startswith("Axioms:"):
                 continue
-            
+
             # Start of new axiom definition
             if line == line.lstrip():
                 if 'relies on' in line:
@@ -144,17 +144,17 @@ def checker_compiles_scorer(*, allowed_flags: dict[str, Collection[str] | None] 
                     current_axiom = line.split(":")[0].strip()
                     if current_axiom not in allowed_axioms:
                         disallowed_axioms.append(current_axiom)
-        
+
         if disallowed_axioms:
             return Score(
                 value=INCORRECT,
                 explanation=f"Compilation succeeded but has disallowed axioms: {', '.join(disallowed_axioms)}\n\nFull Print Assumptions output:\n{stdout}",
                 metadata=metadata
             )
-            
+
         return Score(
-            value=CORRECT, 
-            explanation=f"Checker.vo compiled successfully with only allowed axioms.\n\nFull Print Assumptions output:\n{stdout}", 
+            value=CORRECT,
+            explanation=f"Checker.vo compiled successfully with only allowed axioms.\n\nFull Print Assumptions output:\n{stdout}",
             metadata=metadata
         )
 

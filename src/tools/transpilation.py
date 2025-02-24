@@ -87,19 +87,48 @@ class LeanCompilationResult(TypedDict):
     unknown_lhs_identifiers: list[str]
     unknown_rhs_identifiers: list[str]
 
+_coq_project_map: list[CoqProject] = []
+_lean_export_project_map: list[LeanProject] = []
+_lean_project_map: list[LeanProject] = []
 
 class ProjectState(TypedDict):
     result: LeanCompilationResult
-    coq_project: CoqProject
-    lean_export_project: LeanProject
+    coq_project_id: int
+    lean_export_project_id: int
     coq_identifiers: list[CoqIdentifier]
     cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]
     cl_identifiers: list[tuple[CoqIdentifier, LeanIdentifier]]
     lean_statements: LeanFile
-    lean_project: LeanProject
+    lean_project_id: int
     missing_identifiers: list[CoqIdentifier]
     excess_identifiers: list[tuple[str, str]]
 
+def get_coq_project() -> CoqProject:
+    state: ProjectState = inspect_ai.util.store().get("translation_state")
+    return _coq_project_map[state["coq_project_id"]]
+
+def set_coq_project(coq_project: CoqProject):
+    state: ProjectState = inspect_ai.util.store().get("translation_state")
+    state["coq_project_id"] = len(_coq_project_map)
+    _coq_project_map.append(coq_project)
+
+def get_lean_export_project() -> LeanProject:
+    state: ProjectState = inspect_ai.util.store().get("translation_state")
+    return _lean_export_project_map[state["lean_export_project_id"]]
+
+def set_lean_export_project(lean_export_project: LeanProject):
+    state: ProjectState = inspect_ai.util.store().get("translation_state")
+    state["lean_export_project_id"] = len(_lean_export_project_map)
+    _lean_export_project_map.append(lean_export_project)
+
+def get_lean_project() -> LeanProject:
+    state: ProjectState = inspect_ai.util.store().get("translation_state")
+    return _lean_project_map[state["lean_project_id"]]
+
+def set_lean_project(lean_project: LeanProject):
+    state: ProjectState = inspect_ai.util.store().get("translation_state")
+    state["lean_project_id"] = len(_lean_project_map)
+    _lean_project_map.append(lean_project)
 
 async def generate_and_autorepair_isos(
     *,
@@ -123,8 +152,8 @@ async def generate_and_autorepair_isos(
     }
     result = state["result"]
 
-    state["coq_project"] = generate_isos(
-        state["coq_project"],
+    coq_project = generate_isos(
+        get_coq_project(),
         state["cc_identifiers_blocks"],
         original_name=original_name,
         imported_name=imported_name,
@@ -132,9 +161,10 @@ async def generate_and_autorepair_isos(
     )
 
     # Check that the iso proof compiles
-    state["coq_project"], result["status"], result["stderr"] = make_isos(
-        state["coq_project"], "Checker.vo"
+    coq_project, result["status"], result["stderr"] = make_isos(
+        coq_project, "Checker.vo"
     )
+    set_coq_project(coq_project)
     if result["status"]:
         return ContentText(text="Success!")
 
@@ -142,18 +172,19 @@ async def generate_and_autorepair_isos(
 
     logging.info("Isomorphism proof failed to compile, attempting to repair...")
 
-    error = result["error"] = parse_iso_errors(result["stderr"], iso_file=str(state["coq_project"][iso_file].contents), project=state["coq_project"])
+    error = result["error"] = parse_iso_errors(result["stderr"], iso_file=str(coq_project[iso_file].contents), project=coq_project)
     logging.info(f"Current error type is {type(error).__name__}")
 
     if isinstance(error, MissingTypeIso):
-        state["coq_project"], state["cc_identifiers_blocks"] = repair_missing_type_iso(
-            state["coq_project"],
+        coq_project, state["cc_identifiers_blocks"] = repair_missing_type_iso(
+            coq_project,
             error,
             state["cc_identifiers_blocks"],
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
         )
+        set_coq_project(coq_project)
         return await generate_and_autorepair_isos(
             original_name=original_name,
             imported_name=imported_name,
@@ -177,7 +208,7 @@ async def generate_and_autorepair_isos(
             )
         else:
             if write_to_directory_on_error is not None:
-                state["coq_project"].write(write_to_directory_on_error)
+                coq_project.write(write_to_directory_on_error)
             return ContentText(
                 text=f"Failed to prove isomorphisms because of missing import, please invoke the add_import tool with an import to make available the missing reference {error.import_str}"
             )
@@ -188,9 +219,9 @@ async def generate_and_autorepair_isos(
             original_name=original_name,
             imported_name=imported_name,
         ):
-            state["coq_project"], state["cc_identifiers_blocks"] = (
+            coq_project, state["cc_identifiers_blocks"] = (
                 autofix_disordered_constr(
-                    state["coq_project"],
+                    coq_project,
                     error,
                     state["cc_identifiers_blocks"],
                     original_name=original_name,
@@ -198,6 +229,7 @@ async def generate_and_autorepair_isos(
                     iso_file=iso_file,
                 )
             )
+            set_coq_project(coq_project)
             return await generate_and_autorepair_isos(
                 original_name=original_name,
                 imported_name=imported_name,
@@ -206,7 +238,7 @@ async def generate_and_autorepair_isos(
             )
         else:
             if write_to_directory_on_error is not None:
-                state["coq_project"].write(write_to_directory_on_error)
+                coq_project.write(write_to_directory_on_error)
             return ContentText(
                 text=f"Failed to prove isomorphism between {error.orig_source} and {error.orig_target} because the constructors are out of order.  This can be fixed by invoking the repair_iso_by_reorder_constructors tool with a permutation. The constructor misalignment is: {error.hint}"
             )
@@ -247,7 +279,7 @@ left: {unknown_lhs}
 right: {unknown_rhs}
 """
         if write_to_directory_on_error is not None:
-            state["coq_project"].write(write_to_directory_on_error)
+            coq_project.write(write_to_directory_on_error)
         return ContentText(
             text=f"""Failed to prove isomorphism between {error.orig_source} and {error.orig_target}.
 {missing_iso_text}
@@ -721,21 +753,22 @@ def transpilation_tool(
             "unknown_rhs_identifiers": [],
         }
         result = state["result"]
-        if "lean_export_project" not in state:
-            state["lean_export_project"] = init_lean_export_project
-        if "coq_project" not in state:
-            state["coq_project"] = init_coq_project
+        if "lean_export_project_id" not in state:
+            set_lean_export_project(init_lean_export_project)
+        if "coq_project_id" not in state:
+            set_coq_project(init_coq_project)
         if "coq_identifiers" not in state:
             state["coq_identifiers"] = coq_identifiers
 
         state["lean_statements"] = LeanFile(lean_code)
         # Verify that the Lean code compiles
-        state["lean_project"], result["status"], result["stderr"] = check_compilation(
+        lean_project, result["status"], result["stderr"] = check_compilation(
             state["lean_statements"], project=None
         )
+        set_lean_project(lean_project)
         if not result["status"]:
             if write_to_directory_on_error is not None:
-                state["lean_project"].write(write_to_directory_on_error)
+                lean_project.write(write_to_directory_on_error)
             result["suggestion"] = "Lean code failed to compile."
             result["failure_phase"] = CompilationPhase.LEAN_COMPILATION
             return ContentText(
@@ -754,24 +787,28 @@ def transpilation_tool(
         state["excess_identifiers"] = [
             (k, v) for k, v in coq_lean_identifiers.items() if k not in coq_identifiers
         ]
+        lean_export_project = get_lean_export_project()
+        coq_project = get_coq_project()
 
         (
-            state["lean_export_project"],
-            state["coq_project"],
+            lean_export_project,
+            coq_project,
             result["status"],
             cc_identifiers_blocks,
             result["stderr"],
         ) = lean_to_coq(
-            state["lean_export_project"],
-            state["coq_project"],
+            lean_export_project,
+            coq_project,
             state["lean_statements"],
             state["cl_identifiers"],
         )
+        set_lean_export_project(lean_export_project)
+        set_coq_project(coq_project)
         state["cc_identifiers_blocks"] = list(cc_identifiers_blocks)
 
         if not result["status"]:
             if write_to_directory_on_error is not None:
-                state["coq_project"].write(write_to_directory_on_error)
+                coq_project.write(write_to_directory_on_error)
             raise ToolError(
                 f"""Lean code failed to import to Coq (please summon a wizard):
 {result["stderr"]}"""
