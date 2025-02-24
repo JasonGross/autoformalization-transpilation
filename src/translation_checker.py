@@ -59,6 +59,15 @@ Coq project:
 ```coq
 {coq_import_file.contents}
 ```
+retcode: {result.returncode}
+stdout:
+```
+{result.stdout}
+```
+stderr:
+```
+{result.stderr}
+```
 """
         logging.error(msg)
         # TODO: Actually retrieve error, for example look at result.stderr, search for the last
