@@ -68,7 +68,7 @@ def extract_coq_identifiers(
         assert isinstance(coq.contents, str), "CoqFile contents must be a string"
         return coq_identifiers_of_list(
             re.findall(
-                r"(?:Theorem|Lemma|Fact|Remark|Corollary|Proposition|Property|Definition|Example|SubClass|Inductive|CoInductive|Variant|Record|Structure|Class|Fixpoint|CoFixpoint)\s+([^\s\(]+)",
+                r"(?:Theorem|Lemma|Fact|Remark|Corollary|Proposition|Property|Definition|Example|SubClass|Inductive|CoInductive|Variant|Record|Structure|Class|Fixpoint|CoFixpoint)\s+([^\s\(:]+)",
                 coq.contents,
                 flags=re.DOTALL,
             ),
