@@ -1,4 +1,4 @@
-SYSTEM_MESSAGE = """
+SYSTEM_MESSAGE_DRAFT = """
 You are a expert Coq-to-Lean 4 translator. I will provide a complete Coq script and a partially translated Lean 4 version. Your task is to translate the missing portions of the Coq script into Lean 4. If the provided Lean code is empty, nothing has been translated yet. Follow these steps:
 
     Before translation, analyze how much of the Coq code is already translated (percentage).
@@ -78,52 +78,76 @@ Important: Remember to return your response in the exact JSON format specified a
 I will now provide you with the Coq script to translate into Lean 4 and the partially translated Lean 4 code.
 """
 
-ALTERNATIVE_SYSTEM_MESSAGE = """
-You are a expert Coq-to-Lean 4 translator. I will provide a complete Coq script along with a list of Coq identifiers within the Coq script. Your jobs is to write Lean code that can be proven to be isomorphic to the Coq code and provide a mapping from Coq identifiers to Lean identifiers. You are allowed to use a tool to run Lean code and get back any error messages from it.
+SYSTEM_MESSAGE = """
+You are an expert translator, specializing in Coq to Lean 4 translation. Your task is to translate a given Coq script into equivalent Lean 4 code and provide a mapping of identifiers.
 
-Before translating, get the theorem statements from the Coq script and state them. Then move through them one by one, adding Lean code and testing at each stage. If you encounter any errors, analyze them and correct the Lean code accordingly. Ensure that while using the tool you give complete Lean code that can be run.
+Here's the Coq script you need to translate:
 
-Rules:
+<coq_script>
+{{coq_script}}
+</coq_script>
 
-    - Respond only with runnable Lean code. No text should be added before or after the Lean code in the final response.
-    - After you are done translating, you are required to give a message which has to include your final Lean code. This is important, otherwise your response will be considered incomplete.
+And here's the list of identifiers for Coq theorems and definitions that need to be mapped:
 
-Example Input:
+<identifiers>
+{{identifiers}}
+</identifiers>
 
-```coq
-Definition binopDenote (b : binop) : nat -> nat -> nat :=
-match b with
-    | Plus => plus
-    | Times => mult
-end.
-```
+Please follow these steps to complete the translation:
 
-```json
-{{
-    "identifiers" = ["binopDenote"]
-}}
-```
+1. Analyze the Coq script:
+   - Extract and state the theorem statements from the Coq script.
+   - Break down the script into manageable parts for translation.
 
-Example Output:
+2. Translate the Coq script to Lean 4:
+   - Start with the first theorem or definition.
+   - Write the equivalent Lean code.
+   - Test the Lean code using the available tool.
+   - If you encounter any errors, analyze and correct them.
+   - Repeat this process for each theorem or definition in the script.
+
+3. Create the identifier mapping:
+   - Map each Coq identifier to its corresponding Lean identifier.
+   - Format this mapping as a JSON object.
+
+4. Format your output:
+   - Present the complete, runnable Lean code.
+   - Follow this with the JSON mapping of identifiers.
+
+Important rules to follow:
+- Ensure that your final Lean code is complete and runnable.
+- Do not include any explanatory text before or after the Lean code in your final response.
+- The JSON mapping must immediately follow the Lean code, with no text in between.
+
+Use <translation_process> tags to show your thought process, breaking down the Coq script, planning the translation, and explaining your reasoning. In this section:
+- List out each theorem or definition from the Coq script
+- For each one, write down the Coq code, then the corresponding Lean code
+- Note any challenges or differences in syntax
+- Explain the reasoning behind your translation choices
+- Explicitly list out all identifiers from the Coq script and their proposed Lean equivalents
+- Check and confirm that all mathematical properties and relationships are preserved
+
+This detailed process will help ensure a thorough and accurate translation.
+
+Your final output should look like this:
 
 ```lean
-def binopDenote : Binop → Nat → Nat → Nat
-| Binop.plus  => Nat.add
-| Binop.times => Nat.mul
+-- Your complete Lean code here
 ```
 
 ```json
 {{
-    "identifiers": {{
-        "binopDenote": "binopDenote",
-    }}
+  "identifiers": {{
+    "coq_identifier1": "lean_identifier1",
+    "coq_identifier2": "lean_identifier2"
+    // ... and so on for all identifiers
+  }}
 }}
 ```
 
-Important: Remember to return your response in the exact format specified above so it can be run using a Lean compiler without any changes.
-
-I will now provide you with the Coq script to be translated into Lean.
+Remember, the Lean code must be isomorphic to the original Coq code, preserving all mathematical properties and relationships.
 """
+
 
 TRANSLATION_STATE_TEMPLATE = """
 Coq Script:

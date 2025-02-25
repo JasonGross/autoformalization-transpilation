@@ -7,7 +7,7 @@ from inspect_ai.model import CachePolicy
 from dataset.prepare import format_translation_input, prepare_dataset
 from models import AnthropicModel, OpenAIModel
 from prompts.transpilation import (
-    ALTERNATIVE_SYSTEM_MESSAGE,
+    SYSTEM_MESSAGE,
     TRANSLATION_STATE_TEMPLATE,
 )
 from scorers.transpilation import (
@@ -44,7 +44,7 @@ def coq_to_lean(cache: CachePolicy | bool = False):
     return Task(
         dataset=dataset,
         solver=basic_agent(
-            init=system_message(ALTERNATIVE_SYSTEM_MESSAGE),
+            init=system_message(SYSTEM_MESSAGE),
             tools=[
                 lean_run_tool(),
                 transpilation_tool(EXAMPLE_COQ_FILEPATH.read_text()),
