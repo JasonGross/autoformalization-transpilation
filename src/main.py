@@ -41,7 +41,6 @@ def preprocess_source(src) -> CoqFile | None:  # Optional[CoqProject]) -> CoqFil
     # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
 
-
 def translate(
     coq: CoqFile | None, error_code: Optional[str], error: Optional[str]
 ) -> tuple[LeanFile, list[tuple[CoqIdentifier, LeanIdentifier]]]:
@@ -71,7 +70,9 @@ def translate_and_prove(
     success = False
     error_code, error = None, None  # Used for subsequent attempts of translation
 
-    coq_identifiers = extract_coq_identifiers(coq_statements)
+    coq_identifiers = extract_coq_identifiers(
+        coq_statements, default_definition_pairs=DEFINITION_PAIRS
+    )
     coq_project, interface_success, error = generate_and_prove_iso_interface(
         coq_project, coq_identifiers
     )

@@ -6,10 +6,9 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Callable, Iterator, Literal, Self, TypeVar, cast, overload
+from typing import Any, Callable, Iterator, Literal, Self, TypeVar, cast, overload
 import base64
 
-from config import DEFINITION_PAIRS
 from utils import logging, run_cmd
 from utils.memoshelve import cache, hash_as_tuples
 
@@ -320,11 +319,13 @@ def coq_identifiers_of_list(
 def extract_coq_identifiers_str(
     coq: CoqFile | None | str,
     sigil: Literal[False] | Callable[[str], str] = sigil,
+    *,
+    default_definition_pairs: list[tuple[CoqIdentifier, Any]] = [],
 ) -> list[str]:
     # Extract identifiers from Coq statements
     if not coq:
         # TODO: Have the actual identifier pairs
-        result = [str(coq_id) for coq_id, _ in DEFINITION_PAIRS]
+        result = [str(coq_id) for coq_id, _ in default_definition_pairs]
         if not sigil:
             result = [desigil(coq_id) for coq_id in result]
         return result
@@ -345,5 +346,7 @@ def extract_coq_identifiers_str(
 def extract_coq_identifiers(
     coq: CoqFile | None | str,
     sigil: Literal[False] | Callable[[str], str] = sigil,
+    *,
+    default_definition_pairs: list[tuple[CoqIdentifier, Any]] = [],
 ) -> list[CoqIdentifier]:
-    return [CoqIdentifier(coq_id) for coq_id in extract_coq_identifiers_str(coq, sigil)]
+    return [CoqIdentifier(coq_id) for coq_id in extract_coq_identifiers_str(coq, sigil, default_definition_pairs=default_definition_pairs)]

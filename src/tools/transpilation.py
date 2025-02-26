@@ -609,7 +609,9 @@ def transpilation_tool(
     init_lean_export_project = LeanProject.read(lean_export_directory)
 
     if coq_names is None:
-        coq_identifiers = extract_coq_identifiers(coq_statements_file, sigil=False)
+        coq_identifiers = extract_coq_identifiers(
+            coq_statements_file, sigil=False, default_definition_pairs=DEFINITION_PAIRS
+        )
         assert coq_identifiers, f"No Coq identifiers found in {coq_statements}"
     else:
         coq_identifiers = coq_identifiers_of_list(coq_names, sigil=False)
