@@ -32,10 +32,6 @@ from isomorphism_prover import (
     generate_and_autorepair_isos,
 )
 import isomorphism_prover
-from main import (
-    coq_identifiers_of_list,
-    extract_coq_identifiers,
-)
 from project_util import (
     CoqFile,
     CoqIdentifier,
@@ -50,6 +46,8 @@ from project_util import (
     MissingTypeIso,
     desigil,
     sigil,
+    extract_coq_identifiers,
+    coq_identifiers_of_list,
 )
 from tools.itp import run_lean_str
 from translation_checker import (
@@ -140,15 +138,15 @@ def set_lean_project(lean_project: LeanProject):
     state["lean_project_id"] = len(_lean_project_map)
     _lean_project_map.append(lean_project)
 
+
 def generate_and_autorepair_isos_tool(
     *,
     admit_failing_isos: bool = False,
     original_name: str = "Original",
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
-    write_to_directory_on_error: (
-        Path | str | None
-)) -> ToolResult:
+    write_to_directory_on_error: Path | str | None,
+) -> ToolResult:
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     state["result"] = {
         "status": False,
@@ -164,7 +162,12 @@ def generate_and_autorepair_isos_tool(
     coq_project = get_coq_project()
 
     try:
-        coq_project, state["cc_identifiers_blocks"], result["status"], result["error"] = generate_and_autorepair_isos(
+        (
+            coq_project,
+            state["cc_identifiers_blocks"],
+            result["status"],
+            result["error"],
+        ) = generate_and_autorepair_isos(
             coq_project,
             state["cc_identifiers_blocks"],
             admit_failing_isos=admit_failing_isos,
@@ -187,12 +190,12 @@ def generate_and_autorepair_isos_tool(
     assert not isinstance(error, MissingTypeIso), error
     if isinstance(error, MissingImport):
         return ContentText(
-                text=f"Failed to prove isomorphisms because of missing import, please invoke `add_import_tool` with an import to make available the missing reference {error.import_str}"
-            )
+            text=f"Failed to prove isomorphisms because of missing import, please invoke `add_import_tool` with an import to make available the missing reference {error.import_str}"
+        )
     elif isinstance(error, DisorderedConstr):
         return ContentText(
-                text=f"Failed to prove isomorphism between {error.orig_source} and {error.orig_target} because the constructors are out of order.  This can be fixed by invoking `repair_iso_by_reorder_constructors_tool` with a permutation. The constructor misalignment is: {error.hint}"
-            )
+            text=f"Failed to prove isomorphism between {error.orig_source} and {error.orig_target} because the constructors are out of order.  This can be fixed by invoking `repair_iso_by_reorder_constructors_tool` with a permutation. The constructor misalignment is: {error.hint}"
+        )
     elif isinstance(error, GenericIsoError):
         missing_iso_text = ""
         if error.unknown_lhs and error.unknown_rhs:
@@ -670,7 +673,7 @@ def transpilation_tool(
             )
 
         state["cl_identifiers"] = [
-            (CoqIdentifier(f"${k}"), LeanIdentifier(f"${coq_lean_identifiers[str(k)]}"))
+            (sigil(k), sigil(LeanIdentifier(coq_lean_identifiers[str(k)])))
             for k in coq_identifiers
             if str(k) in coq_lean_identifiers
         ]

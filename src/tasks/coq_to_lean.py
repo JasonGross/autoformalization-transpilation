@@ -27,7 +27,7 @@ from tools.transpilation import (
 )
 
 EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
-    Path(__file__).parent.parent / "simple-tests" / "incomplete_statements.v"
+    Path(__file__).parent.parent / "simple-tests" / "StackMachine-admitted.v"
 )
 
 
@@ -71,7 +71,7 @@ def coq_to_lean(cache: CachePolicy | bool = False):
 if __name__ == "__main__":
     eval(
         coq_to_lean(
-            # cache=CachePolicy(expiry=None, per_epoch=False),
+            cache=CachePolicy(expiry=None, per_epoch=False),
         ),
         # model=OpenAIModel.BEST,
         model=OpenAIModel.O1PREVIEW,

@@ -1,13 +1,15 @@
 import contextlib
+import re
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Iterator, Self, TypeVar
+from typing import Callable, Iterator, Literal, Self, TypeVar, cast, overload
 import base64
 
+from config import DEFINITION_PAIRS
 from utils import logging, run_cmd
 from utils.memoshelve import cache, hash_as_tuples
 
@@ -286,16 +288,62 @@ class DisorderedConstr(IsoError):
 #     OTHER_ISO_ISSUE = "other_iso_issue"
 
 
-IDT = TypeVar("IDT", CoqIdentifier, LeanIdentifier, str)
+IDT = TypeVar(
+    "IDT", Identifier, CoqIdentifier, LeanIdentifier, str, CoqIdentifier | str
+)
 
 
 def sigil(s: IDT) -> IDT:
     if isinstance(s, str):
         return "$" + s
-    return s.__class__(f"${str(s)}")
+    return s.__class__(sigil(str(s)))
 
 
-def desigil(s: str, prefix: str = "") -> str:
-    if s[0] == "$":
-        return prefix + s[1:]
-    return s
+def desigil(s: IDT, prefix: str = "") -> IDT:
+    if isinstance(s, str):
+        if s[0] == "$":
+            return prefix + s[1:]
+        return s
+    return s.__class__(desigil(str(s), prefix))
+
+
+def coq_identifiers_of_list(
+    coq_list: list[str],
+    sigil: Literal[False] | Callable[[CoqIdentifier], CoqIdentifier] = sigil,
+) -> list[CoqIdentifier]:
+    result = [CoqIdentifier(s) for s in coq_list]
+    if sigil:
+        result = [sigil(coq_id) for coq_id in result]
+    return result
+
+
+def extract_coq_identifiers_str(
+    coq: CoqFile | None | str,
+    sigil: Literal[False] | Callable[[str], str] = sigil,
+) -> list[str]:
+    # Extract identifiers from Coq statements
+    if not coq:
+        # TODO: Have the actual identifier pairs
+        result = [str(coq_id) for coq_id, _ in DEFINITION_PAIRS]
+        if not sigil:
+            result = [desigil(coq_id) for coq_id in result]
+        return result
+    else:
+        coq_str = coq.contents if isinstance(coq, CoqFile) else coq
+        # not perfect, but best-effort
+        assert isinstance(coq_str, str), "CoqFile contents must be a string"
+        result: list[str] = re.findall(
+            r"(?:Theorem|Lemma|Fact|Remark|Corollary|Proposition|Property|Definition|Example|SubClass|Inductive|CoInductive|Variant|Record|Structure|Class|Fixpoint|CoFixpoint)\s+([^\s\(:]+)",
+            coq_str,
+            flags=re.DOTALL,
+        )
+        if sigil:
+            result = [sigil(coq_id) for coq_id in result]
+        return result
+
+
+def extract_coq_identifiers(
+    coq: CoqFile | None | str,
+    sigil: Literal[False] | Callable[[str], str] = sigil,
+) -> list[CoqIdentifier]:
+    return [CoqIdentifier(coq_id) for coq_id in extract_coq_identifiers_str(coq, sigil)]

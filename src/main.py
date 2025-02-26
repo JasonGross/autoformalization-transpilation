@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 import sys
-import re
 from typing import Optional
 
 from config import (
     DEFINITION_PAIRS,
     EXAMPLE_STATEMENTS,
     EXPORT_DIR,
-    SOURCE_DIR,
 )
 from isomorphism_prover import generate_and_prove_iso_interface, init_coq_project
 from project_util import (
@@ -17,7 +15,7 @@ from project_util import (
     LeanFile,
     LeanIdentifier,
     LeanProject,
-    desigil,
+    extract_coq_identifiers,
 )
 from translation_checker import ErrorCode, check_translation
 from utils import logging
@@ -42,38 +40,6 @@ def preprocess_source(src) -> CoqFile | None:  # Optional[CoqProject]) -> CoqFil
     # and add the code to this repo
     # At the moment there is an assumption that we only produce a single CoqFile, which will obviously not hold as project size scales
 
-
-def coq_identifiers_of_list(
-    coq_list: list[str], sigil: bool = True
-) -> list[CoqIdentifier]:
-    result = [CoqIdentifier(s) for s in coq_list]
-    if sigil:
-        result = [CoqIdentifier(f"${coq_id}") for coq_id in result]
-    return result
-
-
-def extract_coq_identifiers(
-    coq: CoqFile | None, sigil: bool = True
-) -> list[CoqIdentifier]:
-    # Extract identifiers from Coq statements
-    if not coq:
-        # TODO: Have the actual identifier pairs
-        result = [coq_id for coq_id, _ in DEFINITION_PAIRS]
-        if not sigil:
-            result = [CoqIdentifier(desigil(str(coq_id))) for coq_id in result]
-        return result
-
-    else:
-        # not perfect, but best-effort
-        assert isinstance(coq.contents, str), "CoqFile contents must be a string"
-        return coq_identifiers_of_list(
-            re.findall(
-                r"(?:Theorem|Lemma|Fact|Remark|Corollary|Proposition|Property|Definition|Example|SubClass|Inductive|CoInductive|Variant|Record|Structure|Class|Fixpoint|CoFixpoint)\s+([^\s\(:]+)",
-                coq.contents,
-                flags=re.DOTALL,
-            ),
-            sigil=sigil,
-        )
 
 
 def translate(
