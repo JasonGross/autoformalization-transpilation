@@ -1,5 +1,7 @@
 import contextlib
+import os
 import re
+import datetime
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
@@ -57,7 +59,7 @@ class File:
         else:
             return f"{self.__class__.__name__}({self.contents[:full_repr_threshold//2]}...(hash={hash(self.contents)})...{self.contents[-full_repr_threshold//2:]})"
 
-    def write(self, filepath: str | Path) -> None:
+    def write(self, filepath: str | Path, *, mod_time: int | float | None = None) -> None:
         logging.debug(
             f"Writing {self.__class__.__name__} to {filepath}\nContents:\n{self}"
         )
@@ -67,6 +69,8 @@ class File:
         else:
             assert isinstance(self.contents, str), type(self.contents)
             Path(filepath).write_text(self.contents)
+        if mod_time is not None:
+            os.utime(filepath, (mod_time, mod_time))
 
     @classmethod
     def read_text(cls, filepath: str | Path):
@@ -109,8 +113,9 @@ class Project:
         logging.debug("Writing %s to %s", self.__class__.__name__, directory)
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)
-        for name, file in self.files.items():
-            file.write(directory / name)
+        dt_epoch = datetime.datetime.now().timestamp()
+        for i, (name, file) in reversed(list(enumerate(reversed(self.files.items())))):
+            file.write(directory / name, mod_time=dt_epoch - i)
 
     def reread(self: Self, directory: str | Path) -> None:
         directory = Path(directory)
