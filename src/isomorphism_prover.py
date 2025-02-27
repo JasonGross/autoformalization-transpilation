@@ -598,7 +598,7 @@ def repair_isos_interface(
     assert unfold_list or CoqIdentifier(source) not in coq_identifiers[:index], (
         source,
         coq_identifiers,
-        re.sub(r"\s+", " ", errors)
+        re.sub(r"\s+", " ", errors),
     )
     if CoqIdentifier(source) in coq_identifiers[index:]:
         coq_identifiers.remove(CoqIdentifier(source))
@@ -857,6 +857,7 @@ def init_coq_project(
         coq_project[f] = CoqFile("")
     if initial_targets is not None:
         extra_flags = ["-k"] if allow_build_failure else []
+        coq_project.write(Path(__file__).parent.parent / "temp_init_targets")
         result, coq_project = coq_project.make(
             *initial_targets, *extra_flags, check=not allow_build_failure
         )
