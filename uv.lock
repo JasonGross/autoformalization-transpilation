@@ -194,7 +194,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.45.0" },
     { name = "coq-tools", specifier = ">=0.0.4" },
     { name = "dill", specifier = ">=0.3.9" },
-    { name = "inspect-ai", specifier = ">=0.3.59" },
+    { name = "inspect-ai", specifier = ">=0.3.70" },
     { name = "mypy", specifier = ">=1.15.0" },
     { name = "openai", specifier = ">=1.61.1" },
     { name = "pydantic", specifier = ">=2.10.6" },
@@ -498,7 +498,7 @@ wheels = [
 
 [[package]]
 name = "inspect-ai"
-version = "0.3.59"
+version = "0.3.70"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -530,9 +530,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "zipp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/82/f6/6e475863c513c98bbc3fa265094356a007d5dc144d5a661e5ab4605a7c27/inspect_ai-0.3.59.tar.gz", hash = "sha256:7ff04b288c64e09a8da554a52d79f80dee6a0732b28577ff1f1667a3eff2e389", size = 9969076 }
+sdist = { url = "https://files.pythonhosted.org/packages/95/a0/19d2d08d77523f3903d5a8ac4cdb17cfda4a894da6047ed91a6fc5415d6a/inspect_ai-0.3.70.tar.gz", hash = "sha256:4789c30ac24880bd927232d250803be1a993918ad77631936bacfd9d7d58e2a0", size = 10063963 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/b8/5248e410bdef0e3f7df6a9eb54cb09126ec11bde22c3e7a27d75bd403b9d/inspect_ai-0.3.59-py3-none-any.whl", hash = "sha256:6513310ea3528b28cae02ac020f49fa7a0b156c197ddbad1ad1ec63f1b32e636", size = 1855991 },
+    { url = "https://files.pythonhosted.org/packages/26/ad/d7b49e43ade9e4339d6d53d2e0334839b2d5ef20e92345bcc9cf403b4ae0/inspect_ai-0.3.70-py3-none-any.whl", hash = "sha256:672cc4b537ce48cb7c863a2a9fa1ba07bc87d1807af3b68986c41b8e55e3c899", size = 2025779 },
 ]
 
 [[package]]
