@@ -209,7 +209,12 @@ right: {error.unknown_rhs}
             text=f"""Failed to prove isomorphism between {error.orig_source} and {error.orig_target}.
 {missing_iso_text}
 
-You might need to adjust the isomorphism proof of the isomorphism using the `edit_proof_tool` with the new proof. Here is some information that might help diagnose the rewriting:
+You might need to adjust the isomorphism proof of the isomorphism using the `edit_proof_tool` with the new proof.
+{'Likely this is' if not missing_iso_text else 'This may be'} because of a difference in the elaboration of Lean and Coq.
+For example, a standard library definition may be defined recursive on a different argument or calling a subdefinition with arguments in a different order, in which case you may need to rewrite with a commutativity lemma (e.g., using `iso. iso_rel_rewrite Nat.add_comm. iso.` or `iso. iso_rel_rewrite Nat.mul_comm. iso. iso_rel_rewrite Nat.add_comm. iso.`).
+Or elaboration may pick different associativity for an infix operation, in which case you may need to rewrite with an associativity lemma.
+Pay special attention to the left-hand-side of the isomorphism goal, which is the Coq source, rather than the right-hand-side, which is mangled by the Lean elaborator and re-import.
+Here is some information that might help diagnose the rewriting:
 ```
 {error.prefix}
 ```
@@ -508,7 +513,7 @@ def edit_proof_tool(
 
         Args:
             iso_source: The source identifier for the isomorphism block to be reordered. (str)
-            new_proof: The new proof for the isomorphism block. (str)
+            new_proof: The new proof for the isomorphism block.  This is likely to be something like 'iso. iso_rel_rewrite {lemma here}. iso.' (str)
             iso_target: The target identifier for the isomorphism block to be reordered. Optional. (str|None)
         """
         return await edit_proof_higher_order(

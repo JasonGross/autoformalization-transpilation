@@ -55,9 +55,9 @@ def coq_to_lean(cache: CachePolicy | bool = False):
                 edit_proof_tool(),
                 repair_iso_by_reorder_constructors_tool(),
             ],
-            max_attempts=3,
+            max_attempts=1,
             message_limit=30,
-            token_limit=50_000,
+            token_limit=128_000,
             cache=cache,
         ),
         scorer=[
@@ -74,7 +74,8 @@ if __name__ == "__main__":
             cache=CachePolicy(expiry=None, per_epoch=False),
         ),
         # model=OpenAIModel.BEST,
-        model=OpenAIModel.O1PREVIEW,
+        # model=OpenAIModel.O1PREVIEW,
+        model=AnthropicModel.BEST,
         token_limit=128000,
     )
     pass

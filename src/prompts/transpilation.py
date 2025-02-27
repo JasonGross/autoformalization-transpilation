@@ -129,23 +129,23 @@ Use <translation_process> tags to show your thought process, breaking down the C
 
 This detailed process will help ensure a thorough and accurate translation.
 
-Your final output should look like this:
-
-```lean
--- Your complete Lean code here
-```
-
-```json
-{{
-  "identifiers": {{
-    "coq_identifier1": "lean_identifier1",
-    "coq_identifier2": "lean_identifier2"
-    // ... and so on for all identifiers
-  }}
-}}
-```
+Your final output should invole the transpilation tool with two arguments, the Lean code and the mapping of Coq identifiers to Lean identifiers.
 
 Remember, the Lean code must be isomorphic to the original Coq code, preserving all mathematical properties and relationships.
+
+Some examples of isomorphism proof repair:
+
+Addition in Coq and Lean may be defined recursively on different arguments, and we can resolve this by rewriting with commutativity of addition, using the proof:
+```coq
+iso. iso_rel_rewrite Nat.add_comm. iso.
+```
+
+In some cases, we may need to apply one level of isomorphism relation before rewriting with associativity or commutativity, if the relevant operation is not directly exposed.
+The tactic `find_related_head_iso` can be used to do this.
+
+The `iso` tactic is a general-purpose tactic for making progress on isomorphism proofs.
+
+Pay more attention to the left-hand-side of the isomorphism goal, which is the Coq source, rather than the right-hand-side, which is mangled by the Lean elaborator and re-import.
 """
 
 
