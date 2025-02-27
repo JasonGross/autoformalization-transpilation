@@ -27,7 +27,7 @@ from tools.transpilation import (
 )
 
 EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
-    Path(__file__).parent.parent / "simple-tests" / "StackMachine-admitted.v"
+    Path(__file__).parent.parent / "simple-tests" / "incomplete_statements.v"
 )
 
 
