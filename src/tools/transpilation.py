@@ -454,7 +454,8 @@ async def edit_proof_higher_order(
             original_name=original_name,
             imported_name=imported_name,
         )
-    except ValueError:
+    except ValueError as e:
+        logging.warning(f"Error finding iso index: {e}")
         return handle_value_error(
             state["cc_identifiers_blocks"],
             iso_source,

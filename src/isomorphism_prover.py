@@ -674,6 +674,9 @@ def find_iso_index(
                     return cc_identifiers_str.index((orig_source, orig_target))
                 except ValueError:
                     pass
+        raise ValueError(
+            f"Could not find iso for {orig_sources} to {orig_targets} in {cc_identifiers_str}"
+        )
     else:
         c_identifiers_str = [s for s, _ in cc_identifiers_str]
         for orig_source in orig_sources:
@@ -681,9 +684,9 @@ def find_iso_index(
                 return c_identifiers_str.index(orig_source)
             except ValueError:
                 pass
-    raise ValueError(
-        f"Could not find iso for {orig_source} to {orig_target} in {cc_identifiers_str}"
-    )
+        raise ValueError(
+            f"Could not find iso for {orig_sources} in {cc_identifiers_str}"
+        )
 
 
 def has_iso(
