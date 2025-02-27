@@ -689,8 +689,9 @@ def transpilation_tool(
         state["missing_identifiers"] = [
             k for k in coq_identifiers if str(k) not in coq_lean_identifiers
         ]
+        coq_identifiers_str = [str(k) for k in coq_identifiers]
         state["excess_identifiers"] = [
-            (k, v) for k, v in coq_lean_identifiers.items() if k not in coq_identifiers
+            (k, v) for k, v in coq_lean_identifiers.items() if k not in coq_identifiers_str
         ]
         lean_export_project = get_lean_export_project()
         coq_project = get_coq_project()
