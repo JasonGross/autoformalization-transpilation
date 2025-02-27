@@ -154,4 +154,8 @@ Coq Script:
 ```coq
 {coq_script}
 ```
+
+<identifiers>
+{coq_identifiers}
+</identifiers>
 """

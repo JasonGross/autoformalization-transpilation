@@ -35,7 +35,7 @@ EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
 def coq_to_lean(cache: CachePolicy | bool = False):
     # dataset
     input_msg = format_translation_input(
-        TRANSLATION_STATE_TEMPLATE, EXAMPLE_COQ_FILEPATH
+        TRANSLATION_STATE_TEMPLATE, EXAMPLE_COQ_FILEPATH, coq_identifiers=["plus_0_r_statement", "plus_comm_statement"]
     )
     dataset = prepare_dataset([input_msg])
 
