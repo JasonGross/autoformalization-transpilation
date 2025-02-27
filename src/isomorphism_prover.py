@@ -594,9 +594,11 @@ def repair_isos_interface(
 
     if not (unfold_list or CoqIdentifier(source) not in coq_identifiers[:index]):
         project.write(Path(__file__).parent.parent / "temp_interface_errors")
+        logging.error(errors)
     assert unfold_list or CoqIdentifier(source) not in coq_identifiers[:index], (
         source,
         coq_identifiers,
+        re.sub(r"\s+", " ", errors)
     )
     if CoqIdentifier(source) in coq_identifiers[index:]:
         coq_identifiers.remove(CoqIdentifier(source))
