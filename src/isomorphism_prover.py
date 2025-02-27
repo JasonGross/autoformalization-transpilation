@@ -22,6 +22,7 @@ from project_util import (
     MissingImport,
     MissingTypeIso,
     desigil,
+    sigil,
 )
 from utils import logging
 
@@ -654,16 +655,34 @@ def find_iso_index(
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
+    fuzzy_sigil: bool = True,
 ) -> int:
     cc_identifiers_str = make_identifiers_str(
         cc_identifiers_blocks, original_name=original_name, imported_name=imported_name
     )
-    if orig_target is not None:
-        return cc_identifiers_str.index((orig_source, orig_target))
+    orig_sources = [orig_source]
+    orig_targets = [orig_target] if orig_target is not None else None
+    if fuzzy_sigil:
+        orig_sources += [s for s in [desigil(orig_source, f"{original_name}."), sigil(desigil(orig_source))] if s != orig_source]
+        if orig_target is not None and orig_targets is not None:
+            orig_targets += [s for s in [desigil(orig_target, f"{imported_name}."), sigil(desigil(orig_target))] if s != orig_target]
+
+
+    if orig_targets is not None:
+        for orig_source in orig_sources:
+            for orig_target in orig_targets:
+                try:
+                    return cc_identifiers_str.index((orig_source, orig_target))
+                except ValueError:
+                    pass
     else:
         c_identifiers_str = [s for s, _ in cc_identifiers_str]
-        return c_identifiers_str.index(orig_source)
-
+        for orig_source in orig_sources:
+            try:
+                return c_identifiers_str.index(orig_source)
+            except ValueError:
+                pass
+    raise ValueError(f"Could not find iso for {orig_source} to {orig_target} in {cc_identifiers_str}")
 
 def has_iso(
     cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
