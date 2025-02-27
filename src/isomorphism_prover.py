@@ -823,6 +823,7 @@ def generate_and_prove_iso_interface(
 
     # Check that the iso proof compiles
     project, result, errors = make_isos_interface(project)
+    project.write(Path(__file__).parent.parent / "temp_interface_status")
 
     if result:
         logging.info("Isomorphism interface proof succeeded")
@@ -838,6 +839,7 @@ def generate_and_prove_iso_interface(
                 coq_identifiers,
                 coq_identifiers_to_unfold=coq_identifiers_to_unfold,
             )
+            project.write(Path(__file__).parent.parent / "temp_interface_status")
             project, result, errors = make_isos_interface(project)
 
     # Eventually will want to feed back isos but for now just return result
