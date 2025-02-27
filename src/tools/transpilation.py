@@ -617,8 +617,10 @@ def transpilation_tool(
         coq_identifiers = coq_identifiers_of_list(coq_names, sigil=False)
         assert coq_identifiers, f"No Coq identifiers found in {coq_names}"
 
-    init_coq_project, interface_success, error = generate_and_prove_iso_interface(
-        init_coq_project, list(map(sigil, coq_identifiers))
+    init_coq_project, interface_success, error, _coq_identifiers_to_unfold = (
+        generate_and_prove_iso_interface(
+            init_coq_project, list(map(sigil, coq_identifiers))
+        )
     )
     assert interface_success, f"Failed to generate and prove interface:\n{error}"
 

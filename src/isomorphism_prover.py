@@ -1,7 +1,7 @@
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Sequence
 
 from config import (
     ISO_CHECKER_HEADER,
@@ -456,16 +456,19 @@ def make_isos(
 
 
 def generate_interface(
-    project: CoqProject, coq_identifiers: list[CoqIdentifier]
+    project: CoqProject,
+    coq_identifiers: list[CoqIdentifier],
+    *,
+    coq_identifiers_to_unfold: Sequence[CoqIdentifier] = [],
+    original_name: str = "Original",
+    output_file: str = "Interface.v",
+    checker_file: str = "Checker.v",
 ) -> CoqProject:
     project = project.copy()
+    coq_identifiers_to_unfold_str = [
+        str(coq_id) for coq_id in coq_identifiers_to_unfold
+    ]
     # TODO: Implement https://github.com/JasonGross/autoformalization/pull/19#discussion_r1934686304
-    # Can make these parameters if needed
-    original_name, output_file, checker_file = (
-        "Original",
-        "Interface.v",
-        "Checker.v",
-    )
 
     # Should also be generating these programmatically, for now these are manual
     # TODO: This should happen in the reimport step!
@@ -488,14 +491,21 @@ def generate_interface(
             if coq_id[0] == "@":
                 coq_id = coq_id[1:]
             iso_name = f"{coq_id}_iso"
-        iso_interface_block = f"""Parameter imported_{coq_id} : import_of {first_id}.
-Parameter {iso_name} : iso_statement {first_id} imported_{coq_id}.
-Existing Instance {iso_name}."""
-        iso_interface_checks.append(iso_interface_block)
+
         iso_block = f"""Derive imported_{coq_id} in (iso_statement {first_id} (imported_{coq_id} :> import_of {first_id})) as {iso_name}.
 Proof. subst imported_{coq_id}. exact Isomorphisms.{iso_name}. Defined.
 Existing Instance {iso_name}."""
         iso_checks.append(iso_block)
+
+        if first_id in coq_identifiers_to_unfold_str:
+            iso_interface_block = f"""Derive imported_{coq_id} in (iso_statement {first_id} (imported_{coq_id} :> import_of {first_id})) as {iso_name}.
+Proof. subst imported_{coq_id}. iso_for_interface. Defined.
+Existing Instance {iso_name}."""
+        else:
+            iso_interface_block = f"""Parameter imported_{coq_id} : import_of {first_id}.
+Parameter {iso_name} : iso_statement {first_id} imported_{coq_id}.
+Existing Instance {iso_name}."""
+        iso_interface_checks.append(iso_interface_block)
 
     # Generate a `Print Assumptions` check for dependencies
     everything_interface_block = f"""Import IsomorphismChecker.Automation.HList.HListNotations.
@@ -503,10 +513,17 @@ Definition everything := ({" :: ".join(iso_names)} :: [])%hlist."""
 
     everything_block = f"""Definition everything := Isomorphisms.everything."""
 
+    force_unfold_block = "\n".join(
+        f"#[local] Instance: MustUnfold {coq_id} := {{}}."
+        for coq_id in coq_identifiers_to_unfold_str
+    )
+
     # Combine all sections
     full_interface_content = "\n\n".join(
         [
             ISO_INTERFACE_HEADER,
+            force_unfold_block,
+            "Module Type Interface.",
             "\n\n".join(iso_interface_checks),
             everything_interface_block,
             "End Interface.",
@@ -538,18 +555,21 @@ def repair_isos_interface(
     errors: str,
     coq_identifiers: list[CoqIdentifier],
     *,
+    coq_identifiers_to_unfold: Sequence[CoqIdentifier] = (),
     original_name: str = "Original",
     interface_file: str = "Interface.v",
-) -> tuple[CoqProject, list[CoqIdentifier]]:
+    checker_file: str = "Checker.v",
+) -> tuple[CoqProject, list[CoqIdentifier], list[CoqIdentifier]]:
+    coq_identifiers_to_unfold = list(coq_identifiers_to_unfold)
     # Look at the errors, attempt to fix the isos
     result = re.search(
-        r"While importing ([\w\.]+): Consider adding iso_statement ([\w\.]+|\(@[\w\.]+\)) ",
+        r"While importing ([\w\.]+): Consider adding iso_statement ([\w\.]+|\(@[\w\.]+\)) (?:and unfolding \[([^\]]+)\])?",
         re.sub(r"\s+", " ", errors),
     )
     if result is None:
         project.write(Path(__file__).parent.parent / "temp_interface_errors")
     assert result is not None, (project[interface_file], re.sub(r"\s+", " ", errors))
-    orig_source, source = result.groups()
+    orig_source, source, unfold_list = result.groups()
     coq_identifiers_str = [
         desigil(str(s), f"{original_name}.") for s in coq_identifiers
     ]
@@ -557,11 +577,40 @@ def repair_isos_interface(
         orig_source,
         coq_identifiers_str,
     )
-    logging.info(f"Adding iso_statement {source} for {orig_source}")
     index = coq_identifiers_str.index(orig_source)
-    coq_identifiers.insert(index, CoqIdentifier(source))
-    project = generate_interface(project, coq_identifiers)
-    return project, coq_identifiers
+    if unfold_list:
+        unfold_ids = unfold_list.split(", ")
+        coq_identifiers_to_unfold += [CoqIdentifier(s) for s in unfold_ids]
+        for coq_id in unfold_ids:
+            if coq_id not in coq_identifiers_str:
+                project.write(Path(__file__).parent.parent / "temp_interface_errors")
+            assert coq_id in coq_identifiers_str, (coq_id, coq_identifiers_str)
+            index = min(index, coq_identifiers_str.index(coq_id))
+    logging.info(
+        f"Adding iso_statement {source} for {orig_source}"
+        f"{' before ' + coq_identifiers_str[index] if orig_source != coq_identifiers_str[index] else ''}"
+        f"{' and unfolding ' + unfold_list if unfold_list else ''}"
+    )
+
+    if not (unfold_list or CoqIdentifier(source) not in coq_identifiers[:index]):
+        project.write(Path(__file__).parent.parent / "temp_interface_errors")
+    assert unfold_list or CoqIdentifier(source) not in coq_identifiers[:index], (
+        source,
+        coq_identifiers,
+    )
+    if CoqIdentifier(source) in coq_identifiers[index:]:
+        coq_identifiers.remove(CoqIdentifier(source))
+    if CoqIdentifier(source) not in coq_identifiers:
+        coq_identifiers.insert(index, CoqIdentifier(source))
+    project = generate_interface(
+        project,
+        coq_identifiers,
+        coq_identifiers_to_unfold=coq_identifiers_to_unfold,
+        original_name=original_name,
+        output_file=interface_file,
+        checker_file=checker_file,
+    )
+    return project, coq_identifiers, coq_identifiers_to_unfold
 
 
 @lru_cache()
@@ -759,9 +808,16 @@ def llm_suggest_paired_identifier(
 def generate_and_prove_iso_interface(
     project: CoqProject,
     coq_identifiers: list[CoqIdentifier],
-) -> tuple[CoqProject, bool, Optional[str]]:
+    *,
+    coq_identifiers_to_unfold: Sequence[CoqIdentifier] = (),
+) -> tuple[CoqProject, bool, Optional[str], list[CoqIdentifier]]:
+    coq_identifiers_to_unfold = list(coq_identifiers_to_unfold)
     # Make interface file
-    project = generate_interface(project, coq_identifiers)
+    project = generate_interface(
+        project,
+        coq_identifiers,
+        coq_identifiers_to_unfold=coq_identifiers_to_unfold,
+    )
 
     # Check that the iso proof compiles
     project, result, errors = make_isos_interface(project)
@@ -774,13 +830,16 @@ def generate_and_prove_iso_interface(
             attempt += 1
             logging.info(f"Isomorphism interface proof failed on attempt {attempt}")
             logging.debug(errors)
-            project, coq_identifiers = repair_isos_interface(
-                project, errors, coq_identifiers
+            project, coq_identifiers, coq_identifiers_to_unfold = repair_isos_interface(
+                project,
+                errors,
+                coq_identifiers,
+                coq_identifiers_to_unfold=coq_identifiers_to_unfold,
             )
             project, result, errors = make_isos_interface(project)
 
     # Eventually will want to feed back isos but for now just return result
-    return project, result, errors
+    return project, result, errors, coq_identifiers_to_unfold
 
 
 def init_coq_project(
