@@ -22,12 +22,13 @@ from tools.transpilation import (
     add_iso_tool,
     edit_proof_tool,
     remove_import_tool,
+    remove_iso_tool,
     repair_iso_by_reorder_constructors_tool,
     transpilation_tool,
 )
 
 EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
-    Path(__file__).parent.parent / "simple-tests" / "incomplete_statements.v"
+    Path(__file__).parent.parent / "simple-tests" / "StackMachine-statements.v"
 )
 
 
@@ -52,6 +53,7 @@ def coq_to_lean(cache: CachePolicy | bool = False):
                 remove_import_tool(),
                 add_lemma_tool(),
                 add_iso_tool(),
+                remove_iso_tool(),
                 edit_proof_tool(),
                 repair_iso_by_reorder_constructors_tool(),
             ],

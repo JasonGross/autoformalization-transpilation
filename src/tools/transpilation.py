@@ -45,6 +45,7 @@ from project_util import (
     MissingImport,
     MissingTypeIso,
     desigil,
+    is_sigiled,
     sigil,
     extract_coq_identifiers,
     coq_identifiers_of_list,
@@ -425,6 +426,61 @@ def add_iso_tool(
     return add_iso
 
 
+@tool
+def remove_iso_tool(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: (
+        Path | str | None
+    ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+) -> Tool:
+    async def remove_iso(source: str, target: str | None = None) -> ToolResult:
+        """
+        Removes an isomorphism statement from the Coq project.
+
+        Args:
+            source: The source identifier for the isomorphism. (str)
+            target: The target identifier for the isomorphism. (str | None)
+        """
+        state: ProjectState = inspect_ai.util.store().get("translation_state")
+
+        try:
+            index = find_iso_index(
+                state["cc_identifiers_blocks"],
+                source,
+                target,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+        except ValueError:
+            return handle_value_error(
+                state["cc_identifiers_blocks"],
+                source,
+                target,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+
+        if is_sigiled(state["cc_identifiers_blocks"][index][0]):
+            return ContentText(
+                text=f"Only isomorphisms added by `add_iso_tool` can be removed by `remove_iso_tool`; {source}{' -> ' + target if target is not None else ''} was part of the initial state."
+            )
+
+        logging.info(f"Removing iso_statement {state['cc_identifiers_blocks'][index]}")
+        state["cc_identifiers_blocks"].pop(index)
+
+        return generate_and_autorepair_isos_tool(
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
+        )
+
+    return remove_iso
+
+
 async def edit_proof_higher_order(
     iso_source: str,
     new_proof: Callable[[tuple[CoqIdentifier, CoqIdentifier, str | None]], str],
@@ -692,7 +748,9 @@ def transpilation_tool(
         ]
         coq_identifiers_str = [str(k) for k in coq_identifiers]
         state["excess_identifiers"] = [
-            (k, v) for k, v in coq_lean_identifiers.items() if k not in coq_identifiers_str
+            (k, v)
+            for k, v in coq_lean_identifiers.items()
+            if k not in coq_identifiers_str
         ]
         lean_export_project = get_lean_export_project()
         coq_project = get_coq_project()

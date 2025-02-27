@@ -59,7 +59,9 @@ class File:
         else:
             return f"{self.__class__.__name__}({self.contents[:full_repr_threshold//2]}...(hash={hash(self.contents)})...{self.contents[-full_repr_threshold//2:]})"
 
-    def write(self, filepath: str | Path, *, mod_time: int | float | None = None) -> None:
+    def write(
+        self, filepath: str | Path, *, mod_time: int | float | None = None
+    ) -> None:
         logging.debug(
             f"Writing {self.__class__.__name__} to {filepath}\nContents:\n{self}"
         )
@@ -311,6 +313,10 @@ def desigil(s: IDT, prefix: str = "") -> IDT:
     return s.__class__(desigil(str(s), prefix))
 
 
+def is_sigiled(s: IDT) -> bool:
+    return str(s)[0] == "$"
+
+
 def coq_identifiers_of_list(
     coq_list: list[str],
     sigil: Literal[False] | Callable[[CoqIdentifier], CoqIdentifier] = sigil,
@@ -354,4 +360,9 @@ def extract_coq_identifiers(
     *,
     default_definition_pairs: list[tuple[CoqIdentifier, Any]] = [],
 ) -> list[CoqIdentifier]:
-    return [CoqIdentifier(coq_id) for coq_id in extract_coq_identifiers_str(coq, sigil, default_definition_pairs=default_definition_pairs)]
+    return [
+        CoqIdentifier(coq_id)
+        for coq_id in extract_coq_identifiers_str(
+            coq, sigil, default_definition_pairs=default_definition_pairs
+        )
+    ]
