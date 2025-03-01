@@ -1,15 +1,17 @@
+import base64
 import contextlib
+import datetime
 import os
 import re
-import datetime
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass, field
+from hashlib import sha256
+from functools import cache
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Any, Callable, Iterator, Literal, Self, TypeVar, cast, overload
-import base64
 
 from utils import logging, run_cmd
 from utils.memoshelve import cache, hash_as_tuples
@@ -18,30 +20,38 @@ full_repr: bool = False
 full_repr_threshold: int = 100
 
 
-@dataclass
 class File:
     # we would like to use str | bytes, but inspect wants its store to be utf-8 only
-    _contents: str
+    # _contents: str
+    _cache_dir: str = Path(__file__).parent.parent / ".cache" / "files"
     contents_is_bytes: bool = False
 
     def __init__(self, contents: str | bytes):
-        super().__init__()
         if isinstance(contents, str):
-            self._contents = contents
             self.contents_is_bytes = False
         else:
-            self._contents = base64.b64encode(contents).decode("utf-8")
             self.contents_is_bytes = True
+            contents = base64.b64encode(contents).decode("utf-8")
+
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+        self._cache_file_path = self._cache_dir / sha256(contents.encode()).hexdigest()
+
+        if not self._cache_file_path.exists():
+            if self.contents_is_bytes:
+                self._cache_file_path.write_bytes(base64.b64decode(contents))
+            else:
+                self._cache_file_path.write_text(contents)
 
     def __hash__(self) -> int:
-        return hash(self.contents)
+        return hash(str(self._cache_file_path))
 
     @property
+    @cache
     def contents(self) -> str | bytes:
         if self.contents_is_bytes:
-            return base64.b64decode(self._contents)
+            return self._cache_file_path.read_bytes()
         else:
-            return self._contents
+            return self._cache_file_path.read_text()
 
     def __str__(self) -> str:
         contents = self.contents
@@ -57,7 +67,7 @@ class File:
         if full or len(self.contents) <= full_repr_threshold:
             return f"{self.__class__.__name__}({self.contents!r})"
         else:
-            return f"{self.__class__.__name__}({self.contents[:full_repr_threshold//2]}...(hash={hash(self.contents)})...{self.contents[-full_repr_threshold//2:]})"
+            return f"{self.__class__.__name__}({self.contents[: full_repr_threshold // 2]}...(hash={hash(self.contents)})...{self.contents[-full_repr_threshold // 2 :]})"
 
     def write(
         self, filepath: str | Path, *, mod_time: int | float | None = None
