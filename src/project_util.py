@@ -8,7 +8,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass, field
 from hashlib import sha256
-from functools import cache
+from functools import lru_cache
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import Any, Callable, Iterator, Literal, Self, TypeVar, cast, overload
@@ -46,7 +46,7 @@ class File:
         return hash(str(self._cache_file_path))
 
     @property
-    @cache()
+    @lru_cache
     def contents(self) -> str | bytes:
         if self.contents_is_bytes:
             return self._cache_file_path.read_bytes()
