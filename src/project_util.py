@@ -46,7 +46,7 @@ class File:
         return hash(str(self._cache_file_path))
 
     @property
-    @cache
+    @cache()
     def contents(self) -> str | bytes:
         if self.contents_is_bytes:
             return self._cache_file_path.read_bytes()
