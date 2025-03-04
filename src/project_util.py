@@ -23,7 +23,7 @@ full_repr_threshold: int = 100
 class File:
     # we would like to use str | bytes, but inspect wants its store to be utf-8 only
     # _contents: str
-    _cache_dir: str = Path(__file__).parent.parent / ".cache" / "files"
+    _cache_dir: Path = Path(__file__).parent.parent / ".cache" / "files"
     contents_is_bytes: bool = False
 
     def __init__(self, contents: str | bytes):
