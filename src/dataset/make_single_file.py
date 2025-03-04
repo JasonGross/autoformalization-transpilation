@@ -154,7 +154,7 @@ def main():
                 "-f",
                 "_CoqProject",
                 "Everything.v",
-                f"Everything{lib_name}.v",
+                f"Everything{lib_name}Admitted.v",
                 "--no-error",
                 "--admit-opaque",
             ],
