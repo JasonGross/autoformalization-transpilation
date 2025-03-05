@@ -655,6 +655,7 @@ def transpilation_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    admit_failing_isos: bool = False,
 ) -> Tool:
     coq_statements_file = None if coq_statements is None else CoqFile(coq_statements)
 
@@ -792,6 +793,7 @@ def transpilation_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            admit_failing_isos=admit_failing_isos,
         )
 
     return translate
