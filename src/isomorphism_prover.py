@@ -135,6 +135,10 @@ Print Assumptions everything."""
 
     # Write to file
     project[output_file] = CoqFile(full_content)
+    try:
+        del project[f"{output_file}o"]
+    except KeyError:
+        pass
 
     return project
 
@@ -609,9 +613,18 @@ Definition everything := ({" :: ".join(iso_names)} :: [])%hlist."""
 
     # Write to file
     project[output_file] = CoqFile(full_interface_content)
+    try:
+        del project[f"{output_file}o"]
+    except KeyError:
+        pass
 
     # Write to file
     project[checker_file] = CoqFile(full_content)
+    try:
+        del project[f"{checker_file}o"]
+    except KeyError:
+        pass
+
 
     return project
 
@@ -942,6 +955,9 @@ def init_coq_project(
     init_empty_files: Iterable[str] = ("Isomorphisms.v", "Checker.v", "Interface.v"),
 ) -> CoqProject:
     _, coq_project = CoqProject.read(directory).clean()
+    for f in coq_project:
+        if f.endswith(".vo"):
+            del coq_project[f]
     for f in init_empty_files:
         coq_project[f] = CoqFile("")
     if initial_targets is not None:

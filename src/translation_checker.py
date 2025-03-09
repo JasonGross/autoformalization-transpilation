@@ -42,13 +42,21 @@ def import_to_coq(
         f"""From LeanImport Require Import Lean.
 Redirect "{coq_file_stem}.log" Lean Import "{coq_file_stem}.out"."""
     )
+    try:
+        del project[f"{coq_file_stem}.vo"]
+    except KeyError:
+        pass
 
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
     result, project = project.run_cmd(
-        ["coqc", f"{coq_file_stem}.v"], check=False, shell=False
+        ["coqc", "-q", f"{coq_file_stem}.v"], check=False, shell=False
     )
+    try:
+        del project[f"{coq_file_stem}.vo"]
+    except KeyError:
+        pass
     if result.returncode == 0:
         return project, True, ""
     else:
