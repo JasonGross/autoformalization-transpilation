@@ -265,6 +265,9 @@ class CoqIdentifier(Identifier):
 class IsoError:
     orig_source: str
     orig_target: str
+    orig_proof: str | None
+    iso_index: int | None
+    sigiled_iso_index: int | None
 
 
 @dataclass
@@ -285,9 +288,10 @@ class GenericIsoError(IsoError):
     prefix: str
     ngoals: int
     goals: str
+    simplified_goals: str
 
     def __str__(self):
-        return f"GenericIsoError(orig_source={self.orig_source}, orig_target={self.orig_target}, unknown_lhs={self.unknown_lhs}, unknown_rhs={self.unknown_rhs}, unknown_lhs_filtered={self.unknown_lhs_filtered}, unknown_rhs_filtered={self.unknown_rhs_filtered}, ngoals={self.ngoals},\n prefix='''{self.prefix}''',\n goals='''{self.goals}''')"
+        return f"GenericIsoError(orig_source={self.orig_source}, orig_target={self.orig_target}, orig_proof={self.orig_proof}, iso_index={self.iso_index}, sigiled_iso_index={self.sigiled_iso_index}, unknown_lhs={self.unknown_lhs}, unknown_rhs={self.unknown_rhs}, ngoals={self.ngoals},\n prefix='''{self.prefix}''',\n goals='''{self.goals}''',\n simplified_goals='''{self.simplified_goals}''')"
 
 
 @dataclass

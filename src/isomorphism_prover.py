@@ -22,6 +22,7 @@ from project_util import (
     MissingImport,
     MissingTypeIso,
     desigil,
+    is_sigiled,
     sigil,
 )
 from utils import logging
@@ -189,7 +190,10 @@ def repair_isos(
     project = project.copy()
     # Look at the errors, attempt to fix the isos
     error = parse_iso_errors(
-        errors, iso_file=str(project[iso_file].contents), project=project
+        errors,
+        iso_file=str(project[iso_file].contents),
+        project=project,
+        cc_identifiers_blocks=cc_identifiers_blocks,
     )
     logging.info(f"Current error type is {type(error).__name__}")
 
@@ -318,9 +322,7 @@ def parse_iso_errors(
     *,
     iso_file: str | None = None,
     project: CoqProject | None = None,
-    cc_identifiers_blocks: (
-        list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]] | None
-    ) = None,
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
     original_name: str = "Original",
     imported_name: str = "Imported",
 ) -> IsoError:
@@ -339,6 +341,31 @@ def parse_iso_errors(
     assert_or_error(last_proving_instance)
     assert last_proving_instance, errors
     orig_source, orig_target, errors = last_proving_instance.groups()
+    orig_proof = None
+    iso_index = None
+    sigiled_iso_index = None
+    try:
+        iso_index = find_iso_index(
+            cc_identifiers_blocks,
+            orig_source,
+            orig_target,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
+    except ValueError:
+        pass
+    if iso_index is not None:
+        sigiled_iso_index = len(
+            [
+                block
+                for block in cc_identifiers_blocks[:iso_index]
+                if isinstance(block, tuple) and is_sigiled(block[1])
+            ]
+        )
+        block = cc_identifiers_blocks[iso_index]
+        assert_or_error(not isinstance(block, str))
+        orig_proof = block[2]
+
     result = re.search(
         # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
         r"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ([\w\.]+|\(@[\w\.]+\)) (?:-> )?([\w\.]+|\(@[\w\.]+\))",
@@ -347,13 +374,28 @@ def parse_iso_errors(
     if result:
         source, target = result.groups()
         if (orig_source, orig_target) != (source, target):
-            return MissingTypeIso(orig_source, orig_target, source, target)
+            return MissingTypeIso(
+                orig_source,
+                orig_target,
+                orig_proof,
+                iso_index,
+                sigiled_iso_index,
+                source,
+                target,
+            )
     result = re.search(
         r"Error: The reference ([^\s]+) was not found in the current environment.",
         errors,
     )
     if result:
-        return MissingImport(orig_source, orig_target, result.group(1))
+        return MissingImport(
+            orig_source,
+            orig_target,
+            orig_proof,
+            iso_index,
+            sigiled_iso_index,
+            result.group(1),
+        )
     if (
         "Warning: The argument lengths don't match, perhaps the constructors were defined in different orders?"
         in errors
@@ -364,7 +406,15 @@ def parse_iso_errors(
         hints = [v.strip() for v in dict.fromkeys(blocks[1:-1])]
         prefix, suffix = blocks[0], blocks[-1]
         return DisorderedConstr(
-            orig_source, orig_target, hints[0], prefix, hints[1:], suffix
+            orig_source,
+            orig_target,
+            orig_proof,
+            iso_index,
+            sigiled_iso_index,
+            hints[0],
+            prefix,
+            hints[1:],
+            suffix,
         )
 
     result = re.match(
@@ -375,6 +425,14 @@ def parse_iso_errors(
     )
     assert result, errors
     prefix, ngoals, goals = result.groups()
+    result = re.match(
+        r"^(.*)[\n\s]*Warning:[\s\n]*(\d+) goals? not fully solved \(simplified printout\):[\s\n]*(.*)",
+        goals,
+        flags=re.DOTALL,
+    )
+    simplified_goals = ""
+    if result:
+        goals, _ngoals, simplified_goals = result.groups()
     csts = list(
         dict.fromkeys(
             re.findall(
@@ -432,7 +490,17 @@ def parse_iso_errors(
         prefix,
     ).strip()
     return GenericIsoError(
-        orig_source, orig_target, unknown_lhs, unknown_rhs, prefix, int(ngoals), goals
+        orig_source,
+        orig_target,
+        orig_proof,
+        iso_index,
+        sigiled_iso_index,
+        unknown_lhs,
+        unknown_rhs,
+        prefix,
+        int(ngoals),
+        goals,
+        simplified_goals,
     )
 
 
