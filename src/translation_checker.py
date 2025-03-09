@@ -246,14 +246,13 @@ def export_from_lean(
             return project, False, ExportFile(""), result
 
         # Run Lake exe export to get the exported code
-        cmd = f"lake exe lean4export Main --"
+        cmd = ["lake", "exe", "lean4export", "Main", "--"]
         raw_definitions = [desigil(str(definition)) for definition in definitions]
-        for definition in raw_definitions:
-            cmd += f" {definition}"
+        cmd.extend(raw_definitions)
 
         # # Produce .out file
         logging.info(f"Exporting: {raw_definitions}")
-        result = run_cmd(cmd, shell=True, check=False)
+        result = run_cmd(cmd, shell=False, check=False)
         if result.returncode != 0:
             lean_files = {k: v for k, v in project.items() if k.endswith(".lean")}
             project.write(Path(__file__).parent.parent / "temp_export_lean")
