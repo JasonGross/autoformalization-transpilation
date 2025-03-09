@@ -32,30 +32,30 @@ def lean_id_to_coq(lean_id: LeanIdentifier) -> CoqIdentifier:
 
 
 def import_to_coq(
-    project: CoqProject, lean_export: ExportFile, coq_file: str = "target"
+    project: CoqProject, lean_export: ExportFile, *, coq_file_stem: str = "target"
 ) -> tuple[CoqProject, bool, str]:
     # Copy files first
     project = project.copy()
-    project[f"{coq_file}.out"] = lean_export
+    project[f"{coq_file_stem}.out"] = lean_export
 
-    project[f"{coq_file}.v"] = coq_import_file = CoqFile(
+    project[f"{coq_file_stem}.v"] = coq_import_file = CoqFile(
         f"""From LeanImport Require Import Lean.
-Redirect "{coq_file}.log" Lean Import "{coq_file}.out"."""
+Redirect "{coq_file_stem}.log" Lean Import "{coq_file_stem}.out"."""
     )
 
     # Then run coqc and check its status
     # Plausibly we should be generating a list of statements ready for the isomorphism proofs
     # But for now we just check the status
     result, project = project.run_cmd(
-        ["coqc", f"{coq_file}.v"], check=False, shell=False
+        ["coqc", f"{coq_file_stem}.v"], check=False, shell=False
     )
     if result.returncode == 0:
         return project, True, ""
     else:
-        if f"{coq_file}.log" in project:
+        if f"{coq_file_stem}.log" in project:
             coq_log = f"""Log:
 ```
-{project[f"{coq_file}.log"].contents}
+{project[f"{coq_file_stem}.log"].contents}
 ```
 """
         else:
@@ -93,6 +93,8 @@ def check_translation(
     coq_project: CoqProject,
     lean_statements: LeanFile,
     cl_identifiers: list[tuple[CoqIdentifier, LeanIdentifier]],
+    *,
+    coq_import_file_stem: str = "target",
 ) -> tuple[
     LeanProject, LeanProject, CoqProject, bool, Optional[ErrorCode], Optional[str]
 ]:
@@ -116,7 +118,13 @@ def check_translation(
 
     # Import statements back into Coq
     lean_export_project, coq_project, reimport_success, cc_identifiers, error = (
-        lean_to_coq(lean_export_project, coq_project, lean_statements, cl_identifiers)
+        lean_to_coq(
+            lean_export_project,
+            coq_project,
+            lean_statements,
+            cl_identifiers,
+            coq_file_stem=coq_import_file_stem,
+        )
     )
     # TODO: Kick this back to the translator (if export failed) or end user (if import failed)
     if not reimport_success:
@@ -192,6 +200,8 @@ def lean_to_coq(
     coq_project: CoqProject,
     statements: LeanFile,
     identifiers: list[tuple[CoqIdentifier, LeanIdentifier]],
+    *,
+    coq_file_stem: str = "target",
 ) -> tuple[
     LeanProject,
     CoqProject,
@@ -216,7 +226,9 @@ def lean_to_coq(
     for coq_id, lean_id in identifiers:
         cc_identifiers.append((coq_id, lean_id_to_coq(lean_id), None))
 
-    coq_project, success, error = import_to_coq(coq_project, lean_export)
+    coq_project, success, error = import_to_coq(
+        coq_project, lean_export, coq_file_stem=coq_file_stem
+    )
     return lean_project, coq_project, success, cc_identifiers, error
 
 
@@ -239,7 +251,9 @@ def export_from_lean(
 
         # Run lake build to verify it's valid code
         # we shouldn't have to rm -rf .lake, but it seems to be necessary
-        result = run_cmd(f"rm -rf .lake && lake update && lake build", shell=True, check=False)
+        result = run_cmd(
+            f"rm -rf .lake && lake update && lake build", shell=True, check=False
+        )
         if result.returncode != 0:
             project.write(Path(__file__).parent.parent / "temp_export_lean")
             logging.error(f"Compilation failed: {result.stderr}")

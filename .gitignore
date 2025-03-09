@@ -225,7 +225,7 @@ logs/
 iso-checker/Isomorphisms.v
 iso-checker/Interface.v
 iso-checker/Checker.v
-iso-checker/imported.out
+iso-checker/Imported.out
 *.out
 
 ._*

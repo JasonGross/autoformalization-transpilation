@@ -80,9 +80,6 @@ def generate_isos(
 ) -> CoqProject:
     project = project.copy()
 
-    # Retrieve exported Lean file
-    project["imported.out"] = project["target.out"]
-
     # Should also be generating these programmatically, for now these are manual
     # TODO: This should happen in the reimport step!
     # Generate the isomorphism checks for each definition pair

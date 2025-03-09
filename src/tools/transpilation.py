@@ -759,6 +759,7 @@ def transpilation_tool(
             coq_project,
             state["lean_statements"],
             state["cl_identifiers"],
+            coq_file_stem=imported_name,
         )
         set_lean_export_project(lean_export_project)
         set_coq_project(coq_project)
