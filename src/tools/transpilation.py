@@ -1,9 +1,8 @@
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable, Sequence, TypedDict
+from typing import Callable, Sequence, TypedDict
 
 import inspect_ai.util
-from inspect_ai.solver import TaskState
 from inspect_ai.tool import (
     ContentText,
     Tool,
@@ -11,24 +10,13 @@ from inspect_ai.tool import (
     ToolResult,
     tool,
 )
-from inspect_ai.util import Store
 from sympy.combinatorics.permutations import Permutation
 
-from config import DEFINITION_PAIRS, EXPORT_DIR, KNOWN_IMPORTS, SOURCE_DIR
+from config import DEFINITION_PAIRS, EXPORT_DIR, SOURCE_DIR
 from isomorphism_prover import (
-    autofix_disordered_constr,
-    can_autofix_disordered_constr,
     find_iso_index,
-    generate_and_prove_iso,
     generate_and_prove_iso_interface,
-    generate_isos,
-    has_iso_from,
-    has_iso_to,
-    llm_suggest_paired_identifier,
     make_identifiers_str,
-    make_isos,
-    parse_iso_errors,
-    repair_missing_type_iso,
     generate_and_autorepair_isos,
 )
 import isomorphism_prover
@@ -44,17 +32,13 @@ from project_util import (
     LeanProject,
     MissingImport,
     MissingTypeIso,
-    desigil,
     is_sigiled,
     sigil,
     extract_coq_identifiers,
     coq_identifiers_of_list,
 )
-from tools.itp import run_lean_str
 from translation_checker import (
     check_compilation,
-    check_translation,
-    import_to_coq,
     lean_to_coq,
 )
 from utils import logging
