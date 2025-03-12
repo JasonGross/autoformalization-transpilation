@@ -3,7 +3,7 @@ import re
 import pandas as pd
 import json
 import networkx as nx
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 def parseDpdFile(filePath: str) -> Tuple[Dict[str, Dict[str, str]], List[Tuple[str, str]]]:
     nodes: Dict[str, Dict[str, str]] = {}
@@ -131,19 +131,20 @@ def main():
     else:
         df_merged = df_merged.sort_values(by=["fileName"])
 
-    def get_dependencies_labels(node: str) -> List[str]:
+    def get_dependencies_labels(node: str) -> Optional[List[str]]:
         """
         Return a list of labels corresponding to:
          - the node's own label
          - the labels of any incoming nodes
-        If there are no incoming nodes, return ['none'].
+        If there are no incoming nodes, return None (which will become `null` in JSON).
         """
         if node not in G.nodes:
-            return ["none"]
+            return None
 
         preds = list(G.predecessors(node))
         if not preds:
-            return ["none"]
+            # Return None => 'dependencies': null in the final JSON
+            return None
 
         # Node's own label first
         this_label = G.nodes[node]["label"]
@@ -151,8 +152,10 @@ def main():
         preds_labels = [G.nodes[p]["label"] for p in preds]
         return [this_label] + preds_labels
 
+    # Create a 'dependencies' column
     df_merged["dependencies"] = df_merged["Node"].apply(get_dependencies_labels)
 
+    # Write the merged DataFrame to JSON
     df_merged.to_json(output_file, orient="records", indent=2)
     print(f"Data successfully stored in JSON format at: {output_file}")
 
