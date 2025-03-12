@@ -134,23 +134,19 @@ def main():
     def get_dependencies_labels(node: str) -> Optional[List[str]]:
         """
         Return a list of labels corresponding to:
-         - the node's own label
-         - the labels of any incoming nodes
-        If there are no incoming nodes, return None (which will become `null` in JSON).
+        - the labels of any outgoing nodes (dependencies)
+        If there are no outgoing nodes, return None (which will become `null` in JSON).
         """
         if node not in G.nodes:
             return None
 
-        preds = list(G.predecessors(node))
-        if not preds:
-            # Return None => 'dependencies': null in the final JSON
-            return None
+        successors = list(G.successors(node))  # Get outgoing edges
+        if not successors:
+            return None  # Return None when no dependencies exist
 
-        # Node's own label first
-        this_label = G.nodes[node]["label"]
-        # Labels of all incoming nodes
-        preds_labels = [G.nodes[p]["label"] for p in preds]
-        return [this_label] + preds_labels
+        # Get labels of all dependent nodes
+        return [G.nodes[s]["label"] for s in successors]
+
 
     # Create a 'dependencies' column
     df_merged["dependencies"] = df_merged["Node"].apply(get_dependencies_labels)
