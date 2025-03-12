@@ -12,14 +12,14 @@ from inspect_ai.tool import (
 )
 from sympy.combinatorics.permutations import Permutation
 
+import isomorphism_prover
 from config import DEFINITION_PAIRS, EXPORT_DIR, SOURCE_DIR
 from isomorphism_prover import (
     find_iso_index,
+    generate_and_autorepair_isos,
     generate_and_prove_iso_interface,
     make_identifiers_str,
-    generate_and_autorepair_isos,
 )
-import isomorphism_prover
 from project_util import (
     CoqFile,
     CoqIdentifier,
@@ -32,17 +32,16 @@ from project_util import (
     LeanProject,
     MissingImport,
     MissingTypeIso,
+    coq_identifiers_of_list,
+    extract_coq_identifiers,
     is_sigiled,
     sigil,
-    extract_coq_identifiers,
-    coq_identifiers_of_list,
 )
 from translation_checker import (
     check_compilation,
     lean_to_coq,
 )
 from utils import logging
-
 
 _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR = (
     Path(__file__).parent.parent.parent / "temp_transpilation_errors"
@@ -195,7 +194,7 @@ right: {error.unknown_rhs}
 {missing_iso_text}
 
 You might need to adjust the isomorphism proof of the isomorphism using the `edit_proof_tool` with the new proof.
-{'Likely this is' if not missing_iso_text else 'This may be'} because of a difference in the elaboration of Lean and Coq.
+{"Likely this is" if not missing_iso_text else "This may be"} because of a difference in the elaboration of Lean and Coq.
 For example, a standard library definition may be defined recursive on a different argument or calling a subdefinition with arguments in a different order, in which case you may need to rewrite with a commutativity lemma (e.g., using `iso. iso_rel_rewrite Nat.add_comm. iso.` or `iso. iso_rel_rewrite Nat.mul_comm. iso. iso_rel_rewrite Nat.add_comm. iso.`).
 Or elaboration may pick different associativity for an infix operation, in which case you may need to rewrite with an associativity lemma.
 Pay special attention to the left-hand-side of the isomorphism goal, which is the Coq source, rather than the right-hand-side, which is mangled by the Lean elaborator and re-import.
@@ -626,7 +625,7 @@ def repair_iso_by_reorder_constructors_tool(
 
 
 @tool
-def transpilation_tool(
+def submit_translation_tool(
     coq_statements: str | None = None,
     coq_names: list[str] | None = None,
     *,
@@ -650,9 +649,9 @@ def transpilation_tool(
         if isinstance(init_coq_targets, str):
             init_coq_targets = [init_coq_targets]
         result, coq_project = init_coq_project.make(*init_coq_targets)
-        assert (
-            result.returncode == 0
-        ), f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
+        assert result.returncode == 0, (
+            f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
+        )
     init_lean_export_project = LeanProject.read(lean_export_directory)
 
     if coq_names is None:
@@ -671,7 +670,7 @@ def transpilation_tool(
     )
     assert interface_success, f"Failed to generate and prove interface:\n{error}"
 
-    async def translate(lean_code: str, coq_lean_identifiers: dict[str, str]):
+    async def submit_translation(lean_code: str, coq_lean_identifiers: dict[str, str]):
         """
         Submits the given Lean 4 code as the result of translation, with paired identifiers between the Coq and Lean code.
 
@@ -781,4 +780,188 @@ def transpilation_tool(
             admit_failing_isos=admit_failing_isos,
         )
 
-    return translate
+    return submit_translation
+
+
+@tool
+def push_statement_to_queue_tool():
+    async def push_statement_to_queue(statement: str):
+        """
+        Pushes the given statement to the queue.
+
+        Args:
+            statement: The statement to push to the queue. (str)
+
+        Returns:
+            ContentText: Confirmation that the statement was pushed to the queue.
+        """
+        store = inspect_ai.util.store()
+        if "statement_queue" not in store:
+            store.set("statement_queue", [])
+        statement_queue: list[str] = store.get("statement_queue")
+        statement_queue.append(statement)
+        store.set("statement_queue", statement_queue)
+        return ContentText(text="Statement pushed to queue.")
+
+    return push_statement_to_queue
+
+
+@tool
+def pop_statement_from_queue_tool():
+    async def pop_statement_from_queue():
+        """
+        Pops the first statement from the queue.
+
+        Returns:
+            ContentText: The popped statement
+        """
+        store = inspect_ai.util.store()
+        if "statement_queue" not in store:
+            store.set("statement_queue", [])
+        statement_queue: list[str] = store.get("statement_queue")
+        if not statement_queue:
+            return ContentText(text="Queue is empty.")
+        statement = statement_queue.pop(0)
+        store.set("statement_queue", statement_queue)
+        return ContentText(text=statement)
+
+    return pop_statement_from_queue
+
+
+@tool
+def view_statement_queue_tool():
+    async def view_statement_queue():
+        """
+        Views the current statement queue.
+
+        Returns:
+            ContentText: The entire statement queue, one per line, from first to last.
+        """
+        store = inspect_ai.util.store()
+        if "statement_queue" not in store:
+            return ContentText(text="Queue is empty.")
+        statement_queue: list[str] = store.get("statement_queue")
+        return ContentText(text="\n".join(statement_queue))
+
+    return view_statement_queue
+
+
+@tool
+def swap_statements_in_queue_tool():
+    async def swap_statements_in_queue(index1: int, index2: int):
+        """
+        Swaps the statements at the given indices in the queue.
+
+        Args:
+            index1: The index of the first statement to swap. (int)
+            index2: The index of the second statement to swap. (int)
+
+        Returns:
+            ContentText: Confirmation that the statements were swapped.
+        """
+        store = inspect_ai.util.store()
+        if "statement_queue" not in store:
+            return ContentText(text="Queue is empty.")
+        statement_queue: list[str] = store.get("statement_queue")
+        statement_queue[index1], statement_queue[index2] = (
+            statement_queue[index2],
+            statement_queue[index1],
+        )
+        store.set("statement_queue", statement_queue)
+        return ContentText(
+            text=f"Swapped statements in {index1} and {index2} in queue."
+        )
+
+    return swap_statements_in_queue
+
+
+@tool
+def push_translation_to_queue_tool():
+    async def push_translation_to_queue(lean_code: str):
+        """
+        Pushes the given translation to the queue.
+
+        Args:
+            lean_code: The Lean code to push to the queue. (str)
+
+        Returns:
+            ContentText: Confirmation that the translation was pushed to the queue.
+        """
+        store = inspect_ai.util.store()
+        if "translation_queue" not in store:
+            store.set("translation_queue", [])
+        translation_queue: list[str] = store.get("translation_queue")
+        translation_queue.append(lean_code)
+        store.set("translation_queue", translation_queue)
+        return ContentText(text="Translation pushed to queue.")
+
+    return push_translation_to_queue
+
+
+@tool
+def pop_translation_from_queue_tool():
+    async def pop_translation_from_queue():
+        """
+        Pops the first translation from the queue.
+
+        Returns:
+            ContentText: The popped translation
+        """
+        store = inspect_ai.util.store()
+        if "translation_queue" not in store:
+            return ContentText(text="Queue is empty.")
+        translation_queue: list[str] = store.get("translation_queue")
+        if not translation_queue:
+            return ContentText(text="Queue is empty.")
+        translation = translation_queue.pop(0)
+        store.set("translation_queue", translation_queue)
+        return ContentText(text=translation)
+
+    return pop_translation_from_queue
+
+
+@tool
+def update_identifier_mappings_tool():
+    async def update_identifier_mappings(coq_lean_identifiers: dict[str, str]):
+        """
+        Updates the identifier mapping.
+
+        Args:
+            coq_lean_identifiers: Mapping of Coq identifiers to the corresponding translated Lean identifier to add or update in the mapping (dict[str, str])
+
+        Returns:
+            ContentText: Confirmation that the identifier mappings were added or updated.
+        """
+        store = inspect_ai.util.store()
+        if "identifier_mappings" not in store:
+            store.set("identifier_mappings", {})
+        identifier_mappings: dict[str, str] = store.get("identifier_mappings")
+        response = ""
+        for coq_identifier, lean_identifier in coq_lean_identifiers.items():
+            if coq_identifier in identifier_mappings:
+                response += f"Updated {coq_identifier} -> {lean_identifier}\n"
+            else:
+                response += f"Added {coq_identifier} -> {lean_identifier}\n"
+            identifier_mappings[coq_identifier] = lean_identifier
+        store.set("identifier_mappings", identifier_mappings)
+        return ContentText(text=response)
+
+    return update_identifier_mappings
+
+
+@tool
+def view_identifier_mappings_tool():
+    async def view_identifier_mappings():
+        """
+        Views the current identifier mapping.
+
+        Returns:
+            ContentText: The entire identifier mapping, one per line, from Coq identifier to Lean identifier.
+        """
+        store = inspect_ai.util.store()
+        if "identifier_mappings" not in store:
+            return ContentText(text="No identifier mapping found.")
+        identifier_mappings: dict[str, str] = store.get("identifier_mappings")
+        return ContentText(text=str(identifier_mappings))
+
+    return view_identifier_mappings
