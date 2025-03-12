@@ -87,6 +87,7 @@ def main():
     with open(coqDatasetPath, "r", encoding='utf-8') as file:
         json_data = json.load(file)
 
+    # Build DataFrame from the Coq dataset
     data = []
     for entry in json_data:
         file_name = entry.get("fileName", "")
@@ -107,12 +108,13 @@ def main():
 
     df_dpd = pd.DataFrame(expanded_data)
     
-    # Check if 'path' column exists before using it
+    # If your 'dpd' nodes have a 'path' attribute, extract the .v filename from it
     if "path" in df_dpd.columns:
         df_dpd["file"] = df_dpd["path"].apply(extract_filename)
     else:
         df_dpd["file"] = ""
 
+    # Merge Coq DataFrame with the DPD DataFrame
     merged_df = df.merge(
         df_dpd[["file", "Label", "Node"]],
         left_on=["fileName", "Label"],
@@ -128,6 +130,28 @@ def main():
         df_merged = df_merged.sort_values(by=["level", "fileName"])
     else:
         df_merged = df_merged.sort_values(by=["fileName"])
+
+    def get_dependencies_labels(node: str) -> List[str]:
+        """
+        Return a list of labels corresponding to:
+         - the node's own label
+         - the labels of any incoming nodes
+        If there are no incoming nodes, return ['none'].
+        """
+        if node not in G.nodes:
+            return ["none"]
+
+        preds = list(G.predecessors(node))
+        if not preds:
+            return ["none"]
+
+        # Node's own label first
+        this_label = G.nodes[node]["label"]
+        # Labels of all incoming nodes
+        preds_labels = [G.nodes[p]["label"] for p in preds]
+        return [this_label] + preds_labels
+
+    df_merged["dependencies"] = df_merged["Node"].apply(get_dependencies_labels)
 
     df_merged.to_json(output_file, orient="records", indent=2)
     print(f"Data successfully stored in JSON format at: {output_file}")
