@@ -11,7 +11,18 @@ from hashlib import sha256
 from functools import lru_cache
 from pathlib import Path
 from subprocess import CompletedProcess
-from typing import Any, Callable, Iterator, Literal, Self, TypeVar, cast, overload
+from typing import (
+    Any,
+    Callable,
+    Collection,
+    Container,
+    Iterator,
+    Literal,
+    Self,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from utils import logging, run_cmd
 from utils.memoshelve import cache, hash_as_tuples
@@ -129,18 +140,49 @@ class Project:
         for i, (name, file) in reversed(list(enumerate(reversed(self.files.items())))):
             file.write(directory / name, mod_time=dt_epoch - i)
 
-    def reread(self: Self, directory: str | Path) -> None:
+    def reread(
+        self: Self,
+        directory: str | Path,
+        *,
+        filter: (
+            Container[str]
+            | Container[Path]
+            | Container[str | Path]
+            | Callable[[str | Path], bool]
+            | None
+        ) = None,
+    ) -> None:
         directory = Path(directory)
         self.files = OrderedDict()
+        if filter is None:
+            filter = lambda _: True
+        elif isinstance(filter, Container):
+            filter = filter.__contains__
+        elif isinstance(filter, Callable):
+            pass
+        else:
+            raise ValueError(f"Invalid filter: {filter}")
         for file in sorted(directory.rglob("*"), key=lambda f: f.stat().st_mtime_ns):
             if file.is_file():
                 relative_path = file.relative_to(directory)
-                self.files[str(relative_path)] = File.read(file)
+                if filter(relative_path) or filter(str(relative_path)):
+                    self.files[str(relative_path)] = File.read(file)
 
     @classmethod
-    def read(cls, directory: str | Path):
+    def read(
+        cls,
+        directory: str | Path,
+        *,
+        filter: (
+            Container[str]
+            | Container[Path]
+            | Container[str | Path]
+            | Callable[[str | Path], bool]
+            | None
+        ) = None,
+    ):
         result = cls()
-        result.reread(directory)
+        result.reread(directory, filter=filter)
         return result
 
     def keys(self):
