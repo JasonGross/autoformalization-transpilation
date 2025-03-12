@@ -1,7 +1,7 @@
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Container, Iterable, Optional, Sequence
 
 from config import (
     ISO_CHECKER_HEADER,
@@ -17,6 +17,7 @@ from project_util import (
     CoqIdentifier,
     CoqProject,
     DisorderedConstr,
+    File,
     GenericIsoError,
     IsoError,
     MissingImport,
@@ -625,7 +626,6 @@ Definition everything := ({" :: ".join(iso_names)} :: [])%hlist."""
     except KeyError:
         pass
 
-
     return project
 
 
@@ -953,13 +953,32 @@ def init_coq_project(
     initial_targets: Iterable[str] | None = (),
     allow_build_failure: bool = True,
     init_empty_files: Iterable[str] = ("Isomorphisms.v", "Checker.v", "Interface.v"),
+    filter_out_files: Container[str] = ("Demo.v", "DemoInterface.v", "DemoChecker.v"),
 ) -> CoqProject:
-    _, coq_project = CoqProject.read(directory).clean()
+    directory = Path(directory)
+    filter = None
+    coq_project_contents = None
+    if (directory / "_CoqProject").exists():
+        filter = set([Path("_CoqProject"), Path("Makefile")])
+        coq_project_contents = (directory / "_CoqProject").read_text()
+        for line in coq_project_contents.splitlines():
+            line = line.strip()
+            if line.endswith(".v") and line not in filter_out_files:
+                filter.add(Path(line))
+    _, coq_project = CoqProject.read(directory, filter=filter).clean()
     for f in coq_project:
         if f.endswith(".vo"):
             del coq_project[f]
     for f in init_empty_files:
         coq_project[f] = CoqFile("")
+    if coq_project_contents:
+        coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
+        coq_project_contents = "\n".join(
+            [f for f in coq_project_lines if f not in filter_out_files]
+            + [f for f in init_empty_files if f not in coq_project_lines]
+        )
+        coq_project["_CoqProject"] = File(coq_project_contents)
+
     if initial_targets is not None:
         extra_flags = ["-k"] if allow_build_failure else []
         coq_project.write(Path(__file__).parent.parent / "temp_init_targets")
