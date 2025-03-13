@@ -88,3 +88,14 @@ def coq_to_lean(
         ],
         token_limit=256_000,
     )
+
+if __name__ == "__main__":
+    eval(
+        coq_to_lean(
+            cache=CachePolicy(expiry=None, per_epoch=False),
+        ),
+        # model=OpenAIModel.BEST,
+        # model=OpenAIModel.O1PREVIEW,
+        model=AnthropicModel.BEST,
+        token_limit=256_000,
+    )
