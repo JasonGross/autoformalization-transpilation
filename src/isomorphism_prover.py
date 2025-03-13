@@ -328,7 +328,9 @@ def parse_iso_errors(
 ) -> IsoError:
     def assert_or_error(condition):
         msg = (
-            f"{errors}\n{project.format(only_debug_files=True)}" if project else errors
+            f"{errors}\n{project.format(only_debug_files=True)}"
+            if project is not None
+            else errors
         )
         if not condition:
             assert project is not None, (project, msg)
