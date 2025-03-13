@@ -161,7 +161,7 @@ def generate_and_autorepair_isos_tool(
             write_to_directory_on_error=write_to_directory_on_error,
         )
     except (AssertionError, ValueError) as e:
-        raise ToolError(str(e))
+        raise ToolError(str(e)) from e
 
     set_coq_project(coq_project)
     if result["status"]:
@@ -649,9 +649,9 @@ def submit_translation_tool(
         if isinstance(init_coq_targets, str):
             init_coq_targets = [init_coq_targets]
         result, coq_project = init_coq_project.make(*init_coq_targets)
-        assert result.returncode == 0, (
-            f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
     init_lean_export_project = LeanProject.read(lean_export_directory)
 
     if coq_names is None:
