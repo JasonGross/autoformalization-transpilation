@@ -84,12 +84,17 @@ def run_lean_file(
     extra_files: dict[str, bytes] | None = None,
     setup_cmds: list | None = None,
     lean_flags: list[str] | None = None,
+    sanitize_stderr: bool = True,
+    sanitize_stdout: bool = True,
+    sanitize_temp_dir: str = "${PROJECT_ROOT}",
+    sanitize_filename: str | None = "run_lean_file",
 ) -> Dict[str, Any]:
     """Runs a Lean file and returns compilation status"""
     extra_files = extra_files or {}
     setup_cmds = setup_cmds or []
     lean_flags = lean_flags or []
     result = {"status": 0, "stdout": "", "stderr": ""}
+    temp_filename = None
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
             shutil.copytree(project_root, temp_dir, dirs_exist_ok=True)
@@ -119,6 +124,14 @@ def run_lean_file(
             result["status"] = 1
             result["stderr"] = e.stderr
             result["stdout"] = e.stdout
+        finally:
+            for should_sanitize, key in ((sanitize_stderr, "stderr"), (sanitize_stdout, "stdout")):
+                if should_sanitize:
+                    if temp_filename is not None and sanitize_filename is not None:
+                        fname, _ext = os.path.splitext(temp_filename)
+                        result[key] = result[key].replace(fname, os.path.join(sanitize_temp_dir, sanitize_filename))
+                    result[key] = result[key].replace(temp_dir, sanitize_temp_dir)
+
     return result
 
 
