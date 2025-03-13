@@ -29,6 +29,7 @@ from utils.memoshelve import cache, hash_as_tuples
 
 full_repr: bool = False
 full_repr_threshold: int = 100
+_EXTENSION_FORMATS: dict[str, str] = {".lean": "lean", ".v": "coq"}
 
 
 class File:
@@ -128,9 +129,10 @@ class ExportFile(File):
 class Project:
     # See this comment (https://github.com/JasonGross/autoformalization/pull/27#discussion_r1942030347) by Jason for a suggestion of structure here
     files: OrderedDict[str, File] = field(default_factory=OrderedDict)
+    debug_files: set[str] = field(default_factory=set)
 
     def __hash__(self) -> int:
-        return hash(tuple(self.files.items()))
+        return hash((tuple(self.files.items()), tuple(sorted(self.debug_files))))
 
     def write(self, directory: str | Path) -> None:
         logging.debug("Writing %s to %s", self.__class__.__name__, directory)
@@ -192,15 +194,30 @@ class Project:
         return self.files.items()
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(files={self.files!r})"
+        return f"{self.__class__.__name__}(files={self.files!r}, debug_files={self.debug_files!r})"
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({', '.join(self.files.keys())})"
 
-    def format(self):
+    def format(
+        self,
+        *,
+        only_debug_files: bool = False,
+        only_files: Container[str] | None = None,
+    ):
         result = []
+        if only_debug_files:
+            if only_files is not None:
+                raise ValueError(
+                    f"Cannot specify both only_debug_files and only_files={only_files!r}"
+                )
+            only_files = self.debug_files
+        elif only_files is None:
+            only_files = self.files.keys()
         for name, file in self.files.items():
-            result.append(f"File: {name}\n```\n{file}\n```\n")
+            if name in only_files:
+                fmt = _EXTENSION_FORMATS.get(Path(name).suffix, "")
+                result.append(f"File: {name}\n```{fmt}\n{file}\n```\n")
         return "\n".join(result)
 
     def __iter__(self) -> Iterator[str]:

@@ -193,7 +193,6 @@ def repair_isos(
     # Look at the errors, attempt to fix the isos
     error = parse_iso_errors(
         errors,
-        iso_file=str(project[iso_file].contents),
         project=project,
         cc_identifiers_blocks=cc_identifiers_blocks,
     )
@@ -322,14 +321,15 @@ def repair_isos(
 def parse_iso_errors(
     errors: str,
     *,
-    iso_file: str | None = None,
     project: CoqProject | None = None,
     cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
     original_name: str = "Original",
     imported_name: str = "Imported",
 ) -> IsoError:
     def assert_or_error(condition):
-        msg = f"{errors}\nIso file:\n```coq\n{iso_file}\n```" if iso_file else errors
+        msg = (
+            f"{errors}\n{project.format(only_debug_files=True)}" if project else errors
+        )
         if not condition:
             assert project is not None, (project, msg)
             project.write(Path(__file__).parent.parent / "temp_iso_errors")
@@ -956,6 +956,7 @@ def init_coq_project(
     filter_out_files: Container[str] = ("Demo.v", "DemoInterface.v", "DemoChecker.v"),
 ) -> CoqProject:
     directory = Path(directory)
+    init_empty_files = tuple(init_empty_files)
     file_filter = None
     coq_project_contents = None
     if (directory / "_CoqProject").exists():
@@ -971,6 +972,7 @@ def init_coq_project(
             del coq_project[f]
     for f in init_empty_files:
         coq_project[f] = CoqFile("")
+    coq_project.debug_files.update(init_empty_files)
     if coq_project_contents:
         coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
         coq_project_contents = "\n".join(
@@ -1058,7 +1060,6 @@ def generate_and_autorepair_isos(
 
     error = parse_iso_errors(
         errors,
-        iso_file=str(project[iso_file].contents),
         project=project,
         cc_identifiers_blocks=cc_identifiers_blocks,
         original_name=original_name,

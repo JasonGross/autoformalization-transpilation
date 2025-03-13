@@ -37,6 +37,7 @@ def import_to_coq(
     # Copy files first
     project = project.copy()
     project[f"{coq_file_stem}.out"] = lean_export
+    project.debug_files.add(f"{coq_file_stem}.out")
 
     project[f"{coq_file_stem}.v"] = coq_import_file = CoqFile(
         f"""From LeanImport Require Import Lean.
