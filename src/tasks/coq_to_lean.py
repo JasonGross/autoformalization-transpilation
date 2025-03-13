@@ -74,7 +74,7 @@ def coq_to_lean(
             )
         case "multiphase":
             solver = multiphase_agent(
-                workflow=SIMPLE_WORKFLOW.with_tools(common_tools),
+                workflow=SIMPLE_WORKFLOW.with_tools(common_tools), cache=cache
             )
     logger.info(f"Using {agent} agent")
 
