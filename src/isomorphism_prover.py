@@ -956,16 +956,16 @@ def init_coq_project(
     filter_out_files: Container[str] = ("Demo.v", "DemoInterface.v", "DemoChecker.v"),
 ) -> CoqProject:
     directory = Path(directory)
-    filter = None
+    file_filter = None
     coq_project_contents = None
     if (directory / "_CoqProject").exists():
-        filter = set([Path("_CoqProject"), Path("Makefile")])
+        file_filter = set(["_CoqProject", "Makefile"])
         coq_project_contents = (directory / "_CoqProject").read_text()
         for line in coq_project_contents.splitlines():
             line = line.strip()
             if line.endswith(".v") and line not in filter_out_files:
-                filter.add(Path(line))
-    _, coq_project = CoqProject.read(directory, filter=filter).clean()
+                file_filter.add(line)
+    _, coq_project = CoqProject.read(directory, file_filter=file_filter).clean()
     for f in coq_project:
         if f.endswith(".vo"):
             del coq_project[f]

@@ -144,7 +144,7 @@ class Project:
         self: Self,
         directory: str | Path,
         *,
-        filter: (
+        file_filter: (
             Container[str]
             | Container[Path]
             | Container[str | Path]
@@ -154,18 +154,18 @@ class Project:
     ) -> None:
         directory = Path(directory)
         self.files = OrderedDict()
-        if filter is None:
-            filter = lambda _: True
-        elif isinstance(filter, Container):
-            filter = filter.__contains__
-        elif isinstance(filter, Callable):
+        if file_filter is None:
+            file_filter = lambda _: True
+        elif isinstance(file_filter, Container):
+            file_filter = file_filter.__contains__
+        elif callable(file_filter):
             pass
         else:
-            raise ValueError(f"Invalid filter: {filter}")
+            raise ValueError(f"Invalid filter: {file_filter}")
         for file in sorted(directory.rglob("*"), key=lambda f: f.stat().st_mtime_ns):
             if file.is_file():
                 relative_path = file.relative_to(directory)
-                if filter(relative_path) or filter(str(relative_path)):
+                if file_filter(relative_path) or file_filter(str(relative_path)):
                     self.files[str(relative_path)] = File.read(file)
 
     @classmethod
@@ -173,7 +173,7 @@ class Project:
         cls,
         directory: str | Path,
         *,
-        filter: (
+        file_filter: (
             Container[str]
             | Container[Path]
             | Container[str | Path]
@@ -182,7 +182,7 @@ class Project:
         ) = None,
     ):
         result = cls()
-        result.reread(directory, filter=filter)
+        result.reread(directory, file_filter=file_filter)
         return result
 
     def keys(self):
