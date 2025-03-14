@@ -162,7 +162,10 @@ def generate_and_autorepair_isos_tool(
             write_to_directory_on_error=write_to_directory_on_error,
         )
     except (AssertionError, ValueError) as e:
-        raise ToolError(str(e)) from e
+        new_exn = ToolError(str(e))
+        # Remove the error message from the assertion error, we are already printing it
+        e.args = ()
+        raise new_exn from e
 
     set_coq_project(coq_project)
     if result["status"]:
