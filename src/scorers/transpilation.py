@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Collection
+from typing import Any, Collection
 from inspect_ai.scorer import (
     CORRECT,
     INCORRECT,
@@ -221,6 +221,16 @@ def isos_proven_scorer(
     """score based on how many isos were proven"""
 
     async def score(state: TaskState, target: Target | None):
+        store = inspect_ai.util.store()
+        p_state: ProjectState | None = store.get("translation_state")
+        metadata: dict[str, Any] = {"translation_state": p_state}
+        if p_state is None:
+            return Score(
+                value=INCORRECT,
+                explanation="No translation state found",
+                metadata=metadata,
+            )
+
         admit_msgs = generate_and_autorepair_isos_tool(
             original_name=original_name,
             imported_name=imported_name,
@@ -229,21 +239,12 @@ def isos_proven_scorer(
             admit_failing_isos=True,
         )
 
-        store = inspect_ai.util.store()
-        p_state: ProjectState | None = store.get("translation_state")
-        metadata = {"translation_state": p_state}
         if admit_msgs:
             if hasattr(admit_msgs, "text"):
                 if not admit_msgs.text.lower().startswith("Success"):
                     metadata["admit_msgs"] = admit_msgs.text
             else:
                 metadata["admit_msgs"] = admit_msgs
-        if p_state is None:
-            return Score(
-                value=INCORRECT,
-                explanation="No translation state found",
-                metadata=metadata,
-            )
         result = p_state["result"]
         if result.get("failure_phase") == CompilationPhase.LEAN_COMPILATION:
             return Score(
