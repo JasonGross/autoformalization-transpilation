@@ -5,8 +5,8 @@ from pathlib import Path
 
 from inspect_ai.tool import tool
 
-from project_util import File, LeanProject
-from run_itp import run_coq_str, run_lean_str_in_project
+from project_util import CoqProject, File, LeanProject
+from run_itp import run_coq_str_in_project, run_lean_str_in_project
 
 
 @tool
@@ -16,16 +16,15 @@ def coq_run_tool(
     setup_cmds: list = [],
     coq_flags: list[str] = [],
 ):
-    temp_dir = tempfile.mkdtemp()
-    if project_root:
-        shutil.copytree(project_root, temp_dir, dirs_exist_ok=True)
+    coq_project = CoqProject.read(project_root) if project_root else CoqProject()
     for extra_filename, content in extra_files.items():
-        file_path = Path(temp_dir) / extra_filename
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_bytes(content)
-
+        try:
+            content = content.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
+        coq_project[extra_filename] = File(content)
     for cmd in setup_cmds:
-        subprocess.run(cmd, shell=True, cwd=temp_dir, check=True)
+        _, coq_project = coq_project.run_cmd(cmd, shell=True, check=True)
 
     async def run(coq_code: str):
         """
@@ -37,8 +36,8 @@ def coq_run_tool(
         Returns:
             Dict: Compilation status (0 if it worked, 1 if there was an error), stdout (str), and stderr (str)
         """
-        result = run_coq_str(coq_code, temp_dir, {}, [], coq_flags)
-        return result, coq_code
+        result = run_coq_str_in_project(coq_code, coq_project, coq_flags)
+        return result
 
     return run
 

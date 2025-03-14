@@ -10,7 +10,8 @@ from inspect_ai.solver import TaskState
 from inspect_ai.util import Store
 import inspect_ai.util
 
-from tools.itp import run_coq_str
+from run_itp import run_coq_str_in_project
+
 
 @scorer(metrics=[accuracy()])
 def coq_proven_scorer():
@@ -23,8 +24,13 @@ def coq_proven_scorer():
             result = store.get(f"result_{i}")
             if result["submission_status"]:
                 return Score(value=CORRECT)
-        return Score(value=INCORRECT, explanation="No correct submission found, total submissions: {cur_index}")
+        return Score(
+            value=INCORRECT,
+            explanation="No correct submission found, total submissions: {cur_index}",
+        )
+
     return score
+
 
 @scorer(metrics=[accuracy()])
 def coq_runs_scorer():
@@ -32,7 +38,7 @@ def coq_runs_scorer():
         answer = state.output.completion
         try:
             answer = answer[answer.find("```coq") + 6 : answer.rfind("```")]
-            result = run_coq_str(answer)
+            result = run_coq_str_in_project(answer)
             correct = result["status"] == 0
         except Exception as e:
             return Score(value=INCORRECT, explanation=f"Error running Coq code: {e}")

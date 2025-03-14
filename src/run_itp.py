@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
-from project_util import File, LeanProject
+from project_util import CoqFile, CoqProject, File, LeanProject
 
 
 def run_lean_str_in_project(
@@ -38,6 +38,47 @@ def run_lean_str_in_project(
     )
     if process.stderr:
         result["stderr"] += "\n" + process.stderr
+    return result
+
+
+def run_coq_str_in_project(
+    coq_code: str,
+    project: CoqProject = CoqProject(),
+    coq_flags: list[str] | None = None,
+) -> Dict[str, Any]:
+    """Runs Lean code from a string and returns compilation status"""
+    project = project.copy()
+    coq_flags = coq_flags or []
+    fname = "run_coq_str"
+    while f"{fname}.v" in project:
+        fname += "_"
+    fname = f"{fname}.v"
+    project[fname] = CoqFile(coq_code)
+    coq_cmd = ["coqc", "-q"] + coq_flags + [fname]
+    # Hacky way, maybe we can include a flag?
+    if "Makefile" in project and "_CoqProject" in project:
+        coq_cmd = ["make"] + coq_flags
+        cur_coq_project = project["_CoqProject"].contents
+        if isinstance(cur_coq_project, str):
+            cur_coq_project += "\n" + fname
+        elif isinstance(cur_coq_project, bytes):
+            cur_coq_project = cur_coq_project + b"\n" + fname.encode("utf-8")
+        else:
+            raise TypeError(
+                f"Invalid Coq project file of type {type(cur_coq_project)}: {cur_coq_project!r}"
+            )
+        project["_CoqProject"] = File(cur_coq_project)
+    process, project = project.run_cmd(
+        coq_cmd,
+        shell=False,
+        check=False,
+        sanitize="/tmp/run_coq_dir",
+    )
+    result = {
+        "status": process.returncode,
+        "stdout": process.stdout,
+        "stderr": process.stderr,
+    }
     return result
 
 
