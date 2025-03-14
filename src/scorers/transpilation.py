@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import Any, Collection
+
+import inspect_ai.util
 from inspect_ai.scorer import (
     CORRECT,
     INCORRECT,
@@ -11,7 +13,6 @@ from inspect_ai.scorer import (
     scorer,
 )
 from inspect_ai.solver import TaskState
-import inspect_ai.util
 
 from tools.itp import run_lean_str_in_project
 from tools.transpilation import (
@@ -20,7 +21,6 @@ from tools.transpilation import (
     generate_and_autorepair_isos_tool,
     get_coq_project,
 )
-
 
 _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR = (
     Path(__file__).parent.parent.parent / "temp_scorers_transpilation_errors"
@@ -33,56 +33,6 @@ class LeanError(Exception):
 
 class ModelResponseError(Exception):
     pass
-
-
-@scorer(metrics=[accuracy()])
-def lean_runs_scorer():
-    async def score(state: TaskState, target: Target | None):
-        answer = state.output.completion
-        try:
-            answer = answer[answer.find("```lean") + 7 : answer.rfind("```")]
-            result = run_lean_str_in_project(answer)
-            correct = result["status"] == 0
-        except Exception as e:
-            return Score(value=INCORRECT, explanation=f"Error running Lean code: {e}")
-        return Score(
-            value=CORRECT if correct else INCORRECT,
-        )
-
-    return score
-
-
-# @scorer(metrics=[accuracy()])
-# def transpilation_scorer():
-#     async def score(state: TaskState, target: Target | None):
-#         try:
-#             # extract lean code
-#             answer = state.output.completion
-#             answer = answer[answer.find("```lean") + 7 : answer.rfind("```")]
-#             if not answer:
-#                 raise ModelResponseError("Unable to find lean code in model response.")
-
-#             # TODO: extract identifiers rather than use sample
-#             cl_identifiers = DEFINITION_PAIRS
-
-#             result, error_code, error = check_translation(answer, cl_identifiers)
-
-#             if result:
-#                 return Score(value=CORRECT)
-
-#             elif error_code in {
-#                 "compilation_failure",
-#                 "export_import_failure",
-#                 "isomorphism_failure",
-#             }:
-#                 return Score(value=PARTIAL)
-
-#             else:
-#                 return Score(value=INCORRECT)
-#         except Exception as e:
-#             return Score(value=INCORRECT, explanation=str(e))
-
-#     return score
 
 
 @scorer(metrics=[accuracy()])
