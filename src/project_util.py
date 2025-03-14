@@ -258,7 +258,7 @@ class Project:
         del self.files[name]
 
     def copy(self: Self) -> Self:
-        return self.__class__(self.files.copy())
+        return deepcopy(self)
 
     @contextlib.contextmanager
     def tempdir(self, read_on_exit: bool = True, read_on_error: bool = True):
