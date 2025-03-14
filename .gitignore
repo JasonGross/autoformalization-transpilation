@@ -231,3 +231,5 @@ iso-checker/Imported.out
 ._*
 
 temp_*
+src/dataset/raw_data/CompCert
+src/dataset/raw_data/flocq
