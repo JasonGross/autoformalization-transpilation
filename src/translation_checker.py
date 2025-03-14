@@ -1,12 +1,12 @@
 import contextlib
-from copy import deepcopy
-from subprocess import CompletedProcess
 import tempfile
+from copy import deepcopy
 from enum import StrEnum
 from pathlib import Path
+from subprocess import CompletedProcess
 from typing import Optional
 
-from isomorphism_prover import generate_and_prove_iso
+from isomorphism_prover import add_files_to_CoqProject, generate_and_prove_iso
 from project_util import (
     CoqFile,
     CoqIdentifier,
@@ -43,6 +43,7 @@ def import_to_coq(
         f"""From LeanImport Require Import Lean.
 Redirect "{coq_file_stem}.log" Lean Import "{coq_file_stem}.out"."""
     )
+    project = add_files_to_CoqProject(project, f"{coq_file_stem}.v")
     try:
         del project[f"{coq_file_stem}.vo"]
     except KeyError:

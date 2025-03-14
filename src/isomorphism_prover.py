@@ -224,9 +224,9 @@ def repair_isos(
                 output_file=iso_file,
             )
         else:
-            assert (
-                False
-            ), f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+            assert False, (
+                f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+            )
     elif isinstance(error, DisorderedConstr):
         if can_autofix_disordered_constr(
             error,
@@ -950,6 +950,25 @@ def generate_and_prove_iso_interface(
     return project, result, errors, coq_identifiers, coq_identifiers_to_unfold
 
 
+def add_files_to_CoqProject(coq_project: CoqProject, *files: str):
+    coq_project_contents = coq_project["_CoqProject"].contents
+    coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
+    coq_project_contents = "\n".join(
+        [f for f in coq_project_lines if f not in files]
+        + [f for f in files if f not in coq_project_lines]
+    )
+    coq_project["_CoqProject"] = File(coq_project_contents)
+    return coq_project
+
+
+def remove_files_from_CoqProject(coq_project: CoqProject, *files: str):
+    coq_project_contents = coq_project["_CoqProject"].contents
+    coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
+    coq_project_contents = "\n".join([f for f in coq_project_lines if f not in files])
+    coq_project["_CoqProject"] = File(coq_project_contents)
+    return coq_project
+
+
 def init_coq_project(
     directory: str | Path = f"{SOURCE_DIR}/iso-checker",
     initial_targets: Iterable[str] | None = (),
@@ -976,13 +995,9 @@ def init_coq_project(
         coq_project[f] = CoqFile("")
     coq_project.debug_files.update(init_empty_files)
     if coq_project_contents:
-        coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
-        coq_project_contents = "\n".join(
-            [f for f in coq_project_lines if f not in filter_out_files]
-            + [f for f in init_empty_files if f not in coq_project_lines]
-        )
         coq_project["_CoqProject"] = File(coq_project_contents)
-
+        coq_project = add_files_to_CoqProject(coq_project, *init_empty_files)
+        coq_project = remove_files_from_CoqProject(coq_project, *filter_out_files)
     if initial_targets is not None:
         extra_flags = ["-k"] if allow_build_failure else []
         coq_project.write(Path(__file__).parent.parent / "temp_init_targets")
@@ -1042,7 +1057,6 @@ def generate_and_autorepair_isos(
     bool,
     IsoError | None,
 ]:
-
     project = generate_isos(
         project,
         cc_identifiers_blocks,

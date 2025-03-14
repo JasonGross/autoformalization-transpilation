@@ -15,6 +15,7 @@ from sympy.combinatorics.permutations import Permutation
 import isomorphism_prover
 from config import DEFINITION_PAIRS, EXPORT_DIR, SOURCE_DIR
 from isomorphism_prover import (
+    add_files_to_CoqProject,
     find_iso_index,
     generate_and_autorepair_isos,
     generate_and_prove_iso_interface,
@@ -648,13 +649,16 @@ def make_submit_translation_tool(
     init_coq_project = isomorphism_prover.init_coq_project(iso_checker_path)
     if coq_statements_file is not None:
         init_coq_project[f"{original_name}.v"] = coq_statements_file
+        init_coq_project = add_files_to_CoqProject(
+            init_coq_project, f"{original_name}.v"
+        )
     if init_coq_targets is not None:
         if isinstance(init_coq_targets, str):
             init_coq_targets = [init_coq_targets]
         result, coq_project = init_coq_project.make(*init_coq_targets)
-        assert (
-            result.returncode == 0
-        ), f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
+        assert result.returncode == 0, (
+            f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
+        )
     init_lean_export_project = LeanProject.read(lean_export_directory)
 
     if coq_names is None:
@@ -679,7 +683,6 @@ def make_submit_translation_tool(
 
     @tool
     def submit_translation_tool() -> Tool:
-
         async def submit_translation(
             lean_code: str, coq_lean_identifiers: dict[str, str]
         ):
