@@ -33,6 +33,7 @@ from project_util import (
     MissingImport,
     MissingTypeIso,
     coq_identifiers_of_list,
+    desigil,
     extract_coq_identifiers,
     is_sigiled,
     sigil,
@@ -446,7 +447,7 @@ def remove_iso_tool(
                 imported_name=imported_name,
             )
 
-        if is_sigiled(state["cc_identifiers_blocks"][index][0]):
+        if is_sigiled(state["cc_identifiers_blocks"][index][1]):
             return ContentText(
                 text=f"Only isomorphisms added by `add_iso_tool` can be removed by `remove_iso_tool`; {source}{' -> ' + target if target is not None else ''} was part of the initial state."
             )
@@ -623,9 +624,7 @@ def repair_iso_by_reorder_constructors_tool(
 
     return repair_iso_by_reorder_constructors
 
-
-@tool
-def submit_translation_tool(
+def make_submit_translation_tool(
     coq_statements: str | None = None,
     coq_names: list[str] | None = None,
     *,
@@ -639,7 +638,7 @@ def submit_translation_tool(
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
     admit_failing_isos: bool = False,
-) -> Tool:
+) -> tuple[Callable[[], Tool], list[str]]:
     coq_statements_file = None if coq_statements is None else CoqFile(coq_statements)
 
     init_coq_project = isomorphism_prover.init_coq_project(iso_checker_path)
@@ -663,124 +662,129 @@ def submit_translation_tool(
         coq_identifiers = coq_identifiers_of_list(coq_names, sigil=False)
         assert coq_identifiers, f"No Coq identifiers found in {coq_names}"
 
-    init_coq_project, interface_success, error, _coq_identifiers_to_unfold = (
+    init_coq_project, interface_success, error, coq_identifiers, _coq_identifiers_to_unfold = (
         generate_and_prove_iso_interface(
             init_coq_project, list(map(sigil, coq_identifiers))
         )
     )
     assert interface_success, f"Failed to generate and prove interface:\n{error}"
 
-    async def submit_translation(lean_code: str, coq_lean_identifiers: dict[str, str]):
-        """
-        Submits the given Lean 4 code as the result of translation, with paired identifiers between the Coq and Lean code.
 
-        Args:
-            lean_code: Lean code to be run (str)
-            coq_lean_identifiers: Mapping of Coq identifiers to the corresponding translated Lean identifier (dict[str, str])
+    @tool
+    def submit_translation_tool() -> Tool:
 
-        Returns:
-            ToolResult: Messages that came up during execution
-        """
-        store = inspect_ai.util.store()
-        if "translation_state" not in store:
-            store.set("translation_state", {})
-        state: ProjectState = store.get("translation_state")
-        state["result"] = {
-            "status": False,
-            "suggestion": "",
-            "stdout": "",
-            "stderr": "",
-            "failure_phase": None,
-            "error": None,
-            "unknown_lhs_identifiers": [],
-            "unknown_rhs_identifiers": [],
-        }
-        result = state["result"]
-        if "lean_export_project_id" not in state:
-            set_lean_export_project(init_lean_export_project)
-        if "coq_project_id" not in state:
-            set_coq_project(init_coq_project)
-        if "coq_identifiers" not in state:
-            state["coq_identifiers"] = coq_identifiers
+        async def submit_translation(lean_code: str, coq_lean_identifiers: dict[str, str]):
+            """
+            Submits the given Lean 4 code as the result of translation, with paired identifiers between the Coq and Lean code.
 
-        if not coq_lean_identifiers:
-            raise ToolError("coq_lean_identifiers must not be empty")
+            Args:
+                lean_code: Lean code to be run (str)
+                coq_lean_identifiers: Mapping of Coq identifiers to the corresponding translated Lean identifier (dict[str, str])
 
-        state["lean_statements"] = LeanFile(lean_code)
-        # Verify that the Lean code compiles
-        lean_project, result["status"], result["stderr"] = check_compilation(
-            state["lean_statements"], project=None
-        )
-        set_lean_project(lean_project)
-        if not result["status"]:
-            if write_to_directory_on_error is not None:
-                lean_project.write(write_to_directory_on_error)
-            result["suggestion"] = "Lean code failed to compile."
-            result["failure_phase"] = CompilationPhase.LEAN_COMPILATION
-            return ContentText(
+            Returns:
+                ToolResult: Messages that came up during execution
+            """
+            store = inspect_ai.util.store()
+            if "translation_state" not in store:
+                store.set("translation_state", {})
+            state: ProjectState = store.get("translation_state")
+            state["result"] = {
+                "status": False,
+                "suggestion": "",
+                "stdout": "",
+                "stderr": "",
+                "failure_phase": None,
+                "error": None,
+                "unknown_lhs_identifiers": [],
+                "unknown_rhs_identifiers": [],
+            }
+            result = state["result"]
+            if "lean_export_project_id" not in state:
+                set_lean_export_project(init_lean_export_project)
+            if "coq_project_id" not in state:
+                set_coq_project(init_coq_project)
+            if "coq_identifiers" not in state:
+                state["coq_identifiers"] = coq_identifiers
+
+            if not coq_lean_identifiers:
+                raise ToolError("coq_lean_identifiers must not be empty")
+
+            state["lean_statements"] = LeanFile(lean_code)
+            # Verify that the Lean code compiles
+            lean_project, result["status"], result["stderr"] = check_compilation(
+                state["lean_statements"], project=None
+            )
+            set_lean_project(lean_project)
+            if not result["status"]:
+                if write_to_directory_on_error is not None:
+                    lean_project.write(write_to_directory_on_error)
+                result["suggestion"] = "Lean code failed to compile."
+                result["failure_phase"] = CompilationPhase.LEAN_COMPILATION
+                return ContentText(
                 text=f"""Lean code failed to compile:
 {result["stderr"]}"""
+                )
+
+            state["cl_identifiers"] = [
+                (k, sigil(LeanIdentifier(coq_lean_identifiers[str(desigil(k))])))
+                for k in coq_identifiers
+                if str(desigil(k)) in coq_lean_identifiers
+            ]
+            state["missing_identifiers"] = [
+                k for k in coq_identifiers if str(k) not in coq_lean_identifiers
+            ]
+            coq_identifiers_str = [str(desigil(k)) for k in coq_identifiers]
+            state["excess_identifiers"] = [
+                (k, v)
+                for k, v in coq_lean_identifiers.items()
+                if k not in coq_identifiers_str
+            ]
+            lean_export_project = get_lean_export_project()
+            coq_project = get_coq_project()
+
+            if not state["cl_identifiers"]:
+                msg = f"No known Coq identifiers found in coq_lean_identifiers ({coq_lean_identifiers!r})"
+                if state["missing_identifiers"]:
+                    msg += f"\nMissing identifiers for {', '.join(map(str, state['missing_identifiers']))}"
+                if state["excess_identifiers"]:
+                    msg += f"\nUnrecognized identifiers: {', '.join(f'{k} -> {v}' for k, v in state['excess_identifiers'])}"
+                raise ToolError(msg)
+
+            (
+                lean_export_project,
+                coq_project,
+                result["status"],
+                cc_identifiers_blocks,
+                result["stderr"],
+            ) = lean_to_coq(
+                lean_export_project,
+                coq_project,
+                state["lean_statements"],
+                state["cl_identifiers"],
+                coq_file_stem=imported_name,
             )
+            set_lean_export_project(lean_export_project)
+            set_coq_project(coq_project)
+            state["cc_identifiers_blocks"] = list(cc_identifiers_blocks)
 
-        state["cl_identifiers"] = [
-            (sigil(k), sigil(LeanIdentifier(coq_lean_identifiers[str(k)])))
-            for k in coq_identifiers
-            if str(k) in coq_lean_identifiers
-        ]
-        state["missing_identifiers"] = [
-            k for k in coq_identifiers if str(k) not in coq_lean_identifiers
-        ]
-        coq_identifiers_str = [str(k) for k in coq_identifiers]
-        state["excess_identifiers"] = [
-            (k, v)
-            for k, v in coq_lean_identifiers.items()
-            if k not in coq_identifiers_str
-        ]
-        lean_export_project = get_lean_export_project()
-        coq_project = get_coq_project()
-
-        if not state["cl_identifiers"]:
-            msg = f"No known Coq identifiers found in coq_lean_identifiers ({coq_lean_identifiers!r})"
-            if state["missing_identifiers"]:
-                msg += f"\nMissing identifiers for {', '.join(map(str, state['missing_identifiers']))}"
-            if state["excess_identifiers"]:
-                msg += f"\nUnrecognized identifiers: {', '.join(f'{k} -> {v}' for k, v in state['excess_identifiers'])}"
-            raise ToolError(msg)
-
-        (
-            lean_export_project,
-            coq_project,
-            result["status"],
-            cc_identifiers_blocks,
-            result["stderr"],
-        ) = lean_to_coq(
-            lean_export_project,
-            coq_project,
-            state["lean_statements"],
-            state["cl_identifiers"],
-            coq_file_stem=imported_name,
-        )
-        set_lean_export_project(lean_export_project)
-        set_coq_project(coq_project)
-        state["cc_identifiers_blocks"] = list(cc_identifiers_blocks)
-
-        if not result["status"]:
-            if write_to_directory_on_error is not None:
-                coq_project.write(write_to_directory_on_error)
-            raise ToolError(
-                f"""Lean code failed to import to Coq (please summon a wizard):
+            if not result["status"]:
+                if write_to_directory_on_error is not None:
+                    coq_project.write(write_to_directory_on_error)
+                raise ToolError(
+                    f"""Lean code failed to import to Coq (please summon a wizard):
 {result["stderr"]}"""
+                )
+
+            return generate_and_autorepair_isos_tool(
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
+                admit_failing_isos=admit_failing_isos,
             )
 
-        return generate_and_autorepair_isos_tool(
-            original_name=original_name,
-            imported_name=imported_name,
-            iso_file=iso_file,
-            write_to_directory_on_error=write_to_directory_on_error,
-            admit_failing_isos=admit_failing_isos,
-        )
-
-    return submit_translation
+        return submit_translation
+    return submit_translation_tool, [str(desigil(i)) for i in coq_identifiers]
 
 
 @tool

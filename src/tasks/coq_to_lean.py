@@ -28,7 +28,7 @@ from tools.transpilation import (
     remove_import_tool,
     remove_iso_tool,
     repair_iso_by_reorder_constructors_tool,
-    submit_translation_tool,
+    make_submit_translation_tool,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,17 +43,21 @@ def coq_to_lean(
     cache: CachePolicy | bool = False,
     agent: Literal["basic", "multiphase"] = "multiphase",
 ):
+    # NOTE: This will need rewriting when the input coq file is not hardcoded
+    submit_translation_tool, coq_identifiers = make_submit_translation_tool(
+        coq_statements=EXAMPLE_COQ_FILEPATH.read_text(),
+    )
     # dataset
     input_msg = format_translation_input(
-        TRANSLATION_STATE_TEMPLATE, EXAMPLE_COQ_FILEPATH
+        TRANSLATION_STATE_TEMPLATE,
+        EXAMPLE_COQ_FILEPATH,
+        coq_identifiers=coq_identifiers,
     )
     dataset = prepare_dataset([input_msg])
 
     common_tools = [
         lean_run_tool(),
-        submit_translation_tool(
-            EXAMPLE_COQ_FILEPATH.read_text()
-        ),  # NOTE: This will need rewriting when the input coq file is not hardcoded
+        submit_translation_tool(),
         add_import_tool(),
         remove_import_tool(),
         add_lemma_tool(),
@@ -88,6 +92,7 @@ def coq_to_lean(
         ],
         token_limit=256_000,
     )
+
 
 if __name__ == "__main__":
     eval(

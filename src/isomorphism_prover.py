@@ -916,7 +916,7 @@ def generate_and_prove_iso_interface(
     coq_identifiers: list[CoqIdentifier],
     *,
     coq_identifiers_to_unfold: Sequence[CoqIdentifier] = (),
-) -> tuple[CoqProject, bool, Optional[str], list[CoqIdentifier]]:
+) -> tuple[CoqProject, bool, Optional[str], list[CoqIdentifier], list[CoqIdentifier]]:
     coq_identifiers_to_unfold = list(coq_identifiers_to_unfold)
     # Make interface file
     project = generate_interface(
@@ -947,7 +947,7 @@ def generate_and_prove_iso_interface(
             project, result, errors = make_isos_interface(project)
 
     # Eventually will want to feed back isos but for now just return result
-    return project, result, errors, coq_identifiers_to_unfold
+    return project, result, errors, coq_identifiers, coq_identifiers_to_unfold
 
 
 def init_coq_project(
