@@ -624,6 +624,7 @@ def repair_iso_by_reorder_constructors_tool(
 
     return repair_iso_by_reorder_constructors
 
+
 def make_submit_translation_tool(
     coq_statements: str | None = None,
     coq_names: list[str] | None = None,
@@ -662,18 +663,23 @@ def make_submit_translation_tool(
         coq_identifiers = coq_identifiers_of_list(coq_names, sigil=False)
         assert coq_identifiers, f"No Coq identifiers found in {coq_names}"
 
-    init_coq_project, interface_success, error, coq_identifiers, _coq_identifiers_to_unfold = (
-        generate_and_prove_iso_interface(
-            init_coq_project, list(map(sigil, coq_identifiers))
-        )
+    (
+        init_coq_project,
+        interface_success,
+        error,
+        coq_identifiers,
+        _coq_identifiers_to_unfold,
+    ) = generate_and_prove_iso_interface(
+        init_coq_project, list(map(sigil, coq_identifiers))
     )
     assert interface_success, f"Failed to generate and prove interface:\n{error}"
-
 
     @tool
     def submit_translation_tool() -> Tool:
 
-        async def submit_translation(lean_code: str, coq_lean_identifiers: dict[str, str]):
+        async def submit_translation(
+            lean_code: str, coq_lean_identifiers: dict[str, str]
+        ):
             """
             Submits the given Lean 4 code as the result of translation, with paired identifiers between the Coq and Lean code.
 
@@ -721,7 +727,7 @@ def make_submit_translation_tool(
                 result["suggestion"] = "Lean code failed to compile."
                 result["failure_phase"] = CompilationPhase.LEAN_COMPILATION
                 return ContentText(
-                text=f"""Lean code failed to compile:
+                    text=f"""Lean code failed to compile:
 {result["stderr"]}"""
                 )
 
@@ -784,6 +790,7 @@ def make_submit_translation_tool(
             )
 
         return submit_translation
+
     return submit_translation_tool, [str(desigil(i)) for i in coq_identifiers]
 
 
