@@ -13,10 +13,6 @@ from inspect_ai.scorer import (
 from inspect_ai.solver import TaskState
 import inspect_ai.util
 
-from main import (
-    DEFINITION_PAIRS,
-    check_translation,
-)
 from tools.itp import run_lean_str_in_project
 from tools.transpilation import (
     CompilationPhase,

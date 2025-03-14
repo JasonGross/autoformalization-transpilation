@@ -42,15 +42,19 @@ EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
 def coq_to_lean(
     cache: CachePolicy | bool = False,
     agent: Literal["basic", "multiphase"] = "multiphase",
+    *,
+    coq_filepath: str | Path = EXAMPLE_COQ_FILEPATH,
+    translation_state_template: str = TRANSLATION_STATE_TEMPLATE,
 ):
     # NOTE: This will need rewriting when the input coq file is not hardcoded
+    coq_filepath = Path(coq_filepath)
     submit_translation_tool, coq_identifiers = make_submit_translation_tool(
-        coq_statements=EXAMPLE_COQ_FILEPATH.read_text(),
+        coq_statements=coq_filepath.read_text(),
     )
     # dataset
     input_msg = format_translation_input(
-        TRANSLATION_STATE_TEMPLATE,
-        EXAMPLE_COQ_FILEPATH,
+        translation_state_template,
+        coq_filepath,
         coq_identifiers=coq_identifiers,
     )
     dataset = prepare_dataset([input_msg])
