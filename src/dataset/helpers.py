@@ -78,40 +78,46 @@ def formatCoqFile(inputPath: str, outputPath: str) -> None:
 def classifyBlock(blockText: str) -> str:
     lines = blockText.strip().split('\n')
     if not lines:
-        return "misc"
+        return "Misc"
     firstLine = lines[0].strip()
     if firstLine.startswith("Set") or firstLine.startswith("Unset"):
         return "global_directive"
     if firstLine.startswith("Require"):
-        return "require"
+        return "Require"
     if firstLine.startswith("Fixpoint"):
-        return "fixpoint"
+        return "Fixpoint"
     if firstLine.startswith("Lemma"):
-        return "lemma"
+        return "Lemma"
     if firstLine.startswith("Theorem"):
-        return "theorem"
+        return "Theorem"
     if firstLine.startswith("Definition"):
-        return "definition"
+        return "Definition"
     if firstLine.startswith("Ltac"):
-        return "ltac"
+        return "Ltac"
     if firstLine.startswith("Inductive"):
-        return "inductive"
+        return "Inductive"
     if firstLine.startswith("Check"):
-        return "check"
+        return "Dheck"
     if firstLine.startswith("Hint"):
-        return "hint"
+        return "Hint"
     if firstLine.startswith("Create HintDb"):
-        return "create_hint_db"
+        return "Create_hint_db"
     if firstLine.startswith("Import") or firstLine.startswith("Export") or firstLine.startswith("From"):
-        return "import"
+        return "Import"
     if firstLine.startswith("Example"):
-        return "example"
+        return "Example"
     if firstLine.startswith("Module"):
-        return "module"
+        return "Module"
     if firstLine.startswith("Section"):
-        return "section"
+        return "Section"
     if firstLine.startswith("End"):
-        return "end"
+        return "End"
+    if firstLine.startswith("Compute"):
+        return "Compute"
+    if firstLine.startswith("Notation"):
+        return "Notation"
+    if firstLine.startswith("Intros"):
+        return "Intros"
     return "misc"
 
 def extractBlocksFromPreprocessed(fileContent: str) -> list[dict[str, str]]:

@@ -42,15 +42,6 @@ def get_second_word(text: str) -> str:
         return tokens[1].replace(':', '')
     return ""
 
-def parse_attributes(attr_str: str) -> dict:
-    attr_str = attr_str.strip("[];")
-    attr_pairs = attr_str.split(", ")
-    attr_dict = {}
-    for pair in attr_pairs:
-        if "=" in pair:
-            key, value = pair.split("=")
-            attr_dict[key.strip()] = value.strip().strip('"')
-    return attr_dict
 
 def extract_filename(path: str) -> str:
     if not path:
@@ -103,7 +94,6 @@ def main():
     # Process nodes from the dependency graph
     expanded_data = []
     for node, attributes in G.nodes(data=True):
-        attrs = parse_attributes(attributes["attributes"])
         expanded_data.append({"Node": node, "Label": attributes["label"], **attrs})
 
     df_dpd = pd.DataFrame(expanded_data)
