@@ -6,6 +6,40 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
+from project_util import File, LeanProject
+
+
+def run_lean_str_in_project(
+    lean_code: str,
+    project: LeanProject = LeanProject(),
+    lean_flags: list[str] | None = None,
+) -> Dict[str, Any]:
+    """Runs Lean code from a string and returns compilation status"""
+    project = project.copy()
+    lean_flags = lean_flags or []
+    fname = "run_lean_str"
+    while f"{fname}.lean" in project:
+        fname += "_"
+    fname = f"{fname}.lean"
+    project[fname] = File(lean_code)
+    process, project = project.run_cmd(
+        ["lean", *lean_flags, fname],
+        shell=False,
+        check=False,
+        sanitize="/tmp/run_lean_dir",
+    )
+    result = {}
+    result["status"] = process.returncode
+    result["stdout"] = "\n".join(
+        line for line in process.stdout.splitlines() if "error:" not in line
+    )
+    result["stderr"] = "\n".join(
+        line for line in process.stdout.splitlines() if "error:" in line
+    )
+    if process.stderr:
+        result["stderr"] += "\n" + process.stderr
+    return result
+
 
 def run_coq_file(
     filename: str,
@@ -125,11 +159,16 @@ def run_lean_file(
             result["stderr"] = e.stderr
             result["stdout"] = e.stdout
         finally:
-            for should_sanitize, key in ((sanitize_stderr, "stderr"), (sanitize_stdout, "stdout")):
+            for should_sanitize, key in (
+                (sanitize_stderr, "stderr"),
+                (sanitize_stdout, "stdout"),
+            ):
                 if should_sanitize:
                     if temp_filename is not None and sanitize_filename is not None:
                         fname, _ext = os.path.splitext(temp_filename)
-                        result[key] = result[key].replace(fname, os.path.join(sanitize_temp_dir, sanitize_filename))
+                        result[key] = result[key].replace(
+                            fname, os.path.join(sanitize_temp_dir, sanitize_filename)
+                        )
                     result[key] = result[key].replace(temp_dir, sanitize_temp_dir)
 
     return result

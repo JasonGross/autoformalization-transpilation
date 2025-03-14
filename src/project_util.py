@@ -274,9 +274,18 @@ class Project:
                 if read_on_exit:
                     self.reread(".")
 
-    def irun_cmd(self: Self, *args, **kwargs) -> CompletedProcess[str]:
-        with self.tempdir():
-            return run_cmd(*args, **kwargs)
+    def irun_cmd(
+        self: Self,
+        *args,
+        sanitize: str | None = None,
+        **kwargs,
+    ) -> CompletedProcess[str]:
+        with self.tempdir() as p:
+            process = run_cmd(*args, **kwargs)
+            if sanitize is not None:
+                process.stdout = process.stdout.replace(str(p), sanitize)
+                process.stderr = process.stderr.replace(str(p), sanitize)
+            return process
 
     @cache(get_hash=hash_as_tuples, copy=deepcopy)
     def run_cmd(self: Self, *args, **kwargs) -> tuple[CompletedProcess[str], Self]:

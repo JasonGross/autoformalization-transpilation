@@ -17,7 +17,7 @@ from main import (
     DEFINITION_PAIRS,
     check_translation,
 )
-from tools.itp import run_lean_str
+from tools.itp import run_lean_str_in_project
 from tools.transpilation import (
     CompilationPhase,
     ProjectState,
@@ -45,7 +45,7 @@ def lean_runs_scorer():
         answer = state.output.completion
         try:
             answer = answer[answer.find("```lean") + 7 : answer.rfind("```")]
-            result = run_lean_str(answer)
+            result = run_lean_str_in_project(answer)
             correct = result["status"] == 0
         except Exception as e:
             return Score(value=INCORRECT, explanation=f"Error running Lean code: {e}")
