@@ -5,6 +5,8 @@ description = "For the AlphaProof for Software Verification MARS project"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "anthropic>=0.45.0",
+    "inspect-ai>=0.3.70",
     "openai>=1.61.1",
     "pydantic>=2.10.6",
     "python-dotenv>=1.0.1",
@@ -12,8 +14,6 @@ dependencies = [
     "dill>=0.3.9",
     "sympy>=1.13.3",
     "coq-tools>=0.0.7",
-    "inspect-ai>=0.3.73",
-    "anthropic>=0.49.0",
 ]
 
 [tool.uv]
