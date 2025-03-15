@@ -636,14 +636,6 @@ async def edit_iso_proof_higher_order(
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> ToolResult:
-    """
-    Reorders the constructors of an isomorphism proof based on a given permutation.
-
-    Args:
-        iso_source: The source identifier for the isomorphism block to be reordered. (str)
-        new_proof: The new proof for the isomorphism block, taking in the old source, target, and proof and returning the new proof. (Callable)
-        iso_target: The target identifier for the isomorphism block to be reordered. Optional. (str|None)
-    """
     state = inspect_ai.util.store().get("translation_state")
     try:
         index = find_iso_index(
@@ -709,12 +701,12 @@ def edit_iso_proof_tool(
         iso_source: str, new_proof: str, iso_target: str | None = None
     ) -> ToolResult:
         """
-        Reorders the constructors of an isomorphism proof based on a given permutation.
+        Edits the proof of an isomorphism block.
 
         Args:
-            iso_source: The source identifier for the isomorphism block to be reordered. (str)
+            iso_source: The source identifier for the isomorphism block to be edited. (str)
             new_proof: The new proof for the isomorphism block.  This is likely to be something like 'iso. iso_rel_rewrite {lemma here}. iso.' (str)
-            iso_target: The target identifier for the isomorphism block to be reordered. Optional. (str|None)
+            iso_target: The target identifier for the isomorphism block to be edited. Optional. (str|None)
         """
         return await edit_iso_proof_higher_order(
             iso_source,
