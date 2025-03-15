@@ -975,7 +975,6 @@ def remove_files_from_CoqProject(coq_project: CoqProject, *files: str):
     coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
     coq_project_contents = "\n".join([f for f in coq_project_lines if f not in files])
     coq_project["_CoqProject"] = File(coq_project_contents)
-    coq_project.debug_files.update(files)
     return coq_project
 
 
