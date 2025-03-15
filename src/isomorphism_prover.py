@@ -989,7 +989,7 @@ def init_coq_project(
         "Interface.v",
         "Imported.v",
     ),
-    filter_out_files: Container[str] = (),
+    filter_out_files: Iterable[str] = (),
 ) -> CoqProject:
     directory = Path(directory)
     init_empty_files = tuple(init_empty_files)
