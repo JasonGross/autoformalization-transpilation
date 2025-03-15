@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Collection
 
@@ -40,7 +41,7 @@ def lean_compiles_scorer():
 
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
-        p_state: ProjectState | None = store.get("translation_state")
+        p_state: ProjectState | None = deepcopy(store.get("translation_state"))
         metadata = {"translation_state": p_state}
         if p_state is None:
             return Score(
@@ -74,7 +75,7 @@ def checker_compiles_scorer(
 
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
-        p_state: ProjectState | None = store.get("translation_state")
+        p_state: ProjectState | None = deepcopy(store.get("translation_state"))
         metadata = {"translation_state": p_state}
         if p_state is None:
             return Score(
@@ -167,12 +168,20 @@ def isos_proven_scorer(
 
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
-        p_state: ProjectState | None = store.get("translation_state")
+        p_state: ProjectState | None = deepcopy(store.get("translation_state"))
         metadata: dict[str, Any] = {"translation_state": p_state}
         if p_state is None:
             return Score(
                 value=INCORRECT,
                 explanation="No translation state found",
+                metadata=metadata,
+            )
+
+        result = p_state["result"]
+        if result.get("failure_phase") == CompilationPhase.LEAN_COMPILATION:
+            return Score(
+                value=INCORRECT,
+                explanation="Lean code does not compile",
                 metadata=metadata,
             )
 
@@ -190,13 +199,6 @@ def isos_proven_scorer(
                     metadata["admit_msgs"] = admit_msgs.text
             else:
                 metadata["admit_msgs"] = admit_msgs
-        result = p_state["result"]
-        if result.get("failure_phase") == CompilationPhase.LEAN_COMPILATION:
-            return Score(
-                value=INCORRECT,
-                explanation="Lean code does not compile",
-                metadata=metadata,
-            )
         blocks = p_state.get("cc_identifiers_blocks", [])
         if not blocks:
             return Score(
