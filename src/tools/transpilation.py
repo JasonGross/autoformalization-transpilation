@@ -1,5 +1,7 @@
+import datetime
 from enum import StrEnum
 from pathlib import Path
+import time
 from typing import Callable, Sequence, TypedDict
 
 import inspect_ai.util
@@ -171,6 +173,15 @@ def generate_and_autorepair_isos_tool(
     set_coq_project(coq_project)
     if result["status"]:
         return ContentText(text="Success!")
+
+    if write_to_directory_on_error:
+        write_to_directory_on_error = Path(write_to_directory_on_error)
+        key = str(hash(coq_project))
+        (write_to_directory_on_error / key).mkdir(parents=True, exist_ok=True)
+        if len(list((write_to_directory_on_error / key).iterdir())) == 0:
+            now = datetime.datetime.now()
+            iso_string = now.isoformat()
+            coq_project.write(write_to_directory_on_error / key / iso_string)
 
     result["failure_phase"] = CompilationPhase.PROVING_ISOS
     error = result["error"]
@@ -656,9 +667,9 @@ def make_submit_translation_tool(
         if isinstance(init_coq_targets, str):
             init_coq_targets = [init_coq_targets]
         result, coq_project = init_coq_project.make(*init_coq_targets)
-        assert result.returncode == 0, (
-            f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
-        )
+        assert (
+            result.returncode == 0
+        ), f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
     init_lean_export_project = LeanProject.read(lean_export_directory)
 
     if coq_names is None:
