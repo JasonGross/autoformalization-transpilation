@@ -981,12 +981,7 @@ def init_coq_project(
     directory: str | Path = f"{SOURCE_DIR}/iso-checker",
     initial_targets: Iterable[str] | None = (),
     allow_build_failure: bool = True,
-    init_empty_files: Iterable[str] = (
-        "Isomorphisms.v",
-        "Checker.v",
-        "Interface.v",
-        "Imported.v",
-    ),
+    init_empty_files: Iterable[str] = ("Isomorphisms.v", "Checker.v", "Interface.v"),
     filter_out_files: Iterable[str] = (),
 ) -> CoqProject:
     directory = Path(directory)
