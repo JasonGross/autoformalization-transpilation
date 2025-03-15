@@ -136,6 +136,7 @@ Print Assumptions everything."""
 
     # Write to file
     project[output_file] = CoqFile(full_content)
+    project = add_files_to_CoqProject(project, output_file)
     try:
         del project[f"{output_file}o"]
     except KeyError:
@@ -616,6 +617,7 @@ Definition everything := ({" :: ".join(iso_names)} :: [])%hlist."""
 
     # Write to file
     project[output_file] = CoqFile(full_interface_content)
+    project = add_files_to_CoqProject(project, output_file)
     try:
         del project[f"{output_file}o"]
     except KeyError:
@@ -623,6 +625,7 @@ Definition everything := ({" :: ".join(iso_names)} :: [])%hlist."""
 
     # Write to file
     project[checker_file] = CoqFile(full_content)
+    project = add_files_to_CoqProject(project, checker_file)
     try:
         del project[f"{checker_file}o"]
     except KeyError:
@@ -983,8 +986,8 @@ def init_coq_project(
     directory: str | Path = f"{SOURCE_DIR}/iso-checker",
     initial_targets: Iterable[str] | None = (),
     allow_build_failure: bool = True,
-    init_empty_files: Iterable[str] = ("Isomorphisms.v", "Checker.v", "Interface.v"),
-    filter_out_files: Container[str] = ("Demo.v", "DemoInterface.v", "DemoChecker.v"),
+    init_empty_files: Iterable[str] = (),
+    filter_out_files: Iterable[str] = (),
 ) -> CoqProject:
     directory = Path(directory)
     init_empty_files = tuple(init_empty_files)
