@@ -24,9 +24,11 @@ from tools.transpilation import (
     add_import_tool,
     add_iso_tool,
     add_lemma_tool,
-    edit_proof_tool,
+    edit_lemma_tool,
+    edit_iso_proof_tool,
     remove_import_tool,
     remove_iso_tool,
+    remove_lemma_tool,
     repair_iso_by_reorder_constructors_tool,
     make_submit_translation_tool,
 )
@@ -65,9 +67,11 @@ def coq_to_lean(
         add_import_tool(),
         remove_import_tool(),
         add_lemma_tool(),
+        remove_lemma_tool(),
+        edit_lemma_tool(),
         add_iso_tool(),
         remove_iso_tool(),
-        edit_proof_tool(),
+        edit_iso_proof_tool(),
         repair_iso_by_reorder_constructors_tool(),
     ]
 

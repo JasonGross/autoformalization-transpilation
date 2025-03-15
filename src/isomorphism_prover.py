@@ -1,7 +1,7 @@
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Container, Iterable, NamedTuple, Optional, Sequence
+from typing import Any, Container, Iterable, NamedTuple, Optional, Sequence
 
 from config import (
     ISO_CHECKER_HEADER,
@@ -13,6 +13,7 @@ from config import (
     SOURCE_DIR,
 )
 from project_util import (
+    AmbiguousIsoError,
     CoqFile,
     CoqIdentifier,
     CoqProject,
@@ -20,8 +21,10 @@ from project_util import (
     File,
     GenericIsoError,
     IsoError,
+    IsoErrorWithoutHints,
     MissingImport,
     MissingTypeIso,
+    NonIsoBlockError,
     desigil,
     is_sigiled,
     sigil,
@@ -71,6 +74,112 @@ def make_isos_interface(project: CoqProject) -> tuple[CoqProject, bool, Optional
     return make_isos(project, "Interface.vo")
 
 
+class ProcessedCoqName(NamedTuple):
+    first_id: str
+    coq_id: str
+    iso_name: str
+    is_sigiled: bool
+
+
+def process_coq_name(
+    coq_name: CoqIdentifier, *, original_name: str = "Original"
+) -> ProcessedCoqName:
+    first_id = str(coq_name)
+    coq_id = str(coq_name).replace(".", "_")
+    iso_name = f"{coq_id}_iso"
+    is_sigiled = False
+    if coq_id[0] == "$":
+        # Python is dynamically typed for a reason
+        coq_name = str(coq_name)[1:]  # type: ignore
+        coq_id = coq_id[1:]
+        first_id = f"{original_name}.{coq_name}"
+        iso_name = f"{coq_id}_iso"
+        is_sigiled = True
+    elif coq_id[0] == "(":
+        assert coq_id[-1] == ")", coq_id
+        coq_id = coq_id[1:-1]
+        if coq_id[0] == "@":
+            coq_id = coq_id[1:]
+        iso_name = f"{coq_id}_iso"
+    return ProcessedCoqName(first_id, coq_id, iso_name, is_sigiled)
+
+
+def iso_name_of_coq_name(
+    coq_name: CoqIdentifier, *, original_name: str = "Original"
+) -> str:
+    return process_coq_name(coq_name, original_name=original_name).iso_name
+
+
+def process_coq_lean_name(
+    coq_lean_name: CoqIdentifier, *, imported_name: str = "Imported"
+) -> str:
+    if str(coq_lean_name)[0] == "$":
+        coq_lean_name = str(coq_lean_name)[1:]  # type: ignore
+        return f"{imported_name}.{coq_lean_name}"
+    else:
+        return str(coq_lean_name)
+
+
+class CheckBlock(NamedTuple):
+    # the block of Coq code that gets added to Isomorphisms.v
+    check_block: str
+    # the isomorphism name to add to the list for Print Assumptions, if any
+    iso_name: str | None
+
+
+def check_block_of_cc_identifier_block(
+    block: str | tuple[CoqIdentifier, CoqIdentifier, str | None],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> CheckBlock:
+    if isinstance(block, str):
+        return CheckBlock(block, None)
+    else:
+        coq_name, coq_lean_name, proof = block
+        proof = proof or "iso."
+        processed_coq_name = process_coq_name(coq_name, original_name=original_name)
+        first_id, coq_id, iso_name, is_sigiled = processed_coq_name
+        second_id = process_coq_lean_name(coq_lean_name, imported_name=imported_name)
+
+        if not proof.endswith("Admitted."):
+            proof = f"Proof. {proof} Defined."
+
+        iso_block = f"""Instance {iso_name} : iso_statement {first_id} {second_id}.
+{proof}
+Instance: KnownConstant {first_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)
+Instance: KnownConstant {second_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)"""
+
+        return CheckBlock(iso_block, iso_name if is_sigiled else None)
+
+
+def generate_indexed_isos_blocks(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> list[tuple[int | None, str]]:
+    """
+    Returns a list of blocks of Coq code for the isomorphisms file, paired with the index of the block in cc_identifiers_blocks.
+    If the block does not correspond to any statement in the cc_identifiers_blocks, the index is None.
+    """
+    iso_checks = []
+    iso_names = []
+    for i, (iso_block, iso_name) in enumerate(
+        map(check_block_of_cc_identifier_block, cc_identifiers_blocks)
+    ):
+        iso_checks.append((i, iso_block))
+        if iso_name is not None:
+            iso_names.append(iso_name)
+
+    # Generate a `Print Assumptions` check for dependencies
+    print_assumptions_block = f"""Import IsomorphismChecker.Automation.HList.HListNotations.
+Definition everything := ({" :: ".join(iso_names)} :: [])%hlist.
+Print Assumptions everything."""
+
+    return [(None, ISO_HEADER), *iso_checks, (None, print_assumptions_block)]
+
+
 def generate_isos(
     project: CoqProject,
     cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
@@ -81,56 +190,14 @@ def generate_isos(
 ) -> CoqProject:
     project = project.copy()
 
-    # Should also be generating these programmatically, for now these are manual
-    # TODO: This should happen in the reimport step!
-    # Generate the isomorphism checks for each definition pair
-    iso_checks = []
-    iso_names = []
-    for block in cc_identifiers_blocks:
-        if isinstance(block, str):
-            iso_checks.append(block)
-        else:
-            coq_name, coq_lean_name, proof = block
-            proof = proof or "iso."
-            first_id = coq_name
-            second_id = coq_lean_name
-            coq_id = str(coq_name).replace(".", "_")
-            iso_name = f"{coq_id}_iso"
-            if coq_id[0] == "$":
-                # Python is dynamically typed for a reason
-                coq_name = str(coq_name)[1:]  # type: ignore
-                coq_id = coq_id[1:]
-                first_id = f"{original_name}.{coq_name}"  # type: ignore
-                iso_name = f"{coq_id}_iso"
-                iso_names.append(iso_name)
-            elif coq_id[0] == "(":
-                assert coq_id[-1] == ")", coq_id
-                coq_id = coq_id[1:-1]
-                if coq_id[0] == "@":
-                    coq_id = coq_id[1:]
-                iso_name = f"{coq_id}_iso"
-            if str(coq_lean_name)[0] == "$":
-                coq_lean_name = str(coq_lean_name)[1:]  # type: ignore
-                second_id = imported_name + "." + coq_lean_name  # type: ignore
-
-            if not proof.endswith("Admitted."):
-                proof = f"Proof. {proof} Defined."
-
-            iso_block = f"""Instance {iso_name} : iso_statement {first_id} {second_id}.
-{proof}
-Instance: KnownConstant {first_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)
-Instance: KnownConstant {second_id} := {{}}. (* only needed when rel_iso is typeclasses opaque *)"""
-
-            iso_checks.append(iso_block)
-
-    # Generate a `Print Assumptions` check for dependencies
-    print_assumptions_block = f"""Import IsomorphismChecker.Automation.HList.HListNotations.
-Definition everything := ({" :: ".join(iso_names)} :: [])%hlist.
-Print Assumptions everything."""
-
     # Combine all sections
     full_content = "\n\n".join(
-        [ISO_HEADER, "\n\n".join(iso_checks), print_assumptions_block]
+        block
+        for _, block in generate_indexed_isos_blocks(
+            cc_identifiers_blocks,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
     )
     logging.debug(f"{full_content}")
 
@@ -142,6 +209,35 @@ Print Assumptions everything."""
         pass
 
     return project
+
+
+def block_index_of_error_line(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    linenum: int,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> int | None:
+    """
+    This function takes a list of Coq code blocks and a line number, and returns the index of the block that contains the line.
+
+    linenum is 1-indexed
+    """
+    blocks = []
+    for i, block in generate_indexed_isos_blocks(
+        cc_identifiers_blocks, original_name=original_name, imported_name=imported_name
+    ):
+        if i is None:
+            i = -1
+        block = block.replace("\n", f"\n{i} ")
+        blocks.append(f"{i} {block}")
+
+    line_prefixed_code = "\n\n".join(blocks)
+    lines = line_prefixed_code.split("\n")
+
+    blocknum_str = lines[linenum - 1].split(" ")[0]
+    blocknum = int(blocknum_str)
+    return blocknum if blocknum != -1 else None
 
 
 def repair_missing_type_iso(
@@ -195,6 +291,7 @@ def repair_isos(
         errors,
         project=project,
         cc_identifiers_blocks=cc_identifiers_blocks,
+        iso_file=iso_file,
     )
     logging.info(f"Current error type is {type(error).__name__}")
 
@@ -318,25 +415,94 @@ def repair_isos(
     return project, cc_identifiers_blocks
 
 
+ACTUAL_ERROR_REG_STRING = "(?!Warning)(?!The command has indeed failed with message:)"  # maybe we should just require Error or Timeout?
+DEFAULT_PRE_PRE_ERROR_REG_STRING = (
+    'File "([^"]+)", line ([0-9]+), characters ([0-9]+)-([0-9]+):\n'
+)
+DEFAULT_PRE_ERROR_REG_STRING = (
+    DEFAULT_PRE_PRE_ERROR_REG_STRING + ACTUAL_ERROR_REG_STRING
+)
+DEFAULT_ERROR_REG_STRING = DEFAULT_PRE_ERROR_REG_STRING + "((?:.|\n)+)"
+MAKE_ERROR_REG_STRING = r"^make[^:]*:\s*\*\*\*\s*\[[^\]]*\]\s*Error\s*"
+
+
 def parse_iso_errors(
     errors: str,
     *,
-    project: CoqProject | None = None,
+    project: CoqProject,
     cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
     original_name: str = "Original",
     imported_name: str = "Imported",
-) -> IsoError:
-    def assert_or_error(condition):
-        msg = (
-            f"{errors}\n{project.format(only_debug_files=True)}"
-            if project is not None
-            else errors
-        )
+    iso_file: str = "Isomorphisms.v",
+) -> IsoError | NonIsoBlockError:
+    def assert_or_error(condition, extra: Any = ""):
+        if extra:
+            extra = f"\n{extra}"
+        msg = f"{errors}\n{project.format(only_debug_files=True)}{extra}"
         if not condition:
-            assert project is not None, (project, msg)
             project.write(Path(__file__).parent.parent / "temp_iso_errors")
         assert condition, msg
 
+    def compute_sigiled_iso_index(iso_index: int) -> int:
+        return len(
+            [
+                block
+                for block in cc_identifiers_blocks[:iso_index]
+                if isinstance(block, tuple) and is_sigiled(block[1])
+            ]
+        )
+
+    # First extract the block from the error message
+    err_matches = re.findall(DEFAULT_ERROR_REG_STRING, errors)
+    assert_or_error(err_matches)
+    err_fname, err_linenum, err_start, err_end, error_msg = err_matches[-1]
+    orig_source, orig_target, orig_proof, iso_index = None, None, None, None
+    sigiled_iso_index = None
+    if err_fname[:2] in ("./", ".\\"):
+        err_fname = err_fname[2:]
+    err_linenum = int(err_linenum)
+    err_start = int(err_start)
+    err_end = int(err_end)
+    assert_or_error(err_fname in project, err_fname)
+    err_file_contents = project.files[err_fname].contents
+    assert_or_error(isinstance(err_file_contents, str), err_fname)
+    assert isinstance(err_file_contents, str)  # for the type checker
+    err_line = err_file_contents.split("\n")[err_linenum - 1]
+    # if the error is in another file, we fall back on the hinting
+    if err_fname in (iso_file, f"./{iso_file}", rf".\{iso_file}"):
+        iso_index = block_index_of_error_line(
+            cc_identifiers_blocks,
+            err_linenum,
+            original_name=original_name,
+            imported_name=imported_name,
+        )
+        assert_or_error(iso_index is not None)
+        assert iso_index is not None  # for the type checker
+        block = cc_identifiers_blocks[iso_index]
+        error_msg = re.split(MAKE_ERROR_REG_STRING, error_msg, flags=re.MULTILINE)[0]
+        if isinstance(block, str):
+            return NonIsoBlockError(
+                err_line, err_start, err_end, error_msg, iso_index, block
+            )
+        orig_source_id, orig_target_id, orig_proof = block
+        orig_source = str(desigil(orig_source_id, f"{original_name}."))
+        orig_target = str(desigil(orig_target_id, f"{imported_name}."))
+        sigiled_iso_index = compute_sigiled_iso_index(iso_index)
+
+        # if there are no hints, return an IsoErrorWithoutHints
+        if "Proving iso_statement" not in errors:
+            return IsoErrorWithoutHints(
+                orig_source,
+                orig_target,
+                orig_proof,
+                iso_index,
+                sigiled_iso_index,
+                err_line,
+                err_start,
+                err_end,
+                error_msg,
+            )
+    # if we can't extract a valid block, assume there must be hints
     assert_or_error("Proving iso_statement " in errors)
     errors = errors.split("Proving iso_statement ")[-1]
     last_proving_instance = re.match(
@@ -344,10 +510,35 @@ def parse_iso_errors(
     )
     assert_or_error(last_proving_instance)
     assert last_proving_instance, errors
-    orig_source, orig_target, errors = last_proving_instance.groups()
-    orig_proof = None
-    iso_index = None
-    sigiled_iso_index = None
+    labeled_iso_statement_orig_source, labeled_iso_statement_orig_target, errors = (
+        last_proving_instance.groups()
+    )
+    orig_source = orig_source or labeled_iso_statement_orig_source
+    orig_target = orig_target or labeled_iso_statement_orig_target
+    if (
+        labeled_iso_statement_orig_source != orig_source
+        or labeled_iso_statement_orig_target != orig_target
+    ):
+        pre_error = re.split(DEFAULT_PRE_ERROR_REG_STRING, errors)[0]
+        assert_or_error(isinstance(error_msg, str), repr(error_msg))
+        assert isinstance(error_msg, str)  # for the type checker
+        return AmbiguousIsoError(
+            orig_source,
+            orig_target,
+            orig_proof,
+            iso_index,
+            sigiled_iso_index,
+            err_line,
+            err_start,
+            err_end,
+            error_msg,
+            labeled_iso_statement_orig_source,
+            labeled_iso_statement_orig_target,
+            orig_proof,
+            iso_index,
+            sigiled_iso_index,
+            pre_error,
+        )
     try:
         iso_index = find_iso_index(
             cc_identifiers_blocks,
@@ -359,13 +550,7 @@ def parse_iso_errors(
     except ValueError:
         pass
     if iso_index is not None:
-        sigiled_iso_index = len(
-            [
-                block
-                for block in cc_identifiers_blocks[:iso_index]
-                if isinstance(block, tuple) and is_sigiled(block[1])
-            ]
-        )
+        sigiled_iso_index = compute_sigiled_iso_index(iso_index)
         block = cc_identifiers_blocks[iso_index]
         assert_or_error(not isinstance(block, str))
         orig_proof = block[2]
@@ -526,42 +711,6 @@ def make_isos(
             logging.info(f"Found missing isomorphisms: {set(iso_pairs)}")
         return project, False, error_message
     return project, True, None
-
-
-class ProcessedCoqName(NamedTuple):
-    first_id: str
-    coq_id: str
-    iso_name: str
-    is_sigiled: bool
-
-
-def process_coq_name(
-    coq_name: CoqIdentifier, *, original_name: str = "Original"
-) -> ProcessedCoqName:
-    first_id = str(coq_name)
-    coq_id = str(coq_name).replace(".", "_")
-    iso_name = f"{coq_id}_iso"
-    is_sigiled = False
-    if coq_id[0] == "$":
-        # Python is dynamically typed for a reason
-        coq_name = str(coq_name)[1:]  # type: ignore
-        coq_id = coq_id[1:]
-        first_id = f"{original_name}.{coq_name}"
-        iso_name = f"{coq_id}_iso"
-        is_sigiled = True
-    elif coq_id[0] == "(":
-        assert coq_id[-1] == ")", coq_id
-        coq_id = coq_id[1:-1]
-        if coq_id[0] == "@":
-            coq_id = coq_id[1:]
-        iso_name = f"{coq_id}_iso"
-    return ProcessedCoqName(first_id, coq_id, iso_name, is_sigiled)
-
-
-def iso_name_of_coq_name(
-    coq_name: CoqIdentifier, *, original_name: str = "Original"
-) -> str:
-    return process_coq_name(coq_name, original_name=original_name).iso_name
 
 
 def generate_interface(
@@ -1132,7 +1281,7 @@ def generate_and_autorepair_isos(
     CoqProject,
     list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
     bool,
-    IsoError | None,
+    IsoError | NonIsoBlockError | None,
 ]:
     project = generate_isos(
         project,
@@ -1157,6 +1306,7 @@ def generate_and_autorepair_isos(
         cc_identifiers_blocks=cc_identifiers_blocks,
         original_name=original_name,
         imported_name=imported_name,
+        iso_file=iso_file,
     )
     logging.info(f"Current error type is {type(error).__name__}")
 
@@ -1272,5 +1422,53 @@ def generate_and_autorepair_isos(
             if write_to_directory_on_error is not None:
                 project.write(write_to_directory_on_error)
             return project, cc_identifiers_blocks, False, error
+    elif isinstance(error, NonIsoBlockError):
+        if admit_failing_isos:
+            # remove the failing block
+            logging.info(f"Remove block {error.block_index}: {error.block}")
+            logging.debug(f"Error message: {error.error}")
+            del cc_identifiers_blocks[error.block_index]
+            return generate_and_autorepair_isos(
+                project,
+                cc_identifiers_blocks,
+                admit_failing_isos=admit_failing_isos,
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
+            )
+        else:
+            if write_to_directory_on_error is not None:
+                project.write(write_to_directory_on_error)
+            return project, cc_identifiers_blocks, False, error
+    elif isinstance(error, AmbiguousIsoError) or isinstance(
+        error, IsoErrorWithoutHints
+    ):
+        if admit_failing_isos:
+            # we can remove this failing iso if it's actually an iso and the block is a string or is not sigiled (original)
+            if error.iso_index is not None:
+                block = cc_identifiers_blocks[error.iso_index]
+                if isinstance(block, str) or not is_sigiled(block[1]):
+                    logging.info(
+                        f"Removing iso #{error.iso_index}: {error.orig_source} {error.orig_target}"
+                    )
+                    if isinstance(block, str):
+                        # this should not happen, but we'll handle it anyway
+                        logging.error(
+                            f"Block {error.iso_index} is a string: {block} (from {error})"
+                        )
+                    del cc_identifiers_blocks[error.iso_index]
+                    return generate_and_autorepair_isos(
+                        project,
+                        cc_identifiers_blocks,
+                        admit_failing_isos=admit_failing_isos,
+                        original_name=original_name,
+                        imported_name=imported_name,
+                        iso_file=iso_file,
+                        write_to_directory_on_error=write_to_directory_on_error,
+                    )
+        if write_to_directory_on_error is not None:
+            project.write(write_to_directory_on_error)
+        return project, cc_identifiers_blocks, False, error
     else:
         assert False, f"Unknown error type {type(error)}: {error}"

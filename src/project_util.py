@@ -339,6 +339,37 @@ class IsoError:
 
 
 @dataclass
+class ErrorMessageMixin:
+    error_line: str
+    error_start: int
+    error_end: int
+    error: str
+
+
+@dataclass
+class IsoErrorWithoutHints(ErrorMessageMixin, IsoError):
+    pass
+
+
+@dataclass
+class AmbiguousIsoError(ErrorMessageMixin, IsoError):
+    """IsoError when the line of the error message mismatches the line of the last labeled iso statement"""
+
+    labeled_iso_statement_orig_source: str
+    labeled_iso_statement_orig_target: str
+    labeled_iso_statement_orig_proof: str | None
+    labeled_iso_statement_iso_index: int | None
+    labeled_iso_statement_sigiled_iso_index: int | None
+    pre_error: str
+
+
+@dataclass
+class NonIsoBlockError(ErrorMessageMixin):
+    block_index: int
+    block: str
+
+
+@dataclass
 class MissingTypeIso(IsoError):
     source: str
     target: str
