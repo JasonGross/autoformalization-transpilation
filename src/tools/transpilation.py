@@ -178,10 +178,12 @@ def generate_and_autorepair_isos_tool(
         write_to_directory_on_error = Path(write_to_directory_on_error)
         key = str(hash(coq_project))
         (write_to_directory_on_error / key).mkdir(parents=True, exist_ok=True)
+        now = datetime.datetime.now()
+        iso_string = now.isoformat()
         if len(list((write_to_directory_on_error / key).iterdir())) == 0:
-            now = datetime.datetime.now()
-            iso_string = now.isoformat()
             coq_project.write(write_to_directory_on_error / key / iso_string)
+        else:
+            (write_to_directory_on_error / key / iso_string).touch()
 
     result["failure_phase"] = CompilationPhase.PROVING_ISOS
     error = result["error"]
