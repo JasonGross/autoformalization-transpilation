@@ -958,8 +958,7 @@ def add_files_to_CoqProject(coq_project: CoqProject, *files: str):
     ), f"{coq_project_contents!r} is not a string"
     coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
     coq_project_contents = "\n".join(
-        [f for f in coq_project_lines if f not in files]
-        + [f for f in files if f not in coq_project_lines]
+        coq_project_lines + [f for f in files if f not in coq_project_lines]
     )
     coq_project["_CoqProject"] = File(coq_project_contents)
     coq_project.debug_files.add("_CoqProject")
