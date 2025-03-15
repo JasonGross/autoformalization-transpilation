@@ -1,7 +1,7 @@
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Container, Iterable, Optional, Sequence
+from typing import Container, Iterable, NamedTuple, Optional, Sequence
 
 from config import (
     ISO_CHECKER_HEADER,
@@ -528,6 +528,42 @@ def make_isos(
     return project, True, None
 
 
+class ProcessedCoqName(NamedTuple):
+    first_id: str
+    coq_id: str
+    iso_name: str
+    is_sigiled: bool
+
+
+def process_coq_name(
+    coq_name: CoqIdentifier, *, original_name: str = "Original"
+) -> ProcessedCoqName:
+    first_id = str(coq_name)
+    coq_id = str(coq_name).replace(".", "_")
+    iso_name = f"{coq_id}_iso"
+    is_sigiled = False
+    if coq_id[0] == "$":
+        # Python is dynamically typed for a reason
+        coq_name = str(coq_name)[1:]  # type: ignore
+        coq_id = coq_id[1:]
+        first_id = f"{original_name}.{coq_name}"
+        iso_name = f"{coq_id}_iso"
+        is_sigiled = True
+    elif coq_id[0] == "(":
+        assert coq_id[-1] == ")", coq_id
+        coq_id = coq_id[1:-1]
+        if coq_id[0] == "@":
+            coq_id = coq_id[1:]
+        iso_name = f"{coq_id}_iso"
+    return ProcessedCoqName(first_id, coq_id, iso_name, is_sigiled)
+
+
+def iso_name_of_coq_name(
+    coq_name: CoqIdentifier, *, original_name: str = "Original"
+) -> str:
+    return process_coq_name(coq_name, original_name=original_name).iso_name
+
+
 def generate_interface(
     project: CoqProject,
     coq_identifiers: list[CoqIdentifier],
@@ -548,22 +584,10 @@ def generate_interface(
     # Generate the isomorphism checks for each definition pair
     iso_interface_checks, iso_checks, iso_names = [], [], []
     for coq_name in coq_identifiers:
-        first_id = str(coq_name)
-        coq_id = str(coq_name).replace(".", "_")
-        iso_name = f"{coq_id}_iso"
-        if coq_id[0] == "$":
-            # Python is dynamically typed for a reason
-            coq_name = str(coq_name)[1:]
-            coq_id = coq_id[1:]
-            first_id = f"{original_name}.{coq_name}"
-            iso_name = f"{coq_id}_iso"
+        processed_coq_name = process_coq_name(coq_name, original_name=original_name)
+        first_id, coq_id, iso_name, is_sigiled = processed_coq_name
+        if is_sigiled:
             iso_names.append(iso_name)
-        elif coq_id[0] == "(":
-            assert coq_id[-1] == ")", coq_id
-            coq_id = coq_id[1:-1]
-            if coq_id[0] == "@":
-                coq_id = coq_id[1:]
-            iso_name = f"{coq_id}_iso"
 
         iso_block = f"""Derive imported_{coq_id} in (iso_statement {first_id} (imported_{coq_id} :> import_of {first_id})) as {iso_name}.
 Proof. subst imported_{coq_id}. exact Isomorphisms.{iso_name}. Defined.
@@ -715,6 +739,35 @@ def make_identifiers_str_helper(
     ]
 
 
+@lru_cache()
+def make_identifiers_iso_names_helper(
+    cc_identifiers_blocks: tuple[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    original_name: str = "Original",
+) -> list[str | None]:
+    cc_identifiers = [
+        (None, None, None) if isinstance(v, str) else v for v in cc_identifiers_blocks
+    ]
+    return [
+        (
+            iso_name_of_coq_name(coq_name, original_name=original_name)
+            if coq_name is not None
+            else None
+        )
+        for coq_name, _, _ in cc_identifiers
+    ]
+
+
+def make_identifiers_iso_names(
+    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    *,
+    original_name: str = "Original",
+) -> list[str | None]:
+    return make_identifiers_iso_names_helper(
+        tuple(cc_identifiers_blocks), original_name=original_name
+    )
+
+
 def make_identifiers_str(
     cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
     *,
@@ -736,9 +789,20 @@ def find_iso_index(
     original_name: str = "Original",
     imported_name: str = "Imported",
     fuzzy_sigil: bool = True,
+    allow_iso_name: bool = True,
 ) -> int:
+    if orig_target == "None":
+        logging.warning(
+            f"orig_target is 'None', possible json issue? (going to assume a more permissive target for {orig_source})"
+        )
+        orig_target = None
     cc_identifiers_str = make_identifiers_str(
         cc_identifiers_blocks, original_name=original_name, imported_name=imported_name
+    )
+    cc_identifiers_iso_names = (
+        make_identifiers_iso_names(cc_identifiers_blocks, original_name=original_name)
+        if allow_iso_name
+        else []
     )
     orig_sources = [orig_source]
     orig_targets = [orig_target] if orig_target is not None else None
@@ -764,6 +828,11 @@ def find_iso_index(
                 return c_identifiers_str.index(orig_source)
             except ValueError:
                 pass
+            if allow_iso_name:
+                try:
+                    return cc_identifiers_iso_names.index(orig_source)
+                except ValueError:
+                    pass
         raise ValueError(
             f"Could not find iso for {orig_sources} in {cc_identifiers_str}"
         )
