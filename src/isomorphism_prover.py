@@ -1200,7 +1200,7 @@ def init_coq_project(
     initial_targets: Iterable[str] | None = (),
     allow_build_failure: bool = True,
     init_empty_files: Iterable[str] = ("Isomorphisms.v", "Checker.v", "Interface.v"),
-    filter_out_files: Iterable[str] = (),
+    filter_out_files: Iterable[str] = ("AutomationTests.v",),
 ) -> CoqProject:
     directory = Path(directory)
     init_empty_files = tuple(init_empty_files)
