@@ -74,13 +74,11 @@ def main():
     # Extract JSON data into DataFrame
     data_records = []
     for file_entry in json_data:
-        file_name = file_entry.get("fileName", "")
         items = file_entry.get("items", [])
         for item in items:
             raw_text = item.get("raw", "")
             item_type = item.get("type", "")
             data_records.append({
-                "fileName": file_name,
                 "type": item_type,
                 "raw": raw_text
             })
@@ -93,7 +91,7 @@ def main():
     # 5) Extract node attributes from G into a DataFrame
     expanded_data = []
     for node, attributes in G.nodes(data=True):
-        expanded_data.append({"Node": node, "Label": attributes.get("label", "Unknown")})
+        expanded_data.append({"Label": attributes.get("label", "Unknown")})
 
     df_dpd = pd.DataFrame(expanded_data)
 
@@ -101,17 +99,20 @@ def main():
     merged_df = df.merge(df_dpd, on="Label", how="left")
 
     # 7) Collect dependencies from each Node
-    def get_dependencies_labels(node: str) -> Optional[List[str]]:
-        if not node or node not in G.nodes:
-            return None
-        successors = list(G.successors(node))
-        if not successors:
-            return None
-        return [G.nodes[s]["label"] for s in successors]
+    def get_dependencies_labels(label: str) -> Optional[List[str]]:
+        for node, attributes in G.nodes(data=True):
+            if attributes.get("label") == label:
+                successors = list(G.successors(node))
+                if successors:
+                    return [G.nodes[s]["label"] for s in successors]
+        return None
 
-    merged_df["dependencies"] = merged_df["Node"].apply(get_dependencies_labels)
+    merged_df["dependencies"] = merged_df["Label"].apply(get_dependencies_labels)
 
-    # 8) Write final result to JSON
+    # 8) Drop 'fileName' and 'Node' columns
+    merged_df.drop(columns=["Label"], inplace=True)
+
+    # 9) Write final result to JSON
     merged_df.to_json(output_file, orient="records", indent=2)
     print(f"Merged dataset saved to {output_file}")
 
