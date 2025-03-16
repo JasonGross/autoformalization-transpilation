@@ -19,7 +19,7 @@ shelve.Unpickler = Unpickler
 memoshelve_cache: Dict[str, Dict[str, Any]] = {}
 T = TypeVar("T")
 
-DEFAULT_PRINT_CACHE_MISS = False
+DEFAULT_PRINT_CACHE_MISS = True
 DEFAULT_PRINT_CACHE_HIT = False
 DEFAULT_PRINT_CACHE_MISS_FN = logging.warning
 DEFAULT_PRINT_CACHE_HIT_FN = logging.debug
@@ -112,7 +112,7 @@ def memoshelve(
                                 f for f in frames if "memoshelve.py" not in f.filename
                             ]
                             print_cache_miss(
-                                f"Cache miss (disk): {key} ({[f.name for f in frames]})"
+                                f"Cache miss (disk): {key} ({value.__name__ if hasattr(value, '__name__') else 'anonymous'}) ({[f.name for f in frames]})"
                             )
                         elif isinstance(e, (KeyboardInterrupt, SystemExit)):
                             raise e
