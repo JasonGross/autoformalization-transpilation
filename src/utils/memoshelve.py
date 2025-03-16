@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union, TypeVar
-
+from utils import logging
 from dill import Pickler, Unpickler
 
 from . import backup as backup_file
@@ -17,6 +17,11 @@ shelve.Unpickler = Unpickler
 
 memoshelve_cache: Dict[str, Dict[str, Any]] = {}
 T = TypeVar("T")
+
+DEFAULT_PRINT_CACHE_MISS = False
+DEFAULT_PRINT_CACHE_HIT = False
+DEFAULT_PRINT_CACHE_MISS_FN = logging.warning
+DEFAULT_PRINT_CACHE_HIT_FN = logging.debug
 
 
 def to_tuples(arg: Any) -> Any:
@@ -57,10 +62,24 @@ def memoshelve(
     cache: Dict[str, Dict[str, Any]] = memoshelve_cache,
     get_hash: Callable = repr,  # get_hash_ascii,
     get_hash_mem: Optional[Callable] = None,
-    print_cache_miss: bool = False,
+    print_cache_miss: bool | Callable[[str], None] | None = None,
+    print_cache_hit: bool | Callable[[str], None] | None = None,
     copy: Callable[[T], T] = lambda x: x,
 ):
     """Lightweight memoziation using shelve + in-memory cache"""
+    if print_cache_miss is None:
+        print_cache_miss = DEFAULT_PRINT_CACHE_MISS
+    if print_cache_miss is True:
+        print_cache_miss = DEFAULT_PRINT_CACHE_MISS_FN
+    elif print_cache_miss is False:
+        print_cache_miss = lambda _: None
+    if print_cache_hit is None:
+        print_cache_hit = DEFAULT_PRINT_CACHE_HIT
+    if print_cache_hit is True:
+        print_cache_hit = DEFAULT_PRINT_CACHE_HIT_FN
+    elif print_cache_hit is False:
+        print_cache_hit = lambda _: None
+
     filename = str(Path(filename).absolute())
     mem_db = cache.setdefault(filename, {})
     if get_hash_mem is None:
@@ -74,18 +93,19 @@ def memoshelve(
             def delegate(*args, **kwargs):
                 mkey = get_hash_mem((args, kwargs))
                 try:
-                    return mem_db[mkey]
+                    result = mem_db[mkey]
+                    print_cache_hit(f"Cache hit (mem): {mkey}")
+                    return result
                 except KeyError:
-                    if print_cache_miss:
-                        print(f"Cache miss (mem): {mkey}")
+                    print_cache_miss(f"Cache miss (mem): {mkey}")
                     key = str(get_hash((args, kwargs)))
                     try:
                         mem_db[mkey] = db[key]
+                        print_cache_hit(f"Cache hit (disk): {key}")
                         return mem_db[mkey]
                     except Exception as e:
                         if isinstance(e, KeyError):
-                            if print_cache_miss:
-                                print(f"Cache miss (disk): {key}")
+                            print_cache_miss(f"Cache miss (disk): {key}")
                         elif isinstance(e, (KeyboardInterrupt, SystemExit)):
                             raise e
                         else:
@@ -129,7 +149,8 @@ def cache(
     cache: Dict[str, Dict[str, Any]] = memoshelve_cache,
     get_hash: Callable = repr,  # get_hash_ascii,
     get_hash_mem: Optional[Callable] = None,
-    print_cache_miss: bool = False,
+    print_cache_miss: bool | Callable[[str], None] | None = None,
+    print_cache_hit: bool | Callable[[str], None] | None = None,
     disable: bool = False,
     copy: Callable[[T], T] = lambda x: x,
 ):
@@ -155,6 +176,7 @@ def cache(
                     get_hash=get_hash,
                     get_hash_mem=get_hash_mem,
                     print_cache_miss=print_cache_miss,
+                    print_cache_hit=print_cache_hit,
                     copy=copy,
                 )() as f:
                     return f(*args, **kwargs)
