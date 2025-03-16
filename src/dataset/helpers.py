@@ -83,7 +83,7 @@ def classifyBlock(blockText: str) -> str:
     if firstLine.startswith("Set") or firstLine.startswith("Unset"):
         return "global_directive"
     if firstLine.startswith("Require"):
-        return "Require"
+        return "Import"
     if firstLine.startswith("Fixpoint"):
         return "Fixpoint"
     if firstLine.startswith("Lemma"):
@@ -118,7 +118,7 @@ def classifyBlock(blockText: str) -> str:
         return "Notation"
     if firstLine.startswith("Intros"):
         return "Intros"
-    return "misc"
+    return "Misc"
 
 def extractBlocksFromPreprocessed(fileContent: str) -> list[dict[str, str]]:
     rawBlocks = fileContent.strip().split("\n\n")
