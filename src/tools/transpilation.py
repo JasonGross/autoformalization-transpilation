@@ -451,7 +451,7 @@ def handle_value_error(
         )
         if s is not None
     ]
-    if iso_target is not None:
+    if iso_target is None:
         valid_identifiers = ", ".join(v for v, _ in cc_ids_str)
         return ContentText(
             text=f"Failed to find identifier {iso_source} in the isomorphism list; valid identifiers are: {valid_identifiers}"
