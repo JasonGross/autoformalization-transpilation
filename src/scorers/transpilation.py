@@ -192,6 +192,8 @@ def isos_proven_scorer(
             write_to_directory_on_error=write_to_directory_on_error,
             admit_failing_isos=True,
         )
+        p_state: ProjectState | None = deepcopy(store.get("translation_state"))
+        metadata["postadmit_translation_state"] = p_state
 
         if admit_msgs:
             if hasattr(admit_msgs, "text"):

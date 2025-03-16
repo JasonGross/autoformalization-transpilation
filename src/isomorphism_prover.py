@@ -1462,8 +1462,28 @@ def generate_and_autorepair_isos(
                         iso_file=iso_file,
                         write_to_directory_on_error=write_to_directory_on_error,
                     )
+                elif block[2] != "Admitted.":
+                    project, cc_identifiers_blocks = admit_failing_iso(
+                        project,
+                        cc_identifiers_blocks,
+                        error.orig_source,
+                        error.orig_target,
+                        original_name=original_name,
+                        imported_name=imported_name,
+                    )
+                    return generate_and_autorepair_isos(
+                        project,
+                        cc_identifiers_blocks,
+                        admit_failing_isos=admit_failing_isos,
+                        original_name=original_name,
+                        imported_name=imported_name,
+                        iso_file=iso_file,
+                        write_to_directory_on_error=write_to_directory_on_error,
+                    )
         if write_to_directory_on_error is not None:
             project.write(write_to_directory_on_error)
+        if admit_failing_isos:
+            logging.error(f"Failed to admit iso proof for {error}")
         return project, cc_identifiers_blocks, False, error
     else:
         assert False, f"Unknown error type {type(error)}: {error}"
