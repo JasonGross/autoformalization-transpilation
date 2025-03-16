@@ -1,144 +1,147 @@
 import re
+from typing import List, Dict
 
-# Keywords recognized as possible block starts
-blockStarters = [
-    "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive", "Corollary",
-    "Proposition", "Example", "Record", "CoFixpoint", "Fact", "Module",
-    "Section", "Variable", "Hypothesis", "Axiom", "Parameter", "Goal",
-    "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import",
-    "Export", "From", "Check", "Hint", "Create", "End"
-]
-
-# Possible ways a proof can end
-proofEndings = ["Qed.", "Defined.", "Admitted.", "Abort."]
-
-def isBlockStarter(line: str) -> bool:
+class CoqBlockParser:
     """
-    Returns True if the given line starts with a known Coq block keyword.
+    A parser class to encapsulate the logic for splitting and classifying Coq text blocks.
     """
-    stripped_line = line.lstrip()
-    for starter in blockStarters:
-        # Example: If "Fixpoint" is at the start followed by a space, parentheses, or boundary
-        # we treat it as a valid block start.
-        pattern = r"^" + re.escape(starter) + r"(\b|\s|\()"
-        if re.match(pattern, stripped_line):
-            return True
-    return False
 
+    blockStarters = [
+        "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive", "Corollary",
+        "Proposition", "Example", "Record", "CoFixpoint", "Fact", "Module",
+        "Section", "Variable", "Hypothesis", "Axiom", "Parameter", "Goal",
+        "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import",
+        "Export", "From", "Check", "Hint", "Create", "End"
+    ]
 
-def classifyBlock(blockText: str) -> str:
-    """
-    Returns a coarse classification of a block based on its first line.
-    """
-    lines = blockText.strip().split('\n')
-    if not lines:
+    proofEndings = ["Qed.", "Defined.", "Admitted.", "Abort."]
+
+    @staticmethod
+    def is_block_starter(line: str) -> bool:
+        """
+        Returns True if the given line starts with a known Coq block keyword.
+        """
+        stripped_line = line.lstrip()
+        for starter in CoqBlockParser.blockStarters:
+            pattern = r"^" + re.escape(starter) + r"(\b|\s|\()"
+            if re.match(pattern, stripped_line):
+                return True
+        return False
+
+    @staticmethod
+    def classify_block(block_text: str) -> str:
+        """
+        Returns a coarse classification of a block based on its first line.
+        """
+        lines = block_text.strip().split('\n')
+        if not lines:
+            return "Misc"
+
+        first_line = lines[0].strip()
+
+        if first_line.startswith("Set") or first_line.startswith("Unset"):
+            return "global_directive"
+        if first_line.startswith("Require"):
+            return "Import"
+        if first_line.startswith("Fixpoint"):
+            return "Fixpoint"
+        if first_line.startswith("Lemma"):
+            return "Lemma"
+        if first_line.startswith("Theorem"):
+            return "Theorem"
+        if first_line.startswith("Definition"):
+            return "Definition"
+        if first_line.startswith("Ltac"):
+            return "Ltac"
+        if first_line.startswith("Inductive"):
+            return "Inductive"
+        if first_line.startswith("Check"):
+            return "Dheck"
+        if first_line.startswith("Hint"):
+            return "Hint"
+        if first_line.startswith("Create HintDb"):
+            return "Create_hint_db"
+        if (first_line.startswith("Import") or
+            first_line.startswith("Export") or
+            first_line.startswith("From")):
+            return "Import"
+        if first_line.startswith("Example"):
+            return "Example"
+        if first_line.startswith("Module"):
+            return "Module"
+        if first_line.startswith("Section"):
+            return "Section"
+        if first_line.startswith("End"):
+            return "End"
+        if first_line.startswith("Compute"):
+            return "Compute"
+        if first_line.startswith("Notation"):
+            return "Notation"
+        if first_line.startswith("Intros"):
+            return "Intros"
+
         return "Misc"
 
-    firstLine = lines[0].strip()
-
-    if firstLine.startswith("Set") or firstLine.startswith("Unset"):
-        return "global_directive"
-    if firstLine.startswith("Require"):
-        return "Import"
-    if firstLine.startswith("Fixpoint"):
-        return "Fixpoint"
-    if firstLine.startswith("Lemma"):
-        return "Lemma"
-    if firstLine.startswith("Theorem"):
-        return "Theorem"
-    if firstLine.startswith("Definition"):
-        return "Definition"
-    if firstLine.startswith("Ltac"):
-        return "Ltac"
-    if firstLine.startswith("Inductive"):
-        return "Inductive"
-    if firstLine.startswith("Check"):
-        return "Dheck"
-    if firstLine.startswith("Hint"):
-        return "Hint"
-    if firstLine.startswith("Create HintDb"):
-        return "Create_hint_db"
-    if (firstLine.startswith("Import") or
-        firstLine.startswith("Export") or
-        firstLine.startswith("From")):
-        return "Import"
-    if firstLine.startswith("Example"):
-        return "Example"
-    if firstLine.startswith("Module"):
-        return "Module"
-    if firstLine.startswith("Section"):
-        return "Section"
-    if firstLine.startswith("End"):
-        return "End"
-    if firstLine.startswith("Compute"):
-        return "Compute"
-    if firstLine.startswith("Notation"):
-        return "Notation"
-    if firstLine.startswith("Intros"):
-        return "Intros"
-
-    return "Misc"
-
-
-def get_coq_blocks(fileContent: str) -> list[dict[str, str]]:
-    """
-    Takes the full text of a Coq file, removes comments,
-    splits it into logical blocks, and classifies each block.
-    Returns a list of dictionaries: [{"type": ..., "raw": ...}, ...].
-    """
-
-    # Remove any (* ... *) comments (including multiline)
-    comment_pattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
-    content_no_comments = re.sub(comment_pattern, '', fileContent)
-
-    # Split into lines, strip trailing spaces
-    lines = [line.rstrip() for line in content_no_comments.split('\n')]
-
-    blocks = []
-    currentBlock = []
-    collectingProof = False
-
-    def flushBlock():
+    @staticmethod
+    def get_coq_blocks(file_content: str) -> List[Dict[str, str]]:
         """
-        Utility function to finalize the current block, classify it,
-        and add it to the blocks list if non-empty.
+        Takes the full text of a Coq file, removes comments,
+        splits it into logical blocks, and classifies each block.
+        Returns a list of dicts: [{"type": ..., "raw": ...}, ...].
         """
-        nonlocal currentBlock
-        # Remove blank lines from start and end
-        while currentBlock and not currentBlock[0].strip():
-            currentBlock.pop(0)
-        while currentBlock and not currentBlock[-1].strip():
-            currentBlock.pop()
 
-        if currentBlock:
-            blockText = "\n".join(currentBlock)
-            blockType = classifyBlock(blockText)
-            blocks.append({
-                "type": blockType,
-                "raw": blockText.strip()
-            })
-        currentBlock = []
+        # Remove (* ... *) comments (including multiline)
+        comment_pattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
+        content_no_comments = re.sub(comment_pattern, '', file_content)
 
-    for line in lines:
-        strippedLine = line.strip()
-        # If we are in proof mode, keep reading until we find a proof ending
-        if collectingProof:
-            currentBlock.append(line)
-            if strippedLine in proofEndings:
-                flushBlock()
-                collectingProof = False
-        else:
-            # If this line starts a new block, flush the old one first
-            if isBlockStarter(line):
-                flushBlock()
-                currentBlock.append(line)
-            elif strippedLine == "Proof.":
-                currentBlock.append(line)
-                collectingProof = True
+        # Split into lines, strip trailing spaces
+        lines = [line.rstrip() for line in content_no_comments.split('\n')]
+
+        blocks = []
+        current_block = []
+        collecting_proof = False
+
+        def flush_block():
+            """
+            Utility function to finalize the current block, classify it,
+            and add it to the blocks list if non-empty.
+            """
+            nonlocal current_block
+            # Remove blank lines from start and end
+            while current_block and not current_block[0].strip():
+                current_block.pop(0)
+            while current_block and not current_block[-1].strip():
+                current_block.pop()
+
+            if current_block:
+                block_text = "\n".join(current_block)
+                block_type = CoqBlockParser.classify_block(block_text)
+                blocks.append({
+                    "type": block_type,
+                    "raw": block_text.strip()
+                })
+            current_block = []
+
+        for line in lines:
+            stripped_line = line.strip()
+            # If we are in proof mode, keep reading until we find a proof ending
+            if collecting_proof:
+                current_block.append(line)
+                if stripped_line in CoqBlockParser.proofEndings:
+                    flush_block()
+                    collecting_proof = False
             else:
-                currentBlock.append(line)
+                # If this line starts a new block, flush the old one first
+                if CoqBlockParser.is_block_starter(line):
+                    flush_block()
+                    current_block.append(line)
+                elif stripped_line == "Proof.":
+                    current_block.append(line)
+                    collecting_proof = True
+                else:
+                    current_block.append(line)
 
-    # Flush whatever is left
-    flushBlock()
+        # Flush whatever is left
+        flush_block()
 
-    return blocks
+        return blocks
