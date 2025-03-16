@@ -1,9 +1,11 @@
 import re
 from typing import List, Dict
 
+
 class CoqBlockParser:
     """
-    A parser class to encapsulate the logic for splitting and classifying Coq text blocks.
+    A parser class to encapsulate the logic for splitting and classifying
+    Coq text blocks.
     """
 
     blockStarters = [
@@ -19,7 +21,7 @@ class CoqBlockParser:
     @staticmethod
     def is_block_starter(line: str) -> bool:
         """
-        Returns True if the given line starts with a known Coq block keyword.
+        Return True if the given line starts with a known Coq block keyword.
         """
         stripped_line = line.lstrip()
         for starter in CoqBlockParser.blockStarters:
@@ -31,7 +33,7 @@ class CoqBlockParser:
     @staticmethod
     def classify_block(block_text: str) -> str:
         """
-        Returns a coarse classification of a block based on its first line.
+        Return a coarse classification of a block based on its first line.
         """
         lines = block_text.strip().split('\n')
         if not lines:
@@ -61,9 +63,11 @@ class CoqBlockParser:
             return "Hint"
         if first_line.startswith("Create HintDb"):
             return "Create_hint_db"
-        if (first_line.startswith("Import") or
-            first_line.startswith("Export") or
-            first_line.startswith("From")):
+        if (
+            first_line.startswith("Import")
+            or first_line.startswith("Export")
+            or first_line.startswith("From")
+        ):
             return "Import"
         if first_line.startswith("Example"):
             return "Example"
@@ -85,29 +89,24 @@ class CoqBlockParser:
     @staticmethod
     def get_coq_blocks(file_content: str) -> List[Dict[str, str]]:
         """
-        Takes the full text of a Coq file, removes comments,
-        splits it into logical blocks, and classifies each block.
-        Returns a list of dicts: [{"type": ..., "raw": ...}, ...].
+        Remove (* ... *) comments, split into logical blocks, and classify each
+        block. Return a list of dicts like [{"type": ..., "raw": ...}, ...].
         """
-
-        # Remove (* ... *) comments (including multiline)
         comment_pattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
         content_no_comments = re.sub(comment_pattern, '', file_content)
 
-        # Split into lines, strip trailing spaces
         lines = [line.rstrip() for line in content_no_comments.split('\n')]
 
         blocks = []
         current_block = []
         collecting_proof = False
 
-        def flush_block():
+        def flush_block() -> None:
             """
-            Utility function to finalize the current block, classify it,
-            and add it to the blocks list if non-empty.
+            Finalize the current block, classify it, and add it to blocks if
+            non-empty.
             """
             nonlocal current_block
-            # Remove blank lines from start and end
             while current_block and not current_block[0].strip():
                 current_block.pop(0)
             while current_block and not current_block[-1].strip():
@@ -124,14 +123,12 @@ class CoqBlockParser:
 
         for line in lines:
             stripped_line = line.strip()
-            # If we are in proof mode, keep reading until we find a proof ending
             if collecting_proof:
                 current_block.append(line)
                 if stripped_line in CoqBlockParser.proofEndings:
                     flush_block()
                     collecting_proof = False
             else:
-                # If this line starts a new block, flush the old one first
                 if CoqBlockParser.is_block_starter(line):
                     flush_block()
                     current_block.append(line)
@@ -141,7 +138,5 @@ class CoqBlockParser:
                 else:
                     current_block.append(line)
 
-        # Flush whatever is left
         flush_block()
-
         return blocks
