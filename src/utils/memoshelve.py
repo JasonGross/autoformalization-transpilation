@@ -1,4 +1,5 @@
 import os
+import traceback
 import shelve
 from contextlib import contextmanager
 from functools import wraps
@@ -105,7 +106,14 @@ def memoshelve(
                         return mem_db[mkey]
                     except Exception as e:
                         if isinstance(e, KeyError):
-                            print_cache_miss(f"Cache miss (disk): {key}")
+                            frames = traceback.extract_stack()
+                            # Remove the current frame and the memoshelve internal frames
+                            frames = [
+                                f for f in frames if "memoshelve.py" not in f.filename
+                            ]
+                            print_cache_miss(
+                                f"Cache miss (disk): {key} ({[f.name for f in frames]})"
+                            )
                         elif isinstance(e, (KeyboardInterrupt, SystemExit)):
                             raise e
                         else:
