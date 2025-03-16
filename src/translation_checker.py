@@ -18,7 +18,7 @@ from project_util import (
     desigil,
 )
 from utils import logging, run_cmd
-from utils.memoshelve import cache, hash_as_tuples
+from utils.memoshelve import cache
 
 
 class ErrorCode(StrEnum):
@@ -166,7 +166,7 @@ def check_translation(
     return lean_export_project, lean_project, coq_project, success, error_code, error
 
 
-@cache(get_hash=hash_as_tuples, copy=deepcopy)
+@cache(copy=deepcopy)
 def new_lake_project(name: str = "lean-build") -> LeanProject:
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
@@ -176,7 +176,7 @@ def new_lake_project(name: str = "lean-build") -> LeanProject:
         return LeanProject.read(tempdir / name)
 
 
-@cache(get_hash=hash_as_tuples, copy=deepcopy)
+@cache(copy=deepcopy)
 def check_compilation(
     lean_statements: LeanFile, project: LeanProject | None = None
 ) -> tuple[LeanProject, bool, str]:
@@ -242,7 +242,7 @@ def lean_to_coq(
     return lean_project, coq_project, success, cc_identifiers, error
 
 
-@cache(get_hash=hash_as_tuples, copy=deepcopy)
+@cache(copy=deepcopy)
 def export_from_lean(
     project: LeanProject, definitions: list[LeanIdentifier]
 ) -> tuple[LeanProject, bool, ExportFile, CompletedProcess[str]]:

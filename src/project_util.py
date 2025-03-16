@@ -25,7 +25,7 @@ from typing import (
 )
 
 from utils import logging, run_cmd
-from utils.memoshelve import cache, hash_as_tuples
+from utils.memoshelve import cache
 
 full_repr: bool = False
 full_repr_threshold: int = 100
@@ -56,6 +56,10 @@ class File:
 
     def __hash__(self) -> int:
         return hash(str(self._cache_file_path))
+    def towards_json(self) -> str | bytes:
+        return self.contents
+    def towards_json_for_hash(self) -> str:
+        return str(self._cache_file_path)
 
     @property
     @lru_cache
@@ -287,7 +291,7 @@ class Project:
                 process.stderr = process.stderr.replace(str(p), sanitize)
             return process
 
-    @cache(get_hash=hash_as_tuples, copy=deepcopy)
+    @cache(copy=deepcopy)
     def run_cmd(self: Self, *args, **kwargs) -> tuple[CompletedProcess[str], Self]:
         project = self.copy()
         result = project.irun_cmd(*args, **kwargs)

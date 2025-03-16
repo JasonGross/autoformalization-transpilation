@@ -14,6 +14,7 @@ dependencies = [
     "coq-tools>=0.0.7",
     "anthropic>=0.49.0",
     "inspect-ai>=0.3.74",
+    "frozendict>=2.4.6",
 ]
 
 [tool.uv]
