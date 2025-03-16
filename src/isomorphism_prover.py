@@ -940,11 +940,6 @@ def find_iso_index(
     fuzzy_sigil: bool = True,
     allow_iso_name: bool = True,
 ) -> int:
-    if orig_target == "None":
-        logging.warning(
-            f"orig_target is 'None', possible json issue? (going to assume a more permissive target for {orig_source})"
-        )
-        orig_target = None
     cc_identifiers_str = make_identifiers_str(
         cc_identifiers_blocks, original_name=original_name, imported_name=imported_name
     )

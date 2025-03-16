@@ -49,6 +49,7 @@ from translation_checker import (
     lean_to_coq,
 )
 from utils import logging
+from utils.inspect_utils import handle_none_string
 
 _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR = (
     Path(__file__).parent.parent.parent / "temp_transpilation_errors"
@@ -484,6 +485,7 @@ def add_lemma_tool(
             before_source: The source identifier before which the lemma should be added. (str)
             before_target: The target identifier before which the lemma should be added. Optional. (str|None)
         """
+        before_target = handle_none_string(before_target)
         state: ProjectState = inspect_ai.util.store().get("translation_state")
         try:
             index = find_iso_index(
@@ -587,6 +589,7 @@ def remove_iso_tool(
             source: The source identifier for the isomorphism. (str)
             target: The target identifier for the isomorphism. (str | None)
         """
+        target = handle_none_string(target)
         state: ProjectState = inspect_ai.util.store().get("translation_state")
 
         try:
@@ -708,6 +711,7 @@ def edit_iso_proof_tool(
             new_proof: The new proof for the isomorphism block.  This is likely to be something like 'iso. iso_rel_rewrite {lemma here}. iso.' (str)
             iso_target: The target identifier for the isomorphism block to be edited. Optional. (str|None)
         """
+        iso_target = handle_none_string(iso_target)
         return await edit_iso_proof_higher_order(
             iso_source,
             lambda block: new_proof,
