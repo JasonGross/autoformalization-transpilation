@@ -24,9 +24,11 @@ from tools.transpilation import (
     add_import_tool,
     add_iso_tool,
     add_lemma_tool,
-    edit_proof_tool,
+    edit_lemma_tool,
+    edit_iso_proof_tool,
     remove_import_tool,
     remove_iso_tool,
+    remove_lemma_tool,
     repair_iso_by_reorder_constructors_tool,
     make_submit_translation_tool,
 )
@@ -42,15 +44,19 @@ EXAMPLE_COQ_FILEPATH = EXAMPLE_COQ_FILEPATH = (
 def coq_to_lean(
     cache: CachePolicy | bool = False,
     agent: Literal["basic", "multiphase"] = "multiphase",
+    *,
+    coq_filepath: str | Path = EXAMPLE_COQ_FILEPATH,
+    translation_state_template: str = TRANSLATION_STATE_TEMPLATE,
 ):
     # NOTE: This will need rewriting when the input coq file is not hardcoded
+    coq_filepath = Path(coq_filepath)
     submit_translation_tool, coq_identifiers = make_submit_translation_tool(
-        coq_statements=EXAMPLE_COQ_FILEPATH.read_text(),
+        coq_statements=coq_filepath.read_text(),
     )
     # dataset
     input_msg = format_translation_input(
-        TRANSLATION_STATE_TEMPLATE,
-        EXAMPLE_COQ_FILEPATH,
+        translation_state_template,
+        coq_filepath,
         coq_identifiers=coq_identifiers,
     )
     dataset = prepare_dataset([input_msg])
@@ -61,9 +67,11 @@ def coq_to_lean(
         add_import_tool(),
         remove_import_tool(),
         add_lemma_tool(),
+        remove_lemma_tool(),
+        edit_lemma_tool(),
         add_iso_tool(),
         remove_iso_tool(),
-        edit_proof_tool(),
+        edit_iso_proof_tool(),
         repair_iso_by_reorder_constructors_tool(),
     ]
 

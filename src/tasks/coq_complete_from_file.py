@@ -6,7 +6,7 @@ from inspect_ai.solver import generate, system_message, use_tools
 from dataset.prepare import format_translation_input, prepare_dataset
 from models import AnthropicModel, OpenAIModel
 from prompts.completion import ALTERNATE_SYSTEM_MESSAGE, COQ_STATEMENTS
-from scorers.completion import coq_runs_scorer, coq_proven_scorer
+from scorers.completion import coq_proven_scorer, coq_runs_scorer
 from tools.itp import coq_run_tool
 from tools.submission import coq_submit_tool, sample_definitions, sample_interface
 

@@ -25,7 +25,7 @@ from typing import (
 )
 
 from utils import logging, run_cmd
-from utils.memoshelve import cache, hash_as_tuples
+from utils.memoshelve import cache
 
 full_repr: bool = False
 full_repr_threshold: int = 100
@@ -56,6 +56,10 @@ class File:
 
     def __hash__(self) -> int:
         return hash(str(self._cache_file_path))
+    def towards_json(self) -> str | bytes:
+        return self.contents
+    def towards_json_for_hash(self) -> str:
+        return str(self._cache_file_path)
 
     @property
     @lru_cache
@@ -287,7 +291,7 @@ class Project:
                 process.stderr = process.stderr.replace(str(p), sanitize)
             return process
 
-    @cache(get_hash=hash_as_tuples, copy=deepcopy)
+    @cache(copy=deepcopy)
     def run_cmd(self: Self, *args, **kwargs) -> tuple[CompletedProcess[str], Self]:
         project = self.copy()
         result = project.irun_cmd(*args, **kwargs)
@@ -336,6 +340,37 @@ class IsoError:
     orig_proof: str | None
     iso_index: int | None
     sigiled_iso_index: int | None
+
+
+@dataclass
+class ErrorMessageMixin:
+    error_line: str
+    error_start: int
+    error_end: int
+    error: str
+
+
+@dataclass
+class IsoErrorWithoutHints(ErrorMessageMixin, IsoError):
+    pass
+
+
+@dataclass
+class AmbiguousIsoError(ErrorMessageMixin, IsoError):
+    """IsoError when the line of the error message mismatches the line of the last labeled iso statement"""
+
+    labeled_iso_statement_orig_source: str
+    labeled_iso_statement_orig_target: str
+    labeled_iso_statement_orig_proof: str | None
+    labeled_iso_statement_iso_index: int | None
+    labeled_iso_statement_sigiled_iso_index: int | None
+    pre_error: str
+
+
+@dataclass
+class NonIsoBlockError(ErrorMessageMixin):
+    block_index: int
+    block: str
 
 
 @dataclass

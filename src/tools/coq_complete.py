@@ -1,11 +1,12 @@
+import asyncio
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+import inspect_ai.util
 from inspect_ai.tool import tool
 from inspect_ai.util import Store
-import inspect_ai.util
-import tempfile
-import subprocess
-import shutil
-import asyncio
-from pathlib import Path
 
 
 def store_result(result):

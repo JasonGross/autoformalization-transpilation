@@ -55,6 +55,7 @@ class Workflow:
 
 
 # NOTE: This is basically just a config - probably better placed in a yaml/json file
+# TODO: Refactor to translate chunks and prove isomorphisms for each chunk as we go
 SIMPLE_WORKFLOW = Workflow(
     system_prompt=MULTIPHASE_SYSTEM_MESSAGE,
     phases=[

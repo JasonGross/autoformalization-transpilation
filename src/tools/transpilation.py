@@ -1,5 +1,7 @@
+import datetime
 from enum import StrEnum
 from pathlib import Path
+import time
 from typing import Callable, Sequence, TypedDict
 
 import inspect_ai.util
@@ -15,23 +17,27 @@ from sympy.combinatorics.permutations import Permutation
 import isomorphism_prover
 from config import DEFINITION_PAIRS, EXPORT_DIR, SOURCE_DIR
 from isomorphism_prover import (
+    add_files_to_CoqProject,
     find_iso_index,
     generate_and_autorepair_isos,
     generate_and_prove_iso_interface,
     make_identifiers_str,
 )
 from project_util import (
+    AmbiguousIsoError,
     CoqFile,
     CoqIdentifier,
     CoqProject,
     DisorderedConstr,
     GenericIsoError,
     IsoError,
+    IsoErrorWithoutHints,
     LeanFile,
     LeanIdentifier,
     LeanProject,
     MissingImport,
     MissingTypeIso,
+    NonIsoBlockError,
     coq_identifiers_of_list,
     desigil,
     extract_coq_identifiers,
@@ -43,6 +49,7 @@ from translation_checker import (
     lean_to_coq,
 )
 from utils import logging
+from utils.inspect_utils import handle_none_string
 
 _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR = (
     Path(__file__).parent.parent.parent / "temp_transpilation_errors"
@@ -162,11 +169,25 @@ def generate_and_autorepair_isos_tool(
             write_to_directory_on_error=write_to_directory_on_error,
         )
     except (AssertionError, ValueError) as e:
-        raise ToolError(str(e)) from e
+        new_exn = ToolError(str(e))
+        # Remove the error message from the assertion error, we are already printing it
+        e.args = ()
+        raise new_exn from e
 
     set_coq_project(coq_project)
     if result["status"]:
         return ContentText(text="Success!")
+
+    if write_to_directory_on_error:
+        write_to_directory_on_error = Path(write_to_directory_on_error)
+        key = str(hash(coq_project))
+        (write_to_directory_on_error / key).mkdir(parents=True, exist_ok=True)
+        now = datetime.datetime.now()
+        iso_string = now.isoformat()
+        if len(list((write_to_directory_on_error / key).iterdir())) == 0:
+            coq_project.write(write_to_directory_on_error / key / iso_string)
+        else:
+            (write_to_directory_on_error / key / iso_string).touch()
 
     result["failure_phase"] = CompilationPhase.PROVING_ISOS
     error = result["error"]
@@ -194,7 +215,7 @@ right: {error.unknown_rhs}
             text=f"""Failed to prove isomorphism between {error.orig_source} and {error.orig_target}.
 {missing_iso_text}
 
-You might need to adjust the isomorphism proof of the isomorphism using the `edit_proof_tool` with the new proof.
+You might need to adjust the isomorphism proof of the isomorphism using the `edit_iso_proof_tool` with the new proof.
 {"Likely this is" if not missing_iso_text else "This may be"} because of a difference in the elaboration of Lean and Coq.
 For example, a standard library definition may be defined recursive on a different argument or calling a subdefinition with arguments in a different order, in which case you may need to rewrite with a commutativity lemma (e.g., using `iso. iso_rel_rewrite Nat.add_comm. iso.` or `iso. iso_rel_rewrite Nat.mul_comm. iso. iso_rel_rewrite Nat.add_comm. iso.`).
 Or elaboration may pick different associativity for an infix operation, in which case you may need to rewrite with an associativity lemma.
@@ -207,6 +228,44 @@ There remain {error.ngoals} goals unsolved:
 ```
 {error.goals}
 ```
+"""
+        )
+    elif isinstance(error, NonIsoBlockError):
+        return ContentText(
+            text=f"""Error occured while executing code:
+```coq
+{error.block}
+```
+Error occured on line: {error.error_line}
+Error occured on characters: {error.error_start} - {error.error_end}
+Error message: {error.error}
+
+You can remove this block by invoking `remove_lemma_tool({error.block!r})` or replace it with a new block by invoking `edit_lemma_tool({error.block!r}, *new_block_text*)`.
+"""
+        )
+    elif isinstance(error, IsoErrorWithoutHints) or isinstance(
+        error, AmbiguousIsoError
+    ):
+        if isinstance(error, AmbiguousIsoError):
+            logging.info(
+                f"Ambiguous iso error most likely due to lack of `iso.`: {error}"
+            )
+        current_proof_text = (
+            f"""with proof:
+```coq
+{error.orig_proof}
+```
+"""
+            if error.orig_proof
+            else "."
+        )
+        return ContentText(
+            text=f"""Failed to prove isomorphism between {error.orig_source} and {error.orig_target}{current_proof_text}
+Error message: {error.error}
+Error occured on line: {error.error_line}
+Error occured on characters: {error.error_start} - {error.error_end}
+
+You can adjust the isomorphism proof of the isomorphism using the `edit_iso_proof_tool` with the new proof.  Most likely, the new proof should begin with `iso.` followed by other tactics.
 """
         )
     else:
@@ -240,6 +299,107 @@ def add_import_tool(
         )
 
     return add_import
+
+
+@tool
+def remove_lemma_tool(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: (
+        Path | str | None
+    ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+) -> Tool:
+    async def remove_lemma(code_str: str) -> ToolResult:
+        """
+        Removes custom added code from the Coq isomorphism file.
+
+        Args:
+            code_str: The line of code to be removed. (str)
+        """
+        state: ProjectState = inspect_ai.util.store().get("translation_state")
+        if code_str not in state["cc_identifiers_blocks"]:
+            return ContentText(
+                text=f"Invalid code to remove: {code_str!r}\nValid codes to remove are: {'\n'.join(repr(v) for v in state['cc_identifiers_blocks'] if isinstance(v, str))}"
+            )
+        state["cc_identifiers_blocks"].remove(code_str)
+        return generate_and_autorepair_isos_tool(
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
+        )
+
+    return remove_lemma
+
+
+@tool
+def edit_lemma_tool(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: (
+        Path | str | None
+    ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    permit_substring: bool = True,
+    unique_substring_match: bool = True,
+) -> Tool:
+    async def edit_lemma(code_str: str, new_code_str: str) -> ToolResult:
+        """
+        Replaces a block of code from the Coq isomorphism file.  This tool does not replace isomoprhism proofs, only custom added code.
+
+        Args:
+            code_str: The line of code to be replaced. (str)
+            new_code_str: The new line of code to replace it with. (str)
+        """
+        state: ProjectState = inspect_ai.util.store().get("translation_state")
+        code_str = code_str.strip()
+        new_code_str = new_code_str.strip()
+        full_matches = [
+            i
+            for i, v in enumerate(state["cc_identifiers_blocks"])
+            if isinstance(v, str) and v.strip() == code_str
+        ]
+        substring_matches = [
+            i
+            for i, v in enumerate(state["cc_identifiers_blocks"])
+            if isinstance(v, str) and code_str in v
+        ]
+        indices = full_matches
+        if not indices:
+            if not substring_matches:
+                return ContentText(
+                    text=f"Invalid code to remove: {code_str!r}\nValid codes to remove are: {'\n'.join(repr(v) for v in state['cc_identifiers_blocks'] if isinstance(v, str))}"
+                )
+            elif not permit_substring:
+                return ContentText(
+                    text=f"Invalid code to remove (must be a full match, not a substring): {code_str!r}\nValid codes to remove are: {'\n'.join(repr(v) for v in state['cc_identifiers_blocks'] if isinstance(v, str))}"
+                )
+            elif len(substring_matches) > 1 and unique_substring_match:
+                return ContentText(
+                    text=f"Invalid code to remove (must be a unique substring match): {code_str!r} matches multiple blocks: {', '.join(repr(state['cc_identifiers_blocks'][i]) for i in substring_matches)}"
+                )
+            else:
+                indices = substring_matches
+        for index in indices:
+            block = state["cc_identifiers_blocks"][index]
+            assert isinstance(block, str)
+            if block.strip() == code_str:
+                state["cc_identifiers_blocks"][index] = new_code_str
+            else:
+                state["cc_identifiers_blocks"][index] = block.replace(
+                    code_str, new_code_str
+                )
+        return generate_and_autorepair_isos_tool(
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
+        )
+
+    return edit_lemma
 
 
 @tool
@@ -292,7 +452,7 @@ def handle_value_error(
         )
         if s is not None
     ]
-    if iso_target is not None:
+    if iso_target is None:
         valid_identifiers = ", ".join(v for v, _ in cc_ids_str)
         return ContentText(
             text=f"Failed to find identifier {iso_source} in the isomorphism list; valid identifiers are: {valid_identifiers}"
@@ -325,6 +485,7 @@ def add_lemma_tool(
             before_source: The source identifier before which the lemma should be added. (str)
             before_target: The target identifier before which the lemma should be added. Optional. (str|None)
         """
+        before_target = handle_none_string(before_target)
         state: ProjectState = inspect_ai.util.store().get("translation_state")
         try:
             index = find_iso_index(
@@ -428,6 +589,7 @@ def remove_iso_tool(
             source: The source identifier for the isomorphism. (str)
             target: The target identifier for the isomorphism. (str | None)
         """
+        target = handle_none_string(target)
         state: ProjectState = inspect_ai.util.store().get("translation_state")
 
         try:
@@ -465,7 +627,7 @@ def remove_iso_tool(
     return remove_iso
 
 
-async def edit_proof_higher_order(
+async def edit_iso_proof_higher_order(
     iso_source: str,
     new_proof: Callable[[tuple[CoqIdentifier, CoqIdentifier, str | None]], str],
     iso_target: str | None = None,
@@ -477,14 +639,6 @@ async def edit_proof_higher_order(
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> ToolResult:
-    """
-    Reorders the constructors of an isomorphism proof based on a given permutation.
-
-    Args:
-        iso_source: The source identifier for the isomorphism block to be reordered. (str)
-        new_proof: The new proof for the isomorphism block, taking in the old source, target, and proof and returning the new proof. (Callable)
-        iso_target: The target identifier for the isomorphism block to be reordered. Optional. (str|None)
-    """
     state = inspect_ai.util.store().get("translation_state")
     try:
         index = find_iso_index(
@@ -537,7 +691,7 @@ async def edit_proof_higher_order(
 
 
 @tool
-def edit_proof_tool(
+def edit_iso_proof_tool(
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
@@ -546,18 +700,19 @@ def edit_proof_tool(
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
-    async def edit_proof(
+    async def edit_iso_proof(
         iso_source: str, new_proof: str, iso_target: str | None = None
     ) -> ToolResult:
         """
-        Reorders the constructors of an isomorphism proof based on a given permutation.
+        Edits the proof of an isomorphism block.
 
         Args:
-            iso_source: The source identifier for the isomorphism block to be reordered. (str)
+            iso_source: The source identifier for the isomorphism block to be edited. (str)
             new_proof: The new proof for the isomorphism block.  This is likely to be something like 'iso. iso_rel_rewrite {lemma here}. iso.' (str)
-            iso_target: The target identifier for the isomorphism block to be reordered. Optional. (str|None)
+            iso_target: The target identifier for the isomorphism block to be edited. Optional. (str|None)
         """
-        return await edit_proof_higher_order(
+        iso_target = handle_none_string(iso_target)
+        return await edit_iso_proof_higher_order(
             iso_source,
             lambda block: new_proof,
             iso_target=iso_target,
@@ -567,7 +722,7 @@ def edit_proof_tool(
             write_to_directory_on_error=write_to_directory_on_error,
         )
 
-    return edit_proof
+    return edit_iso_proof
 
 
 @tool
@@ -613,7 +768,7 @@ def repair_iso_by_reorder_constructors_tool(
 {{ start_iso_proof; step_iso_proof_full. }}
 {{ symmetrize_rel_iso; start_iso_proof; step_iso_proof_full. }}"""
 
-        return await edit_proof_higher_order(
+        return await edit_iso_proof_higher_order(
             source,
             new_proof,
             original_name=original_name,
@@ -623,6 +778,7 @@ def repair_iso_by_reorder_constructors_tool(
         )
 
     return repair_iso_by_reorder_constructors
+
 
 def make_submit_translation_tool(
     coq_statements: str | None = None,
@@ -644,6 +800,9 @@ def make_submit_translation_tool(
     init_coq_project = isomorphism_prover.init_coq_project(iso_checker_path)
     if coq_statements_file is not None:
         init_coq_project[f"{original_name}.v"] = coq_statements_file
+        init_coq_project = add_files_to_CoqProject(
+            init_coq_project, f"{original_name}.v"
+        )
     if init_coq_targets is not None:
         if isinstance(init_coq_targets, str):
             init_coq_targets = [init_coq_targets]
@@ -662,18 +821,22 @@ def make_submit_translation_tool(
         coq_identifiers = coq_identifiers_of_list(coq_names, sigil=False)
         assert coq_identifiers, f"No Coq identifiers found in {coq_names}"
 
-    init_coq_project, interface_success, error, coq_identifiers, _coq_identifiers_to_unfold = (
-        generate_and_prove_iso_interface(
-            init_coq_project, list(map(sigil, coq_identifiers))
-        )
+    (
+        init_coq_project,
+        interface_success,
+        error,
+        coq_identifiers,
+        _coq_identifiers_to_unfold,
+    ) = generate_and_prove_iso_interface(
+        init_coq_project, list(map(sigil, coq_identifiers))
     )
     assert interface_success, f"Failed to generate and prove interface:\n{error}"
 
-
     @tool
     def submit_translation_tool() -> Tool:
-
-        async def submit_translation(lean_code: str, coq_lean_identifiers: dict[str, str]):
+        async def submit_translation(
+            lean_code: str, coq_lean_identifiers: dict[str, str]
+        ):
             """
             Submits the given Lean 4 code as the result of translation, with paired identifiers between the Coq and Lean code.
 
@@ -721,7 +884,7 @@ def make_submit_translation_tool(
                 result["suggestion"] = "Lean code failed to compile."
                 result["failure_phase"] = CompilationPhase.LEAN_COMPILATION
                 return ContentText(
-                text=f"""Lean code failed to compile:
+                    text=f"""Lean code failed to compile:
 {result["stderr"]}"""
                 )
 
@@ -784,6 +947,7 @@ def make_submit_translation_tool(
             )
 
         return submit_translation
+
     return submit_translation_tool, [str(desigil(i)) for i in coq_identifiers]
 
 

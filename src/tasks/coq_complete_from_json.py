@@ -1,9 +1,9 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from inspect_ai import Task, eval, task
-from inspect_ai.solver import generate, system_message, use_tools
 from inspect_ai.dataset import MemoryDataset, Sample
+from inspect_ai.solver import generate, system_message, use_tools
 
 from models import AnthropicModel, OpenAIModel
 from prompts.completion import ALTERNATE_SYSTEM_MESSAGE
