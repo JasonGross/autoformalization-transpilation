@@ -27,10 +27,8 @@ def with_time(description=None, quiet: bool = False):
             logger.info(f"Elapsed time: {elapsed_time:.2f} seconds")
 
 
-def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
-    files = tuple(Path(f) for f in files)
-    output_dir = Path(output_dir)
-
+def check_file_validity(*files: Path):
+    """Check that files are valid (_CoqProject or .v files, no Everything.v)."""
     # Check file names
     for file in files:
         if not (file.name == "_CoqProject" or file.suffix == ".v"):
@@ -41,15 +39,18 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
         if file.name == "Everything.v":
             raise ValueError("File Everything.v is not allowed.")
 
-    # Parse _CoqProject
-    coqproject_file = next((f for f in files if f.name == "_CoqProject"), None)
-    if not coqproject_file:
+    # Ensure _CoqProject exists
+    if not any(f.name == "_CoqProject" for f in files):
         raise ValueError("_CoqProject file is required.")
 
-    with coqproject_file.open() as f:
-        lines = f.readlines()
 
-    lib_name = None
+def parse_coqproject(*files: Path):
+    """Parse _CoqProject file to extract library bindings."""
+    coqproject_file = next((f for f in files if f.name == "_CoqProject"), None)
+    assert coqproject_file is not None, "_CoqProject file is required."
+
+    lines = coqproject_file.read_text().splitlines()
+
     bindings = {}
     for line in lines:
         if line.startswith("-Q ") or line.startswith("-R "):
@@ -63,14 +64,16 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
         raise ValueError("Multiple -Q or -R directives are not yet supported.")
 
     lib_name = list(bindings.values())[0]
+    return bindings, lib_name, coqproject_file.parent
 
-    # Find shared parent directory
-    shared_parent = coqproject_file.parent  # Path(os.path.commonpath(files))
 
+def copy_files_to_output(
+    files: tuple[Path, ...], shared_parent: Path, output_dir: Path, bindings: dict
+):
+    """Copy files to output directory and categorize them."""
     known_files = {k: [] for k in set(bindings.values())}
     unknown_files = []
 
-    # Copy files to output directory maintaining structure
     for file in files:
         relative_path = file.relative_to(shared_parent)
         destination = output_dir / relative_path
@@ -84,24 +87,40 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
         else:
             unknown_files.append(relative_path)
 
-    # Create Everything.v
-    everything_v_path = output_dir / "Everything.v"
-    with everything_v_path.open("w") as f:
-        for file in unknown_files:
-            if file.suffix == ".v":
-                module_name = str(
-                    file.relative_to(shared_parent).with_suffix("")
-                ).replace("/", ".")
-                f.write(f"Require {module_name}.\n")
-        for libname, libfiles in known_files.items():
-            for file in libfiles:
-                if file.suffix == ".v":
-                    module_name = str(file.with_suffix("")).replace("/", ".")
-                    if libname:
-                        module_name = f"{libname}.{module_name}"
-                    f.write(f"Require {module_name}.\n")
+    return known_files, unknown_files
 
-    # Run coq_makefile
+
+def create_everything_contents(
+    unknown_files: list[Path], known_files: dict, shared_parent: Path
+):
+    """Create the contents for Everything.v file."""
+    contents = []
+    for file in unknown_files:
+        if file.suffix == ".v":
+            module_name = str(file.relative_to(shared_parent).with_suffix("")).replace(
+                "/", "."
+            )
+            contents.append(f"Require {module_name}.\n")
+    for libname, libfiles in known_files.items():
+        for file in libfiles:
+            if file.suffix == ".v":
+                module_name = str(file.with_suffix("")).replace("/", ".")
+                if libname:
+                    module_name = f"{libname}.{module_name}"
+                contents.append(f"Require {module_name}.\n")
+
+    return "".join(contents)
+
+
+def create_everything_file(output_dir: Path, contents: str):
+    """Create the Everything.v file."""
+    everything_v_path = output_dir / "Everything.v"
+    everything_v_path.write_text(contents)
+    return everything_v_path
+
+
+def create_makefile(output_dir: Path, files: tuple[Path, ...], shared_parent: Path):
+    """Create Makefile using coq_makefile."""
     v_files = [str(f.relative_to(shared_parent)) for f in files if f.suffix == ".v"] + [
         "Everything.v"
     ]
@@ -111,6 +130,9 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
         check=True,
     )
 
+
+def update_gitignore(output_dir: Path, lib_name: str):
+    """Update .gitignore file."""
     (output_dir / ".gitignore").write_text(
         f"""*
 !Everything{lib_name}*.v
@@ -118,7 +140,9 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
 """
     )
 
-    # Run make
+
+def run_make(output_dir: Path, quiet: bool):
+    """Run make in the output directory."""
     with with_time("make", quiet=quiet):
         subprocess.run(
             ["make"],
@@ -127,6 +151,9 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
             stdout=subprocess.DEVNULL if quiet else None,
         )
 
+
+def inline_imports_with_comments(output_dir: Path, lib_name: str, quiet: bool):
+    """Inline imports with comments preserved."""
     with with_time("inlining imports", quiet=quiet):
         subprocess.run(
             [
@@ -140,6 +167,10 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
             check=True,
             stdout=subprocess.DEVNULL if quiet else None,
         )
+
+
+def build_single_file(output_dir: Path, lib_name: str, quiet: bool):
+    """Build the single file version."""
     with with_time("single file build", quiet=quiet):
         subprocess.run(
             ["coqc", "-q", f"Everything{lib_name}WithComments.v"],
@@ -149,6 +180,9 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
             stderr=subprocess.DEVNULL if quiet else None,
         )
 
+
+def inline_imports_admitted(output_dir: Path, lib_name: str, quiet: bool):
+    """Inline imports with admitted proofs."""
     with with_time("inlining imports more robust admitted", quiet=quiet):
         subprocess.run(
             [
@@ -162,9 +196,12 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
             ],
             cwd=output_dir,
             check=True,
-            stdout=subprocess.DEVNULL if quiet else None
+            stdout=subprocess.DEVNULL if quiet else None,
         )
 
+
+def inline_imports_robust(output_dir: Path, lib_name: str, quiet: bool):
+    """Inline imports with robust handling."""
     with with_time("inlining imports more robust", quiet=quiet):
         subprocess.run(
             [
@@ -177,8 +214,37 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
             ],
             cwd=output_dir,
             check=True,
-            stdout=subprocess.DEVNULL if quiet else None
+            stdout=subprocess.DEVNULL if quiet else None,
         )
+
+
+def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
+    files = tuple(Path(f) for f in files)
+    output_dir = Path(output_dir)
+
+    check_file_validity(*files)
+
+    # Parse _CoqProject
+    bindings, lib_name, shared_parent = parse_coqproject(*files)
+
+    # Copy files to output directory
+    known_files, unknown_files = copy_files_to_output(
+        files, shared_parent, output_dir, bindings
+    )
+
+    everything_contents = create_everything_contents(
+        unknown_files, known_files, shared_parent
+    )
+    create_everything_file(output_dir, everything_contents)
+    create_makefile(output_dir, files, shared_parent)
+    update_gitignore(output_dir, lib_name)
+
+    run_make(output_dir, quiet)
+
+    inline_imports_with_comments(output_dir, lib_name, quiet)
+    build_single_file(output_dir, lib_name, quiet)
+    inline_imports_admitted(output_dir, lib_name, quiet)
+    inline_imports_robust(output_dir, lib_name, quiet)
 
 
 def main(argv: Sequence[str] | None = None):
