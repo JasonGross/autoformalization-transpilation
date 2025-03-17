@@ -1,131 +1,133 @@
 import re
+from typing import List, Dict
 
-blockStarters = [
-    "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive", "Corollary",
-    "Proposition", "Example", "Record", "CoFixpoint", "Fact", "Module",
-    "Section", "Variable", "Hypothesis", "Axiom", "Parameter", "Goal",
-    "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import",
-    "Export", "From", "Check", "Hint", "Create", "End"
-]
 
-proofEndings = ["Qed.", "Defined.", "Admitted.", "Abort."]
+class CoqBlockParser:
+    """
+    A parser class to encapsulate the logic for splitting and classifying
+    Coq text blocks.
+    """
 
-def isBlockStarter(line: str) -> bool:
-    strippedLine = line.lstrip()
-    for starter in blockStarters:
-        pattern = r"^" + re.escape(starter) + r"(\b|\s|\()"
-        if re.match(pattern, strippedLine):
-            return True
-    return False
+    # Added "Compute" to the list of known Coq starters
+    blockStarters = [
+        "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive",
+        "Corollary", "Proposition", "Example", "Record", "CoFixpoint",
+        "Fact", "Module", "Section", "Variable", "Hypothesis", "Axiom",
+        "Parameter", "Goal", "Remark", "Notation", "Ltac", "Set", "Unset",
+        "Require", "Import", "Export", "From", "Check", "Hint", "Create",
+        "End", "Compute"
+    ]
 
-def formatCoqFile(inputPath: str, outputPath: str) -> None:
-    with open(inputPath, 'r', encoding='utf-8') as file:
-        content = file.read()
+    proofEndings = ["Qed.", "Defined.", "Admitted.", "Abort."]
 
-    commentPattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
-    content = re.sub(commentPattern, '', content)
+    @staticmethod
+    def is_block_starter(line: str) -> bool:
+        """
+        Return True if the given line starts with a known Coq block keyword.
+        """
+        stripped_line = line.lstrip()
+        for starter in CoqBlockParser.blockStarters:
+            pattern = r"^" + re.escape(starter) + r"(\b|\s|\()"
+            if re.match(pattern, stripped_line):
+                return True
+        return False
 
-    lines = content.split('\n')
-    lines = [line.rstrip() for line in lines]
+    @staticmethod
+    def classify_block(block_text: str) -> str:
+        """
+        Return a coarse classification of a block based on its first line.
+        Uses a dictionary-based approach for clarity.
+        """
+        block_type_map = {
+            "Set": "global_directive",
+            "Unset": "global_directive",
+            "Require": "Import",
+            "Import": "Import",
+            "Export": "Import",
+            "From": "Import",
+            "Fixpoint": "Fixpoint",
+            "Definition": "Definition",
+            "Lemma": "Lemma",
+            "Theorem": "Theorem",
+            "Ltac": "Ltac",
+            "Inductive": "Inductive",
+            "Check": "Check",
+            "Hint": "Hint",
+            "Example": "Example",
+            "Module": "Module",
+            "Section": "Section",
+            "End": "End",
+            "Compute": "Compute",
+            "Notation": "Notation",
+            "Intros": "Intros"
+        }
 
-    preprocessedBlocks = []
-    currentBlock = []
-    collectingProof = False
+        lines = block_text.strip().split('\n')
+        if not lines:
+            return "Misc"
 
-    def flushBlock() -> None:
-        nonlocal currentBlock
-        if not currentBlock:
-            return
+        first_line = lines[0].strip()
 
-        while currentBlock and not currentBlock[0].strip():
-            currentBlock.pop(0)
-        while currentBlock and not currentBlock[-1].strip():
-            currentBlock.pop()
+        # Check dictionary-based approach: see if the block starts
+        # with a recognized keyword.
+        for key, value in block_type_map.items():
+            if first_line.startswith(key):
+                return value
 
-        if currentBlock:
-            blockText = "\n".join(currentBlock)
-            preprocessedBlocks.append(blockText)
-        currentBlock = []
+        return "Misc"
 
-    for line in lines:
-        strippedLine = line.strip()
+    @staticmethod
+    def get_coq_blocks(file_content: str) -> List[Dict[str, str]]:
+        """
+        Remove (* ... *) comments, split into logical blocks, and classify each
+        block. Return a list of dicts like [{"type": ..., "raw": ...}, ...].
+        """
+        comment_pattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
+        content_no_comments = re.sub(comment_pattern, '', file_content)
 
-        if collectingProof:
-            currentBlock.append(line)
-            if strippedLine in proofEndings:
-                flushBlock()
-                collectingProof = False
-        else:
-            if isBlockStarter(line):
-                flushBlock()
-                currentBlock.append(line)
-            elif strippedLine == "Proof.":
-                currentBlock.append(line)
-                collectingProof = True
-            elif strippedLine:
-                currentBlock.append(line)
+        lines = [line.rstrip() for line in content_no_comments.split('\n')]
+
+        blocks = []
+        current_block = []
+        collecting_proof = False
+
+        def flush_block() -> None:
+            """
+            Finalize the current block, classify it, and add it to blocks
+            if non-empty.
+            """
+            nonlocal current_block
+            # Trim empty lines from start/end
+            while current_block and not current_block[0].strip():
+                current_block.pop(0)
+            while current_block and not current_block[-1].strip():
+                current_block.pop()
+
+            if current_block:
+                block_text = "\n".join(current_block)
+                block_type = CoqBlockParser.classify_block(block_text)
+                blocks.append({
+                    "type": block_type,
+                    "raw": block_text.strip()
+                })
+            current_block = []
+
+        for line in lines:
+            stripped_line = line.strip()
+            if collecting_proof:
+                current_block.append(line)
+                if stripped_line in CoqBlockParser.proofEndings:
+                    flush_block()
+                    collecting_proof = False
             else:
-                if currentBlock:
-                    currentBlock.append(line)
+                if CoqBlockParser.is_block_starter(line):
+                    flush_block()
+                    current_block.append(line)
+                elif stripped_line == "Proof.":
+                    current_block.append(line)
+                    collecting_proof = True
+                else:
+                    current_block.append(line)
 
-    flushBlock()
-
-    finalContent = "\n\n".join(preprocessedBlocks) + "\n"
-
-    with open(outputPath, 'w', encoding='utf-8') as file:
-        file.write(finalContent)
-
-def classifyBlock(blockText: str) -> str:
-    lines = blockText.strip().split('\n')
-    if not lines:
-        return "misc"
-    firstLine = lines[0].strip()
-    if firstLine.startswith("Set") or firstLine.startswith("Unset"):
-        return "global_directive"
-    if firstLine.startswith("Require"):
-        return "require"
-    if firstLine.startswith("Fixpoint"):
-        return "fixpoint"
-    if firstLine.startswith("Lemma"):
-        return "lemma"
-    if firstLine.startswith("Theorem"):
-        return "theorem"
-    if firstLine.startswith("Definition"):
-        return "definition"
-    if firstLine.startswith("Ltac"):
-        return "ltac"
-    if firstLine.startswith("Inductive"):
-        return "inductive"
-    if firstLine.startswith("Check"):
-        return "check"
-    if firstLine.startswith("Hint"):
-        return "hint"
-    if firstLine.startswith("Create HintDb"):
-        return "create_hint_db"
-    if firstLine.startswith("Import") or firstLine.startswith("Export") or firstLine.startswith("From"):
-        return "import"
-    if firstLine.startswith("Example"):
-        return "example"
-    if firstLine.startswith("Module"):
-        return "module"
-    if firstLine.startswith("Section"):
-        return "section"
-    if firstLine.startswith("End"):
-        return "end"
-    return "misc"
-
-def extractBlocksFromPreprocessed(fileContent: str) -> list[dict[str, str]]:
-    rawBlocks = fileContent.strip().split("\n\n")
-    items = []
-    for blockText in rawBlocks:
-        blockType = classifyBlock(blockText)
-        items.append({
-            "type": blockType,
-            "raw": blockText.strip()
-        })
-    return items
-
-
-
-## "idtac" might not be handled correctly
-## Require better logic for module/section End statements
+        flush_block()
+        return blocks
