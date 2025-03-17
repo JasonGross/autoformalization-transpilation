@@ -3,7 +3,7 @@ import pandas as pd
 import networkx as nx
 from typing import Dict, List, Tuple, Optional
 
-from helpers import CoqBlockParser
+from .helpers import CoqBlockParser
 
 
 class DependencyGraphBuilder:
@@ -35,9 +35,7 @@ class DependencyGraphBuilder:
                     }
                 elif line.startswith("E:"):
                     parts = line.split()
-                    source: str = parts[1]
-                    target: str = parts[2]
-                    self.edges.append((source, target))
+                    self.edges.append((parts[1], parts[2]))
 
     def create_graph(self) -> nx.DiGraph:
         """
@@ -99,8 +97,10 @@ class CoqDataProcessor:
         dp_builder.parse_dpd_file()
         graph = dp_builder.create_graph()
 
+        # Add a 'Label' column from the second token of the chunk's first line
         df["Label"] = df["Chunk"].apply(self.get_label)
 
+        # Create a simple DataFrame from the graph data for merging
         graph_data = []
         for node, attributes in graph.nodes(data=True):
             graph_data.append({
@@ -109,6 +109,7 @@ class CoqDataProcessor:
             })
         df_graph = pd.DataFrame(graph_data)
 
+        # Merge on Label <--> GraphLabel
         merged_df = df.merge(
             df_graph,
             left_on="Label",
@@ -116,6 +117,7 @@ class CoqDataProcessor:
             how="left"
         )
 
+        # For each row, gather the labels of its successors
         def get_dependencies_labels(node_id: str) -> Optional[List[str]]:
             if pd.isna(node_id):
                 return None
@@ -124,13 +126,13 @@ class CoqDataProcessor:
                 return None
             return [graph.nodes[s]["label"] for s in successors]
 
-        merged_df["Dependencies"] = merged_df["GraphNodeId"].apply(
-            get_dependencies_labels
-        )
+        merged_df["Dependencies"] = merged_df["GraphNodeId"].apply(get_dependencies_labels)
 
+        # Drop helper columns
         columns_to_drop = ["Label", "GraphNodeId", "GraphLabel"]
         merged_df.drop(columns=columns_to_drop, inplace=True)
 
+        # Save to JSON
         merged_df.to_json(
             self.out_file,
             orient="records",
@@ -140,18 +142,21 @@ class CoqDataProcessor:
         print(f"Done. Final JSON saved to: {self.out_file}")
 
 
-def main() -> None:
-    """
-    Instantiate the processor and run the pipeline.
-    """
-    script_dir = Path(__file__).parent.resolve()
-    coq_file = script_dir / "single_file_data" / "lf" / "EverythingLF.v"
-    dpd_file = script_dir.parent / "dependency_graph" / "EverythingLF.dpd"
-    out_file = script_dir / "processed_data" / "df.json"
+# def main() -> None:
+#     """
+#     Instantiate the processor and run the pipeline.
+#     You can choose to parse command-line arguments here
+#     or rely on default paths for demonstration.
+#     """
+#     # Example of using default paths (original logic):
+#     script_dir = Path(__file__).parent.resolve()
+#     coq_file = script_dir / "single_file_data" / "lf" / "EverythingLF.v"
+#     dpd_file = script_dir.parent / "dependency_graph" / "EverythingLF.dpd"
+#     out_file = script_dir / "processed_data" / "df.json"
 
-    processor = CoqDataProcessor(coq_file, dpd_file, out_file)
-    processor.process()
+#     processor = CoqDataProcessor(coq_file, dpd_file, out_file)
+#     processor.process()
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

@@ -8,12 +8,14 @@ class CoqBlockParser:
     Coq text blocks.
     """
 
+    # Added "Compute" to the list of known Coq starters
     blockStarters = [
-        "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive", "Corollary",
-        "Proposition", "Example", "Record", "CoFixpoint", "Fact", "Module",
-        "Section", "Variable", "Hypothesis", "Axiom", "Parameter", "Goal",
-        "Remark", "Notation", "Ltac", "Set", "Unset", "Require", "Import",
-        "Export", "From", "Check", "Hint", "Create", "End"
+        "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive",
+        "Corollary", "Proposition", "Example", "Record", "CoFixpoint",
+        "Fact", "Module", "Section", "Variable", "Hypothesis", "Axiom",
+        "Parameter", "Goal", "Remark", "Notation", "Ltac", "Set", "Unset",
+        "Require", "Import", "Export", "From", "Check", "Hint", "Create",
+        "End", "Compute"
     ]
 
     proofEndings = ["Qed.", "Defined.", "Admitted.", "Abort."]
@@ -34,55 +36,43 @@ class CoqBlockParser:
     def classify_block(block_text: str) -> str:
         """
         Return a coarse classification of a block based on its first line.
+        Uses a dictionary-based approach for clarity.
         """
+        block_type_map = {
+            "Set": "global_directive",
+            "Unset": "global_directive",
+            "Require": "Import",
+            "Import": "Import",
+            "Export": "Import",
+            "From": "Import",
+            "Fixpoint": "Fixpoint",
+            "Definition": "Definition",
+            "Lemma": "Lemma",
+            "Theorem": "Theorem",
+            "Ltac": "Ltac",
+            "Inductive": "Inductive",
+            "Check": "Check",
+            "Hint": "Hint",
+            "Example": "Example",
+            "Module": "Module",
+            "Section": "Section",
+            "End": "End",
+            "Compute": "Compute",
+            "Notation": "Notation",
+            "Intros": "Intros"
+        }
+
         lines = block_text.strip().split('\n')
         if not lines:
             return "Misc"
 
         first_line = lines[0].strip()
 
-        if first_line.startswith("Set") or first_line.startswith("Unset"):
-            return "global_directive"
-        if first_line.startswith("Require"):
-            return "Import"
-        if first_line.startswith("Fixpoint"):
-            return "Fixpoint"
-        if first_line.startswith("Lemma"):
-            return "Lemma"
-        if first_line.startswith("Theorem"):
-            return "Theorem"
-        if first_line.startswith("Definition"):
-            return "Definition"
-        if first_line.startswith("Ltac"):
-            return "Ltac"
-        if first_line.startswith("Inductive"):
-            return "Inductive"
-        if first_line.startswith("Check"):
-            return "Dheck"
-        if first_line.startswith("Hint"):
-            return "Hint"
-        if first_line.startswith("Create HintDb"):
-            return "Create_hint_db"
-        if (
-            first_line.startswith("Import")
-            or first_line.startswith("Export")
-            or first_line.startswith("From")
-        ):
-            return "Import"
-        if first_line.startswith("Example"):
-            return "Example"
-        if first_line.startswith("Module"):
-            return "Module"
-        if first_line.startswith("Section"):
-            return "Section"
-        if first_line.startswith("End"):
-            return "End"
-        if first_line.startswith("Compute"):
-            return "Compute"
-        if first_line.startswith("Notation"):
-            return "Notation"
-        if first_line.startswith("Intros"):
-            return "Intros"
+        # Check dictionary-based approach: see if the block starts
+        # with a recognized keyword.
+        for key, value in block_type_map.items():
+            if first_line.startswith(key):
+                return value
 
         return "Misc"
 
@@ -103,10 +93,11 @@ class CoqBlockParser:
 
         def flush_block() -> None:
             """
-            Finalize the current block, classify it, and add it to blocks if
-            non-empty.
+            Finalize the current block, classify it, and add it to blocks
+            if non-empty.
             """
             nonlocal current_block
+            # Trim empty lines from start/end
             while current_block and not current_block[0].strip():
                 current_block.pop(0)
             while current_block and not current_block[-1].strip():
