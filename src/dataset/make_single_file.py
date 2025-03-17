@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 import argparse
 import pathlib
+from pathlib import Path
 import shutil
 import subprocess
 import os
 import time
 from contextlib import contextmanager
 import logging
+from typing import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +28,9 @@ def with_time(description=None):
         logger.info(f"Elapsed time: {elapsed_time:.2f} seconds")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Process Coq files and generate a Makefile."
-    )
-    parser.add_argument("files", nargs="+", help="List of files to process")
-    parser.add_argument("-o", "--output_dir", required=True, help="Output directory")
-    args = parser.parse_args()
-
-    files = [pathlib.Path(f) for f in args.files]
-    output_dir = pathlib.Path(args.output_dir)
+def process(*files: Path | str, output_dir: Path | str):
+    files = tuple(Path(f) for f in files)
+    output_dir = Path(output_dir)
 
     # Check file names
     for file in files:
@@ -175,6 +170,17 @@ def main():
             cwd=output_dir,
             check=True,
         )
+
+
+def main(argv: Sequence[str] | None = None):
+    parser = argparse.ArgumentParser(
+        description="Process Coq files and generate a Makefile."
+    )
+    parser.add_argument("files", nargs="+", help="List of files to process")
+    parser.add_argument("-o", "--output_dir", required=True, help="Output directory")
+    args = parser.parse_args(argv)
+
+    return process(*args.files, output_dir=args.output_dir)
 
 
 if __name__ == "__main__":
