@@ -12,21 +12,22 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def with_time(description=None):
+def with_time(description=None, quiet: bool = False):
     start_time = time.time()
     try:
-        if description:
+        if description and not quiet:
             logger.info(f"Starting: {description}")
         yield
     finally:
         end_time = time.time()
         elapsed_time = end_time - start_time
-        if description:
+        if description and not quiet:
             logger.info(f"Finished: {description}")
-        logger.info(f"Elapsed time: {elapsed_time:.2f} seconds")
+        if not quiet:
+            logger.info(f"Elapsed time: {elapsed_time:.2f} seconds")
 
 
-def process(*files: Path | str, output_dir: Path | str):
+def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
     files = tuple(Path(f) for f in files)
     output_dir = Path(output_dir)
 
@@ -118,10 +119,15 @@ def process(*files: Path | str, output_dir: Path | str):
     )
 
     # Run make
-    with with_time("make"):
-        subprocess.run(["make"], cwd=output_dir, check=True)
+    with with_time("make", quiet=quiet):
+        subprocess.run(
+            ["make"],
+            cwd=output_dir,
+            check=True,
+            stdout=subprocess.DEVNULL if quiet else None,
+        )
 
-    with with_time("inlining imports"):
+    with with_time("inlining imports", quiet=quiet):
         subprocess.run(
             [
                 "coq-import-inliner",
@@ -132,15 +138,18 @@ def process(*files: Path | str, output_dir: Path | str):
             ],
             cwd=output_dir,
             check=True,
+            stdout=subprocess.DEVNULL if quiet else None,
         )
-    with with_time("single file build"):
+    with with_time("single file build", quiet=quiet):
         subprocess.run(
             ["coqc", "-q", f"Everything{lib_name}WithComments.v"],
             cwd=output_dir,
             check=False,
+            stdout=subprocess.DEVNULL if quiet else None,
+            stderr=subprocess.DEVNULL if quiet else None,
         )
 
-    with with_time("inlining imports more robust admitted"):
+    with with_time("inlining imports more robust admitted", quiet=quiet):
         subprocess.run(
             [
                 "coq-bug-minimizer",
@@ -153,9 +162,10 @@ def process(*files: Path | str, output_dir: Path | str):
             ],
             cwd=output_dir,
             check=True,
+            stdout=subprocess.DEVNULL if quiet else None
         )
 
-    with with_time("inlining imports more robust"):
+    with with_time("inlining imports more robust", quiet=quiet):
         subprocess.run(
             [
                 "coq-bug-minimizer",
@@ -167,6 +177,7 @@ def process(*files: Path | str, output_dir: Path | str):
             ],
             cwd=output_dir,
             check=True,
+            stdout=subprocess.DEVNULL if quiet else None
         )
 
 
@@ -176,9 +187,16 @@ def main(argv: Sequence[str] | None = None):
     )
     parser.add_argument("files", nargs="+", help="List of files to process")
     parser.add_argument("-o", "--output_dir", required=True, help="Output directory")
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="Suppress timing information and stdout",
+    )
     args = parser.parse_args(argv)
 
-    return process(*args.files, output_dir=args.output_dir)
+    return process(*args.files, output_dir=args.output_dir, quiet=args.quiet)
 
 
 if __name__ == "__main__":
