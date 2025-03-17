@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 import argparse
-import pathlib
 from pathlib import Path
 import shutil
 import subprocess
-import os
 import time
 from contextlib import contextmanager
 import logging
@@ -66,7 +64,7 @@ def process(*files: Path | str, output_dir: Path | str):
     lib_name = list(bindings.values())[0]
 
     # Find shared parent directory
-    shared_parent = coqproject_file.parent  # pathlib.Path(os.path.commonpath(files))
+    shared_parent = coqproject_file.parent  # Path(os.path.commonpath(files))
 
     known_files = {k: [] for k in set(bindings.values())}
     unknown_files = []
@@ -78,7 +76,7 @@ def process(*files: Path | str, output_dir: Path | str):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(file, destination)
         for dirname, libname in bindings.items():
-            dirname = pathlib.Path(dirname)
+            dirname = Path(dirname)
             if relative_path.is_relative_to(dirname):
                 known_files[libname].append(relative_path.relative_to(dirname))
                 break
