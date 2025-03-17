@@ -3,7 +3,7 @@ import pandas as pd
 import networkx as nx
 from typing import Dict, List, Tuple, Optional
 
-from .helpers import CoqBlockParser
+from src.dataset.helpers import CoqBlockParser
 
 
 class DependencyGraphBuilder:
@@ -142,21 +142,21 @@ class CoqDataProcessor:
         print(f"Done. Final JSON saved to: {self.out_file}")
 
 
-# def main() -> None:
-#     """
-#     Instantiate the processor and run the pipeline.
-#     You can choose to parse command-line arguments here
-#     or rely on default paths for demonstration.
-#     """
-#     # Example of using default paths (original logic):
-#     script_dir = Path(__file__).parent.resolve()
-#     coq_file = script_dir / "single_file_data" / "lf" / "EverythingLF.v"
-#     dpd_file = script_dir.parent / "dependency_graph" / "EverythingLF.dpd"
-#     out_file = script_dir / "processed_data" / "df.json"
+def main() -> None:
+    """
+    Instantiate the processor and run the pipeline.
+    You can choose to parse command-line arguments here
+    or rely on default paths for demonstration.
+    """
 
-#     processor = CoqDataProcessor(coq_file, dpd_file, out_file)
-#     processor.process()
+    script_dir = Path(__file__).parent.resolve()
+    coq_file = script_dir / "single_file_data" / "lf" / "EverythingLF.v"
+    dpd_file = script_dir.parent / "dependency_graph" / "EverythingLF.dpd"
+    out_file = script_dir / "processed_data" / "df.json"
+
+    processor = CoqDataProcessor(coq_file, dpd_file, out_file)
+    processor.process()
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
