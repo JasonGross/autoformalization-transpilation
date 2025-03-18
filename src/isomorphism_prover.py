@@ -1448,16 +1448,15 @@ def generate_and_autorepair_isos(
             # we can remove this failing iso if it's actually an iso and the block is a string or is not sigiled (original)
             if error.iso_index is not None:
                 block = cc_identifiers_blocks[error.iso_index]
-                if isinstance(block, str) or not is_sigiled(block[1]):
-                    logging.info(
-                        f"Removing iso #{error.iso_index}: {error.orig_source} {error.orig_target}"
+                if not isinstance(block, str) and block[2] != "Admitted.":
+                    project, cc_identifiers_blocks = admit_failing_iso(
+                        project,
+                        cc_identifiers_blocks,
+                        error.orig_source,
+                        error.orig_target,
+                        original_name=original_name,
+                        imported_name=imported_name,
                     )
-                    if isinstance(block, str):
-                        # this should not happen, but we'll handle it anyway
-                        logging.error(
-                            f"Block {error.iso_index} is a string: {block} (from {error})"
-                        )
-                    del cc_identifiers_blocks[error.iso_index]
                     return generate_and_autorepair_isos(
                         project,
                         cc_identifiers_blocks,
@@ -1467,15 +1466,16 @@ def generate_and_autorepair_isos(
                         iso_file=iso_file,
                         write_to_directory_on_error=write_to_directory_on_error,
                     )
-                elif block[2] != "Admitted.":
-                    project, cc_identifiers_blocks = admit_failing_iso(
-                        project,
-                        cc_identifiers_blocks,
-                        error.orig_source,
-                        error.orig_target,
-                        original_name=original_name,
-                        imported_name=imported_name,
+                elif isinstance(block, str) or not is_sigiled(block[1]):
+                    logging.info(
+                        f"Removing iso #{error.iso_index}: {error.orig_source} {error.orig_target}"
                     )
+                    if isinstance(block, str):
+                        # this should not happen, but we'll handle it anyway
+                        logging.error(
+                            f"Block {error.iso_index} is a string: {block} (from {error})"
+                        )
+                    del cc_identifiers_blocks[error.iso_index]
                     return generate_and_autorepair_isos(
                         project,
                         cc_identifiers_blocks,
