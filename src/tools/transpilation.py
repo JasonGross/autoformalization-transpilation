@@ -226,7 +226,7 @@ Here is some information that might help diagnose the rewriting:
 ```
 There remain {error.ngoals} goals unsolved:
 ```
-{error.simplified_goals}
+{error.simplified_goals or error.goals}
 ```
 """
         )
