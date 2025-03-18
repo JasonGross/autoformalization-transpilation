@@ -822,7 +822,7 @@ def repair_isos_interface(
     coq_identifiers_to_unfold = list(coq_identifiers_to_unfold)
     # Look at the errors, attempt to fix the isos
     result = re.search(
-        rf"While importing ([\w\.]+): Consider adding iso_statement ({ISO_TARGET_PATTERN}) (?:and unfolding \[([^\]]+)\])?",
+        rf"While importing ([\w\.]+): (?:While stating iso_statement [^:]*: )?Consider adding iso_statement ({ISO_TARGET_PATTERN}) (?:and unfolding \[([^\]]+)\])?",
         re.sub(r"\s+", " ", errors),
     )
     if result is None:
