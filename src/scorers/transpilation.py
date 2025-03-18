@@ -49,6 +49,7 @@ def lean_compiles_scorer():
                 explanation="No translation state found",
                 metadata=metadata,
             )
+        # TODO: add lean project file contents to metadata
         if p_state["result"].get("failure_phase") == CompilationPhase.LEAN_COMPILATION:
             return Score(
                 value=INCORRECT,
@@ -76,7 +77,7 @@ def checker_compiles_scorer(
     async def score(state: TaskState, target: Target | None):
         store = inspect_ai.util.store()
         p_state: ProjectState | None = deepcopy(store.get("translation_state"))
-        metadata = {"translation_state": p_state}
+        metadata: dict[str, Any] = {"translation_state": p_state}
         if p_state is None:
             return Score(
                 value=INCORRECT,
@@ -98,6 +99,9 @@ def checker_compiles_scorer(
                 explanation="No Coq project state found",
                 metadata=metadata,
             )
+        metadata["coq_project_debug_files"] = {
+            f: f"```coq\n{coq_project[f].contents}\n```" for f in coq_project.debug_files
+        }
         compilation_result, _ = coq_project.make("Checker.vo", check=False)
 
         if compilation_result.returncode != 0:
