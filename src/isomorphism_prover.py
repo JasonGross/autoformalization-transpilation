@@ -31,6 +31,8 @@ from project_util import (
 )
 from utils import logging
 
+ISO_TARGET_PATTERN = r"(?:[\w\.]+|\(@[\w\.]+\))"
+
 
 def generate_and_prove_iso(
     project: CoqProject,
@@ -506,7 +508,9 @@ def parse_iso_errors(
     assert_or_error("Proving iso_statement " in errors)
     errors = errors.split("Proving iso_statement ")[-1]
     last_proving_instance = re.match(
-        r"^([\w\.]+) ([\w\.]+)[\s\n]+(.*)$", errors, flags=re.DOTALL
+        rf"^({ISO_TARGET_PATTERN}) ({ISO_TARGET_PATTERN})[\s\n]+(.*)$",
+        errors,
+        flags=re.DOTALL,
     )
     assert_or_error(last_proving_instance)
     assert last_proving_instance, errors
@@ -557,7 +561,7 @@ def parse_iso_errors(
 
     result = re.search(
         # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
-        r"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ([\w\.]+|\(@[\w\.]+\)) (?:-> )?([\w\.]+|\(@[\w\.]+\))",
+        rf"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ({ISO_TARGET_PATTERN}) (?:-> )?({ISO_TARGET_PATTERN})",
         errors,
     )
     if result:
@@ -705,7 +709,8 @@ def make_isos(
         if iso_pairs := [
             (match.group(1), match.group(2))
             for match in re.finditer(
-                r"Could not find iso for (\w+) -> (\w+)", error_message
+                rf"Could not find iso for ({ISO_TARGET_PATTERN}) -> ({ISO_TARGET_PATTERN})",
+                error_message,
             )
         ]:
             logging.info(f"Found missing isomorphisms: {set(iso_pairs)}")
@@ -817,7 +822,7 @@ def repair_isos_interface(
     coq_identifiers_to_unfold = list(coq_identifiers_to_unfold)
     # Look at the errors, attempt to fix the isos
     result = re.search(
-        r"While importing ([\w\.]+): Consider adding iso_statement ([\w\.]+|\(@[\w\.]+\)) (?:and unfolding \[([^\]]+)\])?",
+        rf"While importing ([\w\.]+): Consider adding iso_statement ({ISO_TARGET_PATTERN}) (?:and unfolding \[([^\]]+)\])?",
         re.sub(r"\s+", " ", errors),
     )
     if result is None:
