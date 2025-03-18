@@ -251,7 +251,7 @@ You can remove this block by invoking `remove_lemma_tool({error.block!r})` or re
                 f"Ambiguous iso error most likely due to lack of `iso.`: {error}"
             )
         current_proof_text = (
-            f"""with proof:
+            f""" with proof:
 ```coq
 {error.orig_proof}
 ```
