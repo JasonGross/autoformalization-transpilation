@@ -47,6 +47,7 @@ def coq_to_lean(
     *,
     coq_filepath: str | Path = EXAMPLE_COQ_FILEPATH,
     translation_state_template: str = TRANSLATION_STATE_TEMPLATE,
+    seed: str = "",  # allows bypassing the cache in a more controlled way
 ):
     # NOTE: This will need rewriting when the input coq file is not hardcoded
     coq_filepath = Path(coq_filepath)
@@ -54,7 +55,7 @@ def coq_to_lean(
         coq_statements=coq_filepath.read_text(),
     )
     # dataset
-    input_msg = format_translation_input(
+    input_msg = seed + format_translation_input(
         translation_state_template,
         coq_filepath,
         coq_identifiers=coq_identifiers,

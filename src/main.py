@@ -18,6 +18,7 @@ if __name__ == "__main__":
             / "incomplete_statements.v",
             cache=CachePolicy(expiry=None, per_epoch=False),
             agent="basic",
+            seed="",
         ),
         # model=OpenAIModel.BEST,
         # model=OpenAIModel.O1PREVIEW,
