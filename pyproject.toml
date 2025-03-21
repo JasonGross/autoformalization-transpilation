@@ -11,12 +11,12 @@ dependencies = [
     "mypy>=1.15.0",
     "dill>=0.3.9",
     "sympy>=1.13.3",
-    "coq-tools>=0.0.7",
     "anthropic>=0.49.0",
-    "inspect-ai>=0.3.74",
     "frozendict>=2.4.6",
     "networkx>=3.4.2",
     "pandas>=2.2.3",
+    "coq-tools>=0.0.8",
+    "inspect-ai>=0.3.75",
 ]
 
 [tool.uv]
