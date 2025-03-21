@@ -552,14 +552,30 @@ def add_iso_tool(
                 imported_name=imported_name,
             )
 
-        new_soruce = CoqIdentifier(source)
+        new_source = CoqIdentifier(source)
         new_target = CoqIdentifier(target)
         block = state["cc_identifiers_blocks"][index]
         assert not isinstance(block, str), block
         logging.info(
             f"Adding iso_statement {source}, {target} for {str(block[0])}, {str(block[1])}"
         )
-        state["cc_identifiers_blocks"].insert(index, (new_soruce, new_target, None))
+        cc_identifiers_blocks_noproofs = [block[:2] if not isinstance(block, str) else (None, None) for block in state["cc_identifiers_blocks"]]
+        existing_index = None
+        try:
+            existing_index = cc_identifiers_blocks_noproofs.index((new_source, new_target))
+        except ValueError:
+            pass
+        proof = None
+        if existing_index is not None:
+            if existing_index <= index:
+                return ContentText(
+                text=f"Cannot add iso_statement {source}, {target} for {str(block[0])}, {str(block[1])} because it already exists at index {existing_index}"
+            )
+            else:
+                proof = state["cc_identifiers_blocks"][existing_index][2]
+                state["cc_identifiers_blocks"].pop(existing_index)
+
+        state["cc_identifiers_blocks"].insert(index, (new_source, new_target, proof))
 
         return generate_and_autorepair_isos_tool(
             original_name=original_name,
