@@ -4,6 +4,7 @@
     "config:recommended"
   ],
   "ignorePaths": [
-    "src/dataset/raw_data/**"
+    "src/dataset/raw_data/**",
+    "inspiration/**"
   ]
 }
