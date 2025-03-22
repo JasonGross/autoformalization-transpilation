@@ -28,10 +28,10 @@ if __name__ == "__main__":
         "--project", required=False, help="Name of the project to process", default="lf"
     )
     parser.add_argument(
-        "--skip-rebuild",
-        action="store_true",
+        "--rebuild",
+        action=argparse.BooleanOptionalAction,
         default=False,
-        help="Skip project processing",
+        help="Do project processing",
     )
     parser.add_argument(
         "--skip-translation",
