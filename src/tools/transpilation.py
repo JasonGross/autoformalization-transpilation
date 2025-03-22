@@ -672,7 +672,7 @@ async def edit_iso_proof_higher_order(
     new_block.proof = new_proof_str
     state["cc_identifiers_blocks"][index] = new_block
     logging.info(
-        f"Reordered constructors for {iso_source} ({block.source}) to {block.target}, new proof is {new_proof_str}, old proof was {cur_proof}"
+        f"Edited proof for {iso_source} ({block.source}) to {block.target}, new proof is {new_proof_str}, old proof was {cur_proof}"
     )
 
     return generate_and_autorepair_isos_tool(
