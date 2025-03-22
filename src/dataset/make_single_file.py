@@ -34,11 +34,6 @@ def check_file_validity(*files: Path):
         if not (file.name == "_CoqProject" or file.suffix == ".v"):
             raise ValueError(f"Invalid file: {file}. Must be _CoqProject or .v files.")
 
-    # Check for Everything*Requires.v
-    for file in files:
-        if file.name.startswith("Everything") and file.name.endswith("Requires.v"):
-            raise ValueError("File Everything*Requires.v is not allowed.")
-
     # Ensure _CoqProject exists
     if not any(f.name == "_CoqProject" for f in files):
         raise ValueError("_CoqProject file is required.")
@@ -220,7 +215,12 @@ def inline_imports_robust(output_dir: Path, lib_name: str, quiet: bool):
         )
 
 
-def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
+def process(
+    *files: Path | str,
+    output_dir: Path | str,
+    quiet: bool = False,
+    robust: bool = False,
+):
     files = tuple(Path(f) for f in files)
     output_dir = Path(output_dir)
 
@@ -228,6 +228,9 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
 
     # Parse _CoqProject
     bindings, lib_name, shared_parent = parse_coqproject(*files)
+    for file in files:
+        if file.name.startswith(f"Everything{lib_name}") and file.name.endswith(".v"):
+            raise ValueError(f"File Everything{lib_name}*.v is not allowed.")
 
     # Copy files to output directory
     known_files, unknown_files = copy_files_to_output(
@@ -246,7 +249,8 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
     inline_imports_with_comments(output_dir, lib_name, quiet)
     build_single_file(output_dir, lib_name, quiet)
     inline_imports_admitted(output_dir, lib_name, quiet)
-    inline_imports_robust(output_dir, lib_name, quiet)
+    if robust:
+        inline_imports_robust(output_dir, lib_name, quiet)
 
 
 def main(argv: Sequence[str] | None = None):
@@ -262,9 +266,17 @@ def main(argv: Sequence[str] | None = None):
         default=False,
         help="Suppress timing information and stdout",
     )
+    parser.add_argument(
+        "--robust",
+        action="store_true",
+        default=False,
+        help="Include the inline_imports_robust pass",
+    )
     args = parser.parse_args(argv)
 
-    return process(*args.files, output_dir=args.output_dir, quiet=args.quiet)
+    return process(
+        *args.files, output_dir=args.output_dir, quiet=args.quiet, robust=args.robust
+    )
 
 
 if __name__ == "__main__":

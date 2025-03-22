@@ -7,7 +7,7 @@ from tasks.coq_to_lean import AnthropicModel, CachePolicy, coq_to_lean, eval
 from utils import logging, run_cmd
 
 
-def make_single_file(project_name: str):
+def make_single_file(project_name: str, robust: bool = False):
     logging.info(f"Making single file for {project_name}. This may take a while...")
     project_config = {
         "flocq": "./make_single_file.py raw_data/flocq/_CoqProject $(git ls-files --recurse-submodules 'raw_data/flocq/src/*.v' | grep -v _8_12) -o single_file_data/flocq/",
@@ -16,6 +16,8 @@ def make_single_file(project_name: str):
     }
     assert project_name in project_config, f"Project {project_name} not found"
     config = project_config[project_name]
+    if robust:
+        config += " --robust"
     command = f"cd {SOURCE_DIR}/src/dataset"
     run_cmd(f"{command} && {config}")
 
@@ -34,6 +36,12 @@ if __name__ == "__main__":
         help="Do project processing",
     )
     parser.add_argument(
+        "--robust",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Get all files, rather than just the ones with admits",
+    )
+    parser.add_argument(
         "--skip-translation",
         action="store_true",
         default=False,
@@ -43,11 +51,11 @@ if __name__ == "__main__":
     project_name = args.project
 
     # Make single file
-    if not args.skip_rebuild:
+    if args.rebuild:
         assert Path(f"src/dataset/raw_data/{project_name}").exists(), (
             "Project raw_data does not exist"
         )
-        make_single_file(project_name)
+        make_single_file(project_name, robust=args.robust)
     # Chunk the single file
     # @@Shiki
 
