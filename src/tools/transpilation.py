@@ -1,7 +1,7 @@
 import datetime
+from copy import deepcopy
 from enum import StrEnum
 from pathlib import Path
-import time
 from typing import Callable, Sequence, TypedDict
 
 import inspect_ai.util
@@ -14,22 +14,22 @@ from inspect_ai.tool import (
 )
 from sympy.combinatorics.permutations import Permutation
 
-import isomorphism_prover
-from config import DEFINITION_PAIRS, EXPORT_DIR, SOURCE_DIR
+from config import EXPORT_DIR, SOURCE_DIR
 from isomorphism_prover import (
-    add_files_to_CoqProject,
+    IsoAlreadyExistsError,
+    find_iso_and_index,
     find_iso_index,
     generate_and_autorepair_isos,
-    generate_and_prove_iso_interface,
+    insert_iso,
     make_identifiers_str,
 )
 from project_util import (
     AmbiguousIsoError,
-    CoqFile,
     CoqIdentifier,
     CoqProject,
     DisorderedConstr,
     GenericIsoError,
+    IsoBlock,
     IsoError,
     IsoErrorWithoutHints,
     LeanFile,
@@ -38,14 +38,11 @@ from project_util import (
     MissingImport,
     MissingTypeIso,
     NonIsoBlockError,
-    coq_identifiers_of_list,
-    desigil,
-    extract_coq_identifiers,
-    is_sigiled,
-    sigil,
+    remove_identifier_prefix,
 )
 from translation_checker import (
     check_compilation,
+    init_translation_project,
     lean_to_coq,
 )
 from utils import logging
@@ -90,7 +87,8 @@ class ProjectState(TypedDict):
     coq_project_id: int
     lean_export_project_id: int
     coq_identifiers: list[CoqIdentifier]
-    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]]
+    coq_identifiers_to_unfold: list[CoqIdentifier]
+    cc_identifiers_blocks: list[str | IsoBlock]
     cl_identifiers: list[tuple[CoqIdentifier, LeanIdentifier]]
     lean_statements: LeanFile
     lean_project_id: int
@@ -178,6 +176,9 @@ def generate_and_autorepair_isos_tool(
     if result["status"]:
         return ContentText(text="Success!")
 
+    result["failure_phase"] = CompilationPhase.PROVING_ISOS
+    error = result["error"]
+
     if write_to_directory_on_error:
         write_to_directory_on_error = Path(write_to_directory_on_error)
         key = str(hash(coq_project))
@@ -186,11 +187,15 @@ def generate_and_autorepair_isos_tool(
         iso_string = now.isoformat()
         if len(list((write_to_directory_on_error / key).iterdir())) == 0:
             coq_project.write(write_to_directory_on_error / key / iso_string)
+            (write_to_directory_on_error / key / iso_string / "errors.txt").write_text(
+                str(error)
+            )
+            (write_to_directory_on_error / key / iso_string / "result.txt").write_text(
+                repr(result)
+            )
         else:
             (write_to_directory_on_error / key / iso_string).touch()
 
-    result["failure_phase"] = CompilationPhase.PROVING_ISOS
-    error = result["error"]
     assert not result["status"], state
     assert error is not None, state
     assert not isinstance(error, MissingTypeIso), error
@@ -412,6 +417,14 @@ def remove_import_tool(
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
 ) -> Tool:
+    """like remove_lemma_tool, but with a different docstring"""
+    remove_code = remove_lemma_tool(
+        original_name=original_name,
+        imported_name=imported_name,
+        iso_file=iso_file,
+        write_to_directory_on_error=write_to_directory_on_error,
+    )
+
     async def remove_import(code_str: str) -> ToolResult:
         """
         Removes an import or other custom added code from the Coq isomorphism file.
@@ -419,24 +432,13 @@ def remove_import_tool(
         Args:
             code_str: The line of code to be removed. (str)
         """
-        state: ProjectState = inspect_ai.util.store().get("translation_state")
-        if code_str not in state["cc_identifiers_blocks"]:
-            return ContentText(
-                text=f"Invalid code to remove: {code_str!r}\nValid codes to remove are: {'\n'.join(repr(v) for v in state['cc_identifiers_blocks'] if isinstance(v, str))}"
-            )
-        state["cc_identifiers_blocks"].remove(code_str)
-        return generate_and_autorepair_isos_tool(
-            original_name=original_name,
-            imported_name=imported_name,
-            iso_file=iso_file,
-            write_to_directory_on_error=write_to_directory_on_error,
-        )
+        return await remove_code(code_str)
 
     return remove_import
 
 
 def handle_value_error(
-    cc_identifiers_blocks: list[str | tuple[CoqIdentifier, CoqIdentifier, str | None]],
+    cc_identifiers_blocks: list[str | IsoBlock],
     iso_source: str,
     iso_target: str | None = None,
     *,
@@ -536,46 +538,26 @@ def add_iso_tool(
             before_source: The source identifier before which the isomorphism should be added. (str)
         """
         state: ProjectState = inspect_ai.util.store().get("translation_state")
-
         try:
-            index = find_iso_index(
+            state["cc_identifiers_blocks"] = insert_iso(
                 state["cc_identifiers_blocks"],
+                source,
+                target,
                 before_source,
                 original_name=original_name,
                 imported_name=imported_name,
             )
-        except ValueError:
+        except ValueError as e:
             return handle_value_error(
                 state["cc_identifiers_blocks"],
                 before_source,
                 original_name=original_name,
                 imported_name=imported_name,
             )
-
-        new_source = CoqIdentifier(source)
-        new_target = CoqIdentifier(target)
-        block = state["cc_identifiers_blocks"][index]
-        assert not isinstance(block, str), block
-        logging.info(
-            f"Adding iso_statement {source}, {target} for {str(block[0])}, {str(block[1])}"
-        )
-        cc_identifiers_blocks_noproofs = [block[:2] if not isinstance(block, str) else (None, None) for block in state["cc_identifiers_blocks"]]
-        existing_index = None
-        try:
-            existing_index = cc_identifiers_blocks_noproofs.index((new_source, new_target))
-        except ValueError:
-            pass
-        proof = None
-        if existing_index is not None:
-            if existing_index <= index:
-                return ContentText(
-                text=f"Cannot add iso_statement {source}, {target} for {str(block[0])}, {str(block[1])} because it already exists at index {existing_index}"
+        except IsoAlreadyExistsError as e:
+            return ContentText(
+                text=f"Cannot add iso_statement {source}, {target} for {e.args[0].before_source}, {e.args[0].before_target} at index {e.args[0].index} because it already exists at index {e.args[0].existing_index}"
             )
-            else:
-                proof = state["cc_identifiers_blocks"][existing_index][2]
-                state["cc_identifiers_blocks"].pop(existing_index)
-
-        state["cc_identifiers_blocks"].insert(index, (new_source, new_target, proof))
 
         return generate_and_autorepair_isos_tool(
             original_name=original_name,
@@ -609,7 +591,7 @@ def remove_iso_tool(
         state: ProjectState = inspect_ai.util.store().get("translation_state")
 
         try:
-            index = find_iso_index(
+            index, block = find_iso_and_index(
                 state["cc_identifiers_blocks"],
                 source,
                 target,
@@ -625,12 +607,12 @@ def remove_iso_tool(
                 imported_name=imported_name,
             )
 
-        if is_sigiled(state["cc_identifiers_blocks"][index][1]):
+        if block.is_required:
             return ContentText(
-                text=f"Only isomorphisms added by `add_iso_tool` can be removed by `remove_iso_tool`; {source}{' -> ' + target if target is not None else ''} was part of the initial state."
+                text=f"Only isomorphisms added by `add_iso_tool` can be removed by `remove_iso_tool`; {source}{' -> ' + target if target is not None else '(' + str(remove_identifier_prefix(block.target, prefix=imported_name)) + ')'} was part of the initial state."
             )
 
-        logging.info(f"Removing iso_statement {state['cc_identifiers_blocks'][index]}")
+        logging.info(f"Removing iso_statement {block}")
         state["cc_identifiers_blocks"].pop(index)
 
         return generate_and_autorepair_isos_tool(
@@ -645,7 +627,7 @@ def remove_iso_tool(
 
 async def edit_iso_proof_higher_order(
     iso_source: str,
-    new_proof: Callable[[tuple[CoqIdentifier, CoqIdentifier, str | None]], str],
+    new_proof: Callable[[IsoBlock], str],
     iso_target: str | None = None,
     *,
     original_name: str = "Original",
@@ -657,7 +639,7 @@ async def edit_iso_proof_higher_order(
 ) -> ToolResult:
     state = inspect_ai.util.store().get("translation_state")
     try:
-        index = find_iso_index(
+        index, block = find_iso_and_index(
             state["cc_identifiers_blocks"],
             iso_source,
             iso_target,
@@ -674,9 +656,7 @@ async def edit_iso_proof_higher_order(
             imported_name=imported_name,
         )
 
-    block = state["cc_identifiers_blocks"][index]
-    assert not isinstance(block, str), block
-    cur_proof = block[2]
+    cur_proof = block.proof
     new_proof_str = new_proof(block).strip()
 
     # Be a bit more lenient with the proof string, and strip off the Proof. and Qed. parts
@@ -688,14 +668,11 @@ async def edit_iso_proof_higher_order(
         new_proof_str = new_proof_str[: -len("Defined.")]
     new_proof_str = new_proof_str.strip()
 
-    reordered_block = (
-        block[0],
-        block[1],
-        new_proof_str,
-    )
-    state["cc_identifiers_blocks"][index] = reordered_block
+    new_block = deepcopy(block)
+    new_block.proof = new_proof_str
+    state["cc_identifiers_blocks"][index] = new_block
     logging.info(
-        f"Reordered constructors for {iso_source} ({block[0]}) to {block[1]}, new proof is {new_proof_str}, old proof was {cur_proof}"
+        f"Reordered constructors for {iso_source} ({block.source}) to {block.target}, new proof is {new_proof_str}, old proof was {cur_proof}"
     )
 
     return generate_and_autorepair_isos_tool(
@@ -730,7 +707,7 @@ def edit_iso_proof_tool(
         iso_target = handle_none_string(iso_target)
         return await edit_iso_proof_higher_order(
             iso_source,
-            lambda block: new_proof,
+            lambda _block: new_proof,
             iso_target=iso_target,
             original_name=original_name,
             imported_name=imported_name,
@@ -762,8 +739,8 @@ def repair_iso_by_reorder_constructors_tool(
             source: The source identifier for the isomorphism block to be reordered. (str)
         """
 
-        def new_proof(block: tuple[CoqIdentifier, CoqIdentifier, str | None]):
-            _, _, cur_proof = block
+        def new_proof(block: IsoBlock):
+            cur_proof = block.proof
             logging.info(f"Reordering constructors using permutation {permutation}")
             permutation_obj: Permutation = Permutation(permutation)
             if cur_proof is not None and "revgoals" in cur_proof:
@@ -796,6 +773,26 @@ def repair_iso_by_reorder_constructors_tool(
     return repair_iso_by_reorder_constructors
 
 
+def ensure_init_translation_state(
+    coq_project: CoqProject,
+    lean_export_project: LeanProject,
+    coq_identifiers: list[CoqIdentifier],
+    coq_identifiers_to_unfold: list[CoqIdentifier],
+):
+    store = inspect_ai.util.store()
+    if "translation_state" not in store:
+        store.set("translation_state", {})
+    state = store.get("translation_state")
+    if "lean_export_project_id" not in state:
+        set_lean_export_project(lean_export_project)
+    if "coq_project_id" not in state:
+        set_coq_project(coq_project)
+    if "coq_identifiers" not in state:
+        state["coq_identifiers"] = coq_identifiers
+    if "coq_identifiers_to_unfold" not in state:
+        state["coq_identifiers_to_unfold"] = coq_identifiers_to_unfold
+
+
 def make_submit_translation_tool(
     coq_statements: str | None = None,
     coq_names: list[str] | None = None,
@@ -811,42 +808,19 @@ def make_submit_translation_tool(
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
     admit_failing_isos: bool = False,
 ) -> tuple[Callable[[], Tool], list[str]]:
-    coq_statements_file = None if coq_statements is None else CoqFile(coq_statements)
-
-    init_coq_project = isomorphism_prover.init_coq_project(iso_checker_path)
-    if coq_statements_file is not None:
-        init_coq_project[f"{original_name}.v"] = coq_statements_file
-        init_coq_project = add_files_to_CoqProject(
-            init_coq_project, f"{original_name}.v"
-        )
-    if init_coq_targets is not None:
-        if isinstance(init_coq_targets, str):
-            init_coq_targets = [init_coq_targets]
-        result, coq_project = init_coq_project.make(*init_coq_targets)
-        assert (
-            result.returncode == 0
-        ), f"Failed to make Coq project with init targets {init_coq_targets}:\nstdout:\n```\n{result.stdout}\n```\nstderr:\n```\n{result.stderr}\n```"
-    init_lean_export_project = LeanProject.read(lean_export_directory)
-
-    if coq_names is None:
-        coq_identifiers = extract_coq_identifiers(
-            coq_statements_file, sigil=False, default_definition_pairs=DEFINITION_PAIRS
-        )
-        assert coq_identifiers, f"No Coq identifiers found in {coq_statements}"
-    else:
-        coq_identifiers = coq_identifiers_of_list(coq_names, sigil=False)
-        assert coq_identifiers, f"No Coq identifiers found in {coq_names}"
-
     (
         init_coq_project,
-        interface_success,
-        error,
+        init_lean_export_project,
         coq_identifiers,
-        _coq_identifiers_to_unfold,
-    ) = generate_and_prove_iso_interface(
-        init_coq_project, list(map(sigil, coq_identifiers))
+        coq_identifiers_to_unfold,
+    ) = init_translation_project(
+        coq_statements,
+        coq_names,
+        iso_checker_path=iso_checker_path,
+        init_coq_targets=init_coq_targets,
+        lean_export_directory=lean_export_directory,
+        original_name=original_name,
     )
-    assert interface_success, f"Failed to generate and prove interface:\n{error}"
 
     @tool
     def submit_translation_tool() -> Tool:
@@ -863,9 +837,13 @@ def make_submit_translation_tool(
             Returns:
                 ToolResult: Messages that came up during execution
             """
+            ensure_init_translation_state(
+                init_coq_project,
+                init_lean_export_project,
+                coq_identifiers,
+                coq_identifiers_to_unfold,
+            )
             store = inspect_ai.util.store()
-            if "translation_state" not in store:
-                store.set("translation_state", {})
             state: ProjectState = store.get("translation_state")
             state["result"] = {
                 "status": False,
@@ -878,12 +856,6 @@ def make_submit_translation_tool(
                 "unknown_rhs_identifiers": [],
             }
             result = state["result"]
-            if "lean_export_project_id" not in state:
-                set_lean_export_project(init_lean_export_project)
-            if "coq_project_id" not in state:
-                set_coq_project(init_coq_project)
-            if "coq_identifiers" not in state:
-                state["coq_identifiers"] = coq_identifiers
 
             if not coq_lean_identifiers:
                 raise ToolError("coq_lean_identifiers must not be empty")
@@ -904,19 +876,29 @@ def make_submit_translation_tool(
 {result["stderr"]}"""
                 )
 
-            state["cl_identifiers"] = [
-                (k, sigil(LeanIdentifier(coq_lean_identifiers[str(desigil(k))])))
+            mapped_lean_identifiers = [
+                coq_lean_identifiers.get(
+                    str(k),
+                    coq_lean_identifiers.get(
+                        remove_identifier_prefix(str(k), prefix=original_name)
+                    ),
+                )
                 for k in coq_identifiers
-                if str(desigil(k)) in coq_lean_identifiers
+            ]
+            state["cl_identifiers"] = [
+                (source, LeanIdentifier(target))
+                for source, target in zip(coq_identifiers, mapped_lean_identifiers)
+                if target is not None
             ]
             state["missing_identifiers"] = [
-                k for k in coq_identifiers if str(k) not in coq_lean_identifiers
+                source
+                for source, target in zip(coq_identifiers, mapped_lean_identifiers)
+                if target is None
             ]
-            coq_identifiers_str = [str(desigil(k)) for k in coq_identifiers]
             state["excess_identifiers"] = [
                 (k, v)
                 for k, v in coq_lean_identifiers.items()
-                if k not in coq_identifiers_str
+                if v not in mapped_lean_identifiers
             ]
             lean_export_project = get_lean_export_project()
             coq_project = get_coq_project()
@@ -941,6 +923,8 @@ def make_submit_translation_tool(
                 state["lean_statements"],
                 state["cl_identifiers"],
                 coq_file_stem=imported_name,
+                imported_name=imported_name,
+                coq_identifiers_to_unfold=state["coq_identifiers_to_unfold"],
             )
             set_lean_export_project(lean_export_project)
             set_coq_project(coq_project)
@@ -964,7 +948,9 @@ def make_submit_translation_tool(
 
         return submit_translation
 
-    return submit_translation_tool, [str(desigil(i)) for i in coq_identifiers]
+    return submit_translation_tool, [
+        str(remove_identifier_prefix(i, prefix=original_name)) for i in coq_identifiers
+    ]
 
 
 @tool

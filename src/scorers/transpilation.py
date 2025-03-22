@@ -15,6 +15,7 @@ from inspect_ai.scorer import (
 )
 from inspect_ai.solver import TaskState
 
+from project_util import IsoBlock
 from tools.transpilation import (
     CompilationPhase,
     ProjectState,
@@ -100,7 +101,8 @@ def checker_compiles_scorer(
                 metadata=metadata,
             )
         metadata["coq_project_debug_files"] = {
-            f: f"```coq\n{coq_project[f].contents}\n```" for f in coq_project.debug_files
+            f: f"```coq\n{coq_project[f].contents}\n```"
+            for f in coq_project.debug_files
         }
         compilation_result, _ = coq_project.make("Checker.vo", check=False)
 
@@ -167,6 +169,8 @@ def isos_proven_scorer(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    only_required: bool = False,
+    only_original: bool = False,
 ):
     """score based on how many isos were proven"""
 
@@ -200,35 +204,40 @@ def isos_proven_scorer(
         metadata["postadmit_translation_state"] = p_state
 
         if admit_msgs:
-            if hasattr(admit_msgs, "text"):
-                if not admit_msgs.text.lower().startswith("Success"):
-                    metadata["admit_msgs"] = admit_msgs.text
+            text = getattr(admit_msgs, "text", None)
+            if text is not None:
+                if not text.lower().startswith("Success"):
+                    metadata["admit_msgs"] = text
             else:
                 metadata["admit_msgs"] = admit_msgs
-        blocks = p_state.get("cc_identifiers_blocks", [])
+        blocks: list[str | IsoBlock] = (p_state or {}).get("cc_identifiers_blocks", [])
         if not blocks:
             return Score(
                 value=INCORRECT, explanation="No blocks found", metadata=metadata
             )
         total_isos, proven_isos = 0, 0
         for block in blocks:
-            if isinstance(block, str):
+            if not isinstance(block, IsoBlock):
                 continue
-            proof = block[2]
-            if proof is not None:
+            if (
+                block.proof is not None
+                and (block.is_required or not only_required)
+                and (block.is_original or not only_original)
+            ):
                 total_isos += 1
-                if "Admitted" not in proof:
+                if "Admitted" not in block.proof:
                     proven_isos += 1
 
+        descr = "original " if only_original else "required " if only_required else ""
         if total_isos == 0:
             return Score(
                 value=INCORRECT,
-                explanation="No isomorphism proofs found",
+                explanation=f"No {descr}isomorphism proofs found",
                 metadata=metadata,
             )
         return Score(
             value=proven_isos / total_isos,
-            explanation=f"{proven_isos}/{total_isos} isomorphism proofs were proven",
+            explanation=f"{proven_isos}/{total_isos} {descr}isomorphism proofs were proven",
             metadata=metadata,
         )
 

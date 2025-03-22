@@ -113,16 +113,16 @@ DEFINITION_PAIRS = list(
     map(
         lambda x: (CoqIdentifier(x[0]), LeanIdentifier(x[1])),
         [  # TODO: Resolve https://github.com/JasonGross/autoformalization/pull/47#issuecomment-2655085138
-            ("$binop", "$Binop"),
-            ("$exp", "$Exp"),
-            ("$stack", "$Stack"),
-            ("$instr", "$Instr"),
-            ("$binopDenote", "$binopDenote"),
-            ("$instrDenote", "$instrDenote"),
-            ("$prog", "$Prog"),
-            ("$expDenote", "$expDenote"),
-            ("$progDenote", "$progDenote"),
-            ("$compile", "$compile"),
+            ("binop", "Binop"),
+            ("exp", "Exp"),
+            ("stack", "Stack"),
+            ("instr", "Instr"),
+            ("binopDenote", "binopDenote"),
+            ("instrDenote", "instrDenote"),
+            ("prog", "Prog"),
+            ("expDenote", "expDenote"),
+            ("progDenote", "progDenote"),
+            ("compile", "compile"),
         ],
     )
 )

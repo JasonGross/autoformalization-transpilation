@@ -6,7 +6,7 @@ import re
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from functools import lru_cache
 from hashlib import sha256
 from pathlib import Path
@@ -19,6 +19,7 @@ from typing import (
     Literal,
     Self,
     TypeVar,
+    cast,
 )
 
 from utils import logging, run_cmd
@@ -286,6 +287,7 @@ class Project:
         with self.tempdir() as p:
             process = run_cmd(*args, **kwargs)
             if sanitize is not None:
+                logging.info("Sanitizing %s -> %s", str(p), sanitize)
                 process.stdout = process.stdout.replace(str(p), sanitize)
                 process.stderr = process.stderr.replace(str(p), sanitize)
             return process
@@ -297,9 +299,9 @@ class Project:
         return result, project
 
     def make(
-        self: Self, *targets: str, check: bool = False
+        self: Self, *targets: str, check: bool = False, **kwargs
     ) -> tuple[CompletedProcess[str], Self]:
-        return self.run_cmd(["make", *targets], shell=False, check=check)
+        return self.run_cmd(["make", *targets], shell=False, check=check, **kwargs)
 
     def clean(self):
         return self.make("clean")
@@ -333,12 +335,35 @@ class CoqIdentifier(Identifier):
 
 
 @dataclass
+class IsoBlock:
+    """Represents an isomorphism between Coq identifiers or a custom block of code."""
+
+    source: CoqIdentifier
+    target: CoqIdentifier
+    proof: str | None = None
+    # Whether this isomorphism was present in the original interface
+    is_interface: bool = False
+    # Whether this isomorphism was present in the original list of extracted identifiers
+    is_original: bool = False
+    # Whether this isomorphism needs to be unfolded in the interface
+    needs_unfolding: bool = False
+
+    @property
+    def is_required(self) -> bool:
+        """Whether this isomorphism must be present"""
+        return self.is_interface
+
+    def __hash__(self) -> int:
+        return hash(tuple(getattr(self, field.name) for field in fields(self)))
+
+
+@dataclass
 class IsoError:
     orig_source: str
     orig_target: str
     orig_proof: str | None
     iso_index: int | None
-    sigiled_iso_index: int | None
+    interface_iso_index: int | None
 
 
 @dataclass
@@ -393,7 +418,7 @@ class GenericIsoError(IsoError):
     simplified_goals: str
 
     def __str__(self):
-        return f"GenericIsoError(orig_source={self.orig_source}, orig_target={self.orig_target}, orig_proof={self.orig_proof}, iso_index={self.iso_index}, sigiled_iso_index={self.sigiled_iso_index}, unknown_lhs={self.unknown_lhs}, unknown_rhs={self.unknown_rhs}, ngoals={self.ngoals},\n prefix='''{self.prefix}''',\n goals='''{self.goals}''',\n simplified_goals='''{self.simplified_goals}''')"
+        return f"GenericIsoError(orig_source={self.orig_source}, orig_target={self.orig_target}, orig_proof={self.orig_proof}, iso_index={self.iso_index}, sigiled_iso_index={self.interface_iso_index}, unknown_lhs={self.unknown_lhs}, unknown_rhs={self.unknown_rhs}, ngoals={self.ngoals},\n prefix='''{self.prefix}''',\n goals='''{self.goals}''',\n simplified_goals='''{self.simplified_goals}''')"
 
 
 @dataclass
@@ -411,41 +436,70 @@ class DisorderedConstr(IsoError):
 
 
 IDT = TypeVar(
-    "IDT", Identifier, CoqIdentifier, LeanIdentifier, str, CoqIdentifier | str
+    "IDT",
+    Identifier,
+    CoqIdentifier,
+    LeanIdentifier,
+    str,
+    CoqIdentifier | str,
+    None,
+    str | None,
+    CoqIdentifier | str | None,
 )
 
 
-def sigil(s: IDT) -> IDT:
-    if isinstance(s, str):
-        return "$" + s
-    return s.__class__(sigil(str(s)))
+def add_identifier_prefix(
+    s: IDT, prefix: str | None, *, dot: str = ".", strict: bool = False
+) -> IDT:
+    """Add a prefix to an identifier.
 
-
-def desigil(s: IDT, prefix: str = "") -> IDT:
-    if isinstance(s, str):
-        if s[0] == "$":
-            return prefix + s[1:]
+    If `strict` is True, the prefix will be added unconditionally.
+    If `strict` is False, the prefix will only be added if it is not already present.
+    """
+    if s is None:
         return s
-    return s.__class__(desigil(str(s), prefix))
+    if prefix is None:
+        return s
+    if isinstance(s, str):
+        # Avoid double-prefixing
+        if not strict and s.startswith(f"{prefix}{dot}"):
+            return s
+        return cast(s.__class__, f"{prefix}{dot}{s}")
+    return s.__class__(
+        add_identifier_prefix(str(s), prefix=prefix, dot=dot, strict=strict)
+    )
 
 
-def is_sigiled(s: IDT) -> bool:
-    return str(s)[0] == "$"
+def remove_identifier_prefix(s: IDT, prefix: str, *, dot: str = ".") -> IDT:
+    """Remove a specific prefix from an identifier if it exists."""
+    if s is None:
+        return s
+    if isinstance(s, str):
+        if s.startswith(f"{prefix}{dot}"):
+            return s[len(prefix) + len(dot) :]
+        return s
+    return s.__class__(remove_identifier_prefix(str(s), prefix=prefix, dot=dot))
+
+
+def has_identifier_prefix(s: IDT, prefix: str, *, dot: str = ".") -> bool:
+    """Check if an identifier has a specific prefix."""
+    if s is None:
+        return False
+    return str(s).startswith(f"{prefix}{dot}")
 
 
 def coq_identifiers_of_list(
     coq_list: list[str],
-    sigil: Literal[False] | Callable[[CoqIdentifier], CoqIdentifier] = sigil,
+    prefix: str | None = None,
+    *,
+    dot: str = ".",
 ) -> list[CoqIdentifier]:
-    result = [CoqIdentifier(s) for s in coq_list]
-    if sigil:
-        result = [sigil(coq_id) for coq_id in result]
-    return result
+    return [add_identifier_prefix(CoqIdentifier(s), prefix) for s in coq_list]
 
 
 def extract_coq_identifiers_str(
     coq: CoqFile | None | str,
-    sigil: Literal[False] | Callable[[str], str] = sigil,
+    prefix: str | None = None,
     *,
     default_definition_pairs: list[tuple[CoqIdentifier, Any]] = [],
 ) -> list[str]:
@@ -453,9 +507,6 @@ def extract_coq_identifiers_str(
     if not coq:
         # TODO: Have the actual identifier pairs
         result = [str(coq_id) for coq_id, _ in default_definition_pairs]
-        if not sigil:
-            result = [desigil(coq_id) for coq_id in result]
-        return result
     else:
         coq_str = coq.contents if isinstance(coq, CoqFile) else coq
         # not perfect, but best-effort
@@ -465,20 +516,18 @@ def extract_coq_identifiers_str(
             coq_str,
             flags=re.DOTALL,
         )
-        if sigil:
-            result = [sigil(coq_id) for coq_id in result]
-        return result
+    return [add_identifier_prefix(s, prefix) for s in result]
 
 
 def extract_coq_identifiers(
     coq: CoqFile | None | str,
-    sigil: Literal[False] | Callable[[str], str] = sigil,
+    prefix: str | None = None,
     *,
     default_definition_pairs: list[tuple[CoqIdentifier, Any]] = [],
 ) -> list[CoqIdentifier]:
     return [
         CoqIdentifier(coq_id)
         for coq_id in extract_coq_identifiers_str(
-            coq, sigil, default_definition_pairs=default_definition_pairs
+            coq, prefix=prefix, default_definition_pairs=default_definition_pairs
         )
     ]
