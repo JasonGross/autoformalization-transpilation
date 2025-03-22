@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from pathlib import Path
-from tasks.coq_to_lean import eval, coq_to_lean, CachePolicy, AnthropicModel
 
+from tasks.coq_to_lean import AnthropicModel, CachePolicy, coq_to_lean, eval
 
 if __name__ == "__main__":
     # Extract a list of Coq statements from the input file(s)
@@ -15,7 +15,7 @@ if __name__ == "__main__":
         coq_to_lean(
             coq_filepath=Path(__file__).parent
             / "simple-tests"
-            / "incomplete_statements.v",
+            / "StackMachine-statements.v",
             cache=CachePolicy(expiry=None, per_epoch=False),
             agent="basic",
             seed="",

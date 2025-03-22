@@ -1,7 +1,7 @@
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Container, Iterable, NamedTuple, Optional, Sequence
+from typing import Any, Iterable, NamedTuple, Optional, Sequence
 
 from config import (
     ISO_CHECKER_HEADER,
@@ -27,7 +27,6 @@ from project_util import (
     NonIsoBlockError,
     desigil,
     is_sigiled,
-    sigil,
 )
 from utils import logging
 
@@ -323,9 +322,9 @@ def repair_isos(
                 output_file=iso_file,
             )
         else:
-            assert (
-                False
-            ), f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+            assert False, (
+                f"We are missing an import, please add the correct one - the missing reference is {error.import_str}"
+            )
     elif isinstance(error, DisorderedConstr):
         if can_autofix_disordered_constr(
             error,
@@ -1171,9 +1170,9 @@ def generate_and_prove_iso_interface(
 def add_files_to_CoqProject(coq_project: CoqProject, *files: str):
     coq_project = coq_project.copy()
     coq_project_contents = coq_project["_CoqProject"].contents
-    assert isinstance(
-        coq_project_contents, str
-    ), f"{coq_project_contents!r} is not a string"
+    assert isinstance(coq_project_contents, str), (
+        f"{coq_project_contents!r} is not a string"
+    )
     coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
     coq_project_contents = "\n".join(
         coq_project_lines + [f for f in files if f not in coq_project_lines]
@@ -1186,9 +1185,9 @@ def add_files_to_CoqProject(coq_project: CoqProject, *files: str):
 def remove_files_from_CoqProject(coq_project: CoqProject, *files: str):
     coq_project = coq_project.copy()
     coq_project_contents = coq_project["_CoqProject"].contents
-    assert isinstance(
-        coq_project_contents, str
-    ), f"{coq_project_contents!r} is not a string"
+    assert isinstance(coq_project_contents, str), (
+        f"{coq_project_contents!r} is not a string"
+    )
     coq_project_lines = [f.strip() for f in coq_project_contents.splitlines()]
     coq_project_contents = "\n".join([f for f in coq_project_lines if f not in files])
     coq_project["_CoqProject"] = File(coq_project_contents)

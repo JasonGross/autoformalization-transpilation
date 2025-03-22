@@ -7,21 +7,18 @@ import tempfile
 from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass, field
-from hashlib import sha256
 from functools import lru_cache
+from hashlib import sha256
 from pathlib import Path
 from subprocess import CompletedProcess
 from typing import (
     Any,
     Callable,
-    Collection,
     Container,
     Iterator,
     Literal,
     Self,
     TypeVar,
-    cast,
-    overload,
 )
 
 from utils import logging, run_cmd
@@ -56,8 +53,10 @@ class File:
 
     def __hash__(self) -> int:
         return hash(str(self._cache_file_path))
+
     def towards_json(self) -> str | bytes:
         return self.contents
+
     def towards_json_for_hash(self) -> str:
         return str(self._cache_file_path)
 
