@@ -26,6 +26,7 @@ from project_util import (
     MissingImport,
     MissingTypeIso,
     NonIsoBlockError,
+    has_identifier_prefix,
     remove_identifier_prefix,
 )
 from utils import logging
@@ -290,6 +291,12 @@ def parse_iso_errors(
         )
 
     errors = clean_irrelevant_warnings(errors)
+
+    missing_reference_match = re.search(
+        r"Error: The reference ([^\s]+) was not found in the current environment.",
+        errors,
+    )
+
     # First extract the block from the error message
     err_matches = re.findall(DEFAULT_ERROR_REG_STRING, errors)
     assert_or_error(err_matches)
@@ -328,7 +335,7 @@ def parse_iso_errors(
         interface_iso_index = compute_interface_iso_index(iso_index)
 
         # if there are no hints, return an IsoErrorWithoutHints
-        if "Proving iso_statement" not in errors:
+        if "Proving iso_statement" not in errors and not missing_reference_match:
             return IsoErrorWithoutHints(
                 orig_source,
                 orig_target,
@@ -340,58 +347,69 @@ def parse_iso_errors(
                 err_end,
                 error_msg,
             )
-    # if we can't extract a valid block, assume there must be hints
-    assert_or_error("Proving iso_statement " in errors)
-    errors = errors.split("Proving iso_statement ")[-1]
-    last_proving_instance = re.match(
-        rf"^({ISO_TARGET_PATTERN}) ({ISO_TARGET_PATTERN})[\s\n]+(.*)$",
-        errors,
-        flags=re.DOTALL,
-    )
-    assert_or_error(last_proving_instance)
-    assert last_proving_instance, errors
-    labeled_iso_statement_orig_source, labeled_iso_statement_orig_target, errors = (
-        last_proving_instance.groups()
-    )
-    orig_source = orig_source or labeled_iso_statement_orig_source
-    orig_target = orig_target or labeled_iso_statement_orig_target
-    if (
-        labeled_iso_statement_orig_source != orig_source
-        or labeled_iso_statement_orig_target != orig_target
-    ):
-        pre_error = re.split(DEFAULT_PRE_ERROR_REG_STRING, errors)[0]
-        assert_or_error(isinstance(error_msg, str), repr(error_msg))
-        assert isinstance(error_msg, str)  # for the type checker
-        return AmbiguousIsoError(
+    else:
+        # if we can't extract a valid block, assume there must be hints
+        assert_or_error("Proving iso_statement " in errors)
+        errors = errors.split("Proving iso_statement ")[-1]
+        last_proving_instance = re.match(
+            rf"^({ISO_TARGET_PATTERN}) ({ISO_TARGET_PATTERN})[\s\n]+(.*)$",
+            errors,
+            flags=re.DOTALL,
+        )
+        assert_or_error(last_proving_instance)
+        assert last_proving_instance, errors
+        labeled_iso_statement_orig_source, labeled_iso_statement_orig_target, errors = (
+            last_proving_instance.groups()
+        )
+        orig_source = orig_source or labeled_iso_statement_orig_source
+        orig_target = orig_target or labeled_iso_statement_orig_target
+        if (
+            labeled_iso_statement_orig_source != orig_source
+            or labeled_iso_statement_orig_target != orig_target
+        ) and not missing_reference_match:
+            pre_error = re.split(DEFAULT_PRE_ERROR_REG_STRING, errors)[0]
+            assert_or_error(isinstance(error_msg, str), repr(error_msg))
+            assert isinstance(error_msg, str)  # for the type checker
+            return AmbiguousIsoError(
+                orig_source,
+                orig_target,
+                orig_proof,
+                iso_index,
+                interface_iso_index,
+                err_line,
+                err_start,
+                err_end,
+                error_msg,
+                labeled_iso_statement_orig_source,
+                labeled_iso_statement_orig_target,
+                orig_proof,
+                iso_index,
+                interface_iso_index,
+                pre_error,
+            )
+        try:
+            iso_index, block = find_iso_and_index(
+                cc_identifiers_blocks,
+                orig_source,
+                orig_target,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+        except ValueError:
+            pass
+        if iso_index is not None:
+            interface_iso_index = compute_interface_iso_index(iso_index)
+            orig_proof = block.proof
+
+    if missing_reference_match:
+        return MissingImport(
             orig_source,
             orig_target,
             orig_proof,
             iso_index,
             interface_iso_index,
-            err_line,
-            err_start,
-            err_end,
-            error_msg,
-            labeled_iso_statement_orig_source,
-            labeled_iso_statement_orig_target,
-            orig_proof,
-            iso_index,
-            interface_iso_index,
-            pre_error,
+            missing_reference_match.group(1),
         )
-    try:
-        iso_index, block = find_iso_and_index(
-            cc_identifiers_blocks,
-            orig_source,
-            orig_target,
-            original_name=original_name,
-            imported_name=imported_name,
-        )
-    except ValueError:
-        pass
-    if iso_index is not None:
-        interface_iso_index = compute_interface_iso_index(iso_index)
-        orig_proof = block.proof
 
     result = re.search(
         # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
@@ -410,19 +428,6 @@ def parse_iso_errors(
                 source,
                 target,
             )
-    result = re.search(
-        r"Error: The reference ([^\s]+) was not found in the current environment.",
-        errors,
-    )
-    if result:
-        return MissingImport(
-            orig_source,
-            orig_target,
-            orig_proof,
-            iso_index,
-            interface_iso_index,
-            result.group(1),
-        )
     if (
         "Warning: The argument lengths don't match, perhaps the constructors were defined in different orders?"
         in errors
@@ -1139,16 +1144,39 @@ def generate_and_autorepair_isos(
             write_to_directory_on_error=write_to_directory_on_error,
         )
     elif isinstance(error, MissingImport):
-        if error.import_str in KNOWN_IMPORTS or admit_failing_isos:
-            if error.import_str in KNOWN_IMPORTS:
+        if error.import_str in KNOWN_IMPORTS:
+            logging.info(
+                f"Adding import {KNOWN_IMPORTS[error.import_str]} for iso_statement {error.orig_source} {error.orig_target}"
+            )
+            cc_identifiers_blocks.insert(
+                0,
+                KNOWN_IMPORTS[error.import_str],
+            )
+        elif (
+            has_identifier_prefix(error.import_str, imported_name)
+            and error.iso_index is not None
+        ):
+            logging.info(
+                f"Removing import prefix {imported_name} from {error.import_str} for iso_statement {error.orig_source} {error.orig_target}"
+            )
+            block = cc_identifiers_blocks[error.iso_index]
+            assert isinstance(block, IsoBlock), (
+                f"Block {error.iso_index} is not an IsoBlock: {block}"
+            )
+            assert str(block.target) == error.import_str, (
+                f"Block {error.iso_index} has target {block.target} which does not match import {error.import_str}"
+            )
+            block.target = remove_identifier_prefix(block.target, imported_name)
+            cc_identifiers_blocks[error.iso_index] = block
+        else:
+            if (
+                has_identifier_prefix(error.import_str, imported_name)
+                and error.iso_index is None
+            ):
                 logging.info(
-                    f"Adding import {KNOWN_IMPORTS[error.import_str]} for iso_statement {error.orig_source} {error.orig_target}"
+                    f"Could not find iso_index for {error.import_str} for iso_statement {error.orig_source} {error.orig_target}"
                 )
-                cc_identifiers_blocks.insert(
-                    0,
-                    KNOWN_IMPORTS[error.import_str],
-                )
-            else:
+            if admit_failing_isos:
                 project, cc_identifiers_blocks = admit_failing_iso(
                     project,
                     cc_identifiers_blocks,
@@ -1157,19 +1185,20 @@ def generate_and_autorepair_isos(
                     original_name=original_name,
                     imported_name=imported_name,
                 )
-            return generate_and_autorepair_isos(
-                project,
-                cc_identifiers_blocks,
-                admit_failing_isos=admit_failing_isos,
-                original_name=original_name,
-                imported_name=imported_name,
-                iso_file=iso_file,
-                write_to_directory_on_error=write_to_directory_on_error,
-            )
-        else:
-            if write_to_directory_on_error is not None:
-                project.write(write_to_directory_on_error)
-            return project, cc_identifiers_blocks, False, error
+            else:
+                if write_to_directory_on_error is not None:
+                    project.write(write_to_directory_on_error)
+                return project, cc_identifiers_blocks, False, error
+        return generate_and_autorepair_isos(
+            project,
+            cc_identifiers_blocks,
+            admit_failing_isos=admit_failing_isos,
+            original_name=original_name,
+            imported_name=imported_name,
+            iso_file=iso_file,
+            write_to_directory_on_error=write_to_directory_on_error,
+        )
+
     elif isinstance(error, DisorderedConstr):
         can_autofix = can_autofix_disordered_constr(
             error,
@@ -1297,6 +1326,7 @@ def generate_and_autorepair_isos(
                     )
                 else:
                     extra_err = f" because block {error.iso_index} is an iso block that is required: {block}"
+
         if write_to_directory_on_error is not None:
             project.write(write_to_directory_on_error)
             extra_err += f" and written to {write_to_directory_on_error}"
