@@ -292,6 +292,9 @@ def parse_iso_errors(
 
     errors = clean_irrelevant_warnings(errors)
 
+    if "Proving iso_statement " in errors:
+        errors = "Proving iso_statement " + errors.split("Proving iso_statement ")[-1]
+
     missing_reference_match = re.search(
         r"Error: The reference ([^\s]+) was not found in the current environment.",
         errors,
