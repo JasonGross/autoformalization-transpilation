@@ -56,7 +56,7 @@
 		"grunt": "1.5.3",
 		"grunt-bowercopy": "1.2.5",
 		"grunt-cli": "0.1.13",
-		"grunt-compare-size": "0.4.0",
+		"grunt-compare-size": "0.4.2",
 		"grunt-contrib-concat": "0.5.1",
 		"grunt-contrib-csslint": "0.5.0",
 		"grunt-contrib-jshint": "0.12.0",
