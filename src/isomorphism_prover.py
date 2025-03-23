@@ -509,9 +509,7 @@ def parse_iso_errors(
         )
 
     if missing_iso_result:
-        logging.info(
-            f"Found missing isomorphisms: {set(missing_iso_result)} in {errors}"
-        )
+        logging.info(f"Found missing isomorphisms: {set(missing_iso_result)}")
         if len(missing_iso_result) > 1:
             logging.warning(
                 f"Found multiple missing isomorphisms: {missing_iso_result}"
