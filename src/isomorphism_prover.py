@@ -1241,13 +1241,15 @@ def generate_and_autorepair_isos(
         extra_write = f" (in {write_to_directory_on_error / key / iso_string})"
         if len(list((write_to_directory_on_error / key).iterdir())) == 0:
             project.write(
-                write_to_directory_on_error / key / iso_string, log=logging.error
+                write_to_directory_on_error / key / iso_string, log=logging.warning
             )
             (write_to_directory_on_error / key / iso_string / "errors.txt").write_text(
                 errors
             )
         else:
-            logging.error("Touching %s", write_to_directory_on_error / key / iso_string)
+            logging.warning(
+                "Touching %s", write_to_directory_on_error / key / iso_string
+            )
             (write_to_directory_on_error / key / iso_string).touch()
 
     logging.info(

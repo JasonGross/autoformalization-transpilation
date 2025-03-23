@@ -175,7 +175,7 @@ def generate_and_autorepair_isos_tool(
                     write_to_directory_on_error / key / iso_string / "result.txt"
                 ).write_text(repr(result))
             else:
-                logging.error(
+                logging.warning(
                     "Touching %s", write_to_directory_on_error / key / iso_string
                 )
                 (write_to_directory_on_error / key / iso_string).touch()
