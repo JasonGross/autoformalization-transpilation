@@ -1181,7 +1181,7 @@ def admit_failing_iso(
     if remove_if_admitted and block.proof == "Admitted.":
         if block.is_required:
             raise IsoIsAlreadyAdmittedError(
-                f"Cannot admit required iso {orig_source} to {orig_target}"
+                f"Cannot remove required iso {orig_source} to {orig_target}"
             )
         else:
             logging.warning(
