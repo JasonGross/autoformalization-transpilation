@@ -210,6 +210,7 @@ def repair_missing_type_iso(
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
     is_interface: bool = False,
+    errors: str,
 ) -> tuple[CoqProject, list[str | IsoBlock]]:
     index = find_iso_index(
         cc_identifiers_blocks,
@@ -224,6 +225,7 @@ def repair_missing_type_iso(
     assert not has_iso(cc_identifiers_blocks, error.source, error.target), (
         error,
         cc_identifiers_blocks,
+        errors,
     )
     cc_identifiers_blocks.insert(
         index,
@@ -1136,6 +1138,7 @@ def generate_and_autorepair_isos(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
+            errors=errors,
         )
         return generate_and_autorepair_isos(
             project,
