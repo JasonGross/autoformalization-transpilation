@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import argparse
-from pathlib import Path
+import logging
 import shutil
 import subprocess
 import time
 from contextlib import contextmanager
-import logging
+from pathlib import Path
 from typing import Sequence
 
 logger = logging.getLogger(__name__)
@@ -28,16 +28,11 @@ def with_time(description=None, quiet: bool = False):
 
 
 def check_file_validity(*files: Path):
-    """Check that files are valid (_CoqProject or .v files, no Everything.v)."""
+    """Check that files are valid (_CoqProject or .v files, no Everything*Requires.v)."""
     # Check file names
     for file in files:
         if not (file.name == "_CoqProject" or file.suffix == ".v"):
             raise ValueError(f"Invalid file: {file}. Must be _CoqProject or .v files.")
-
-    # Check for Everything.v
-    for file in files:
-        if file.name == "Everything.v":
-            raise ValueError("File Everything.v is not allowed.")
 
     # Ensure _CoqProject exists
     if not any(f.name == "_CoqProject" for f in files):
@@ -93,7 +88,7 @@ def copy_files_to_output(
 def create_everything_contents(
     unknown_files: list[Path], known_files: dict, shared_parent: Path
 ):
-    """Create the contents for Everything.v file."""
+    """Create the contents for Everything*Requires.v file."""
     contents = []
     for file in unknown_files:
         if file.suffix == ".v":
@@ -112,17 +107,19 @@ def create_everything_contents(
     return "".join(contents)
 
 
-def create_everything_file(output_dir: Path, contents: str):
-    """Create the Everything.v file."""
-    everything_v_path = output_dir / "Everything.v"
+def create_everything_file(output_dir: Path, lib_name: str, contents: str):
+    """Create the Everything*Requires.v file."""
+    everything_v_path = output_dir / f"Everything{lib_name}Requires.v"
     everything_v_path.write_text(contents)
     return everything_v_path
 
 
-def create_makefile(output_dir: Path, files: tuple[Path, ...], shared_parent: Path):
+def create_makefile(
+    output_dir: Path, files: tuple[Path, ...], shared_parent: Path, lib_name: str
+):
     """Create Makefile using coq_makefile."""
     v_files = [str(f.relative_to(shared_parent)) for f in files if f.suffix == ".v"] + [
-        "Everything.v"
+        f"Everything{lib_name}Requires.v"
     ]
     subprocess.run(
         ["coq_makefile", "-f", "_CoqProject", "-o", "Makefile"] + v_files,
@@ -160,7 +157,7 @@ def inline_imports_with_comments(output_dir: Path, lib_name: str, quiet: bool):
                 "coq-import-inliner",
                 "-f",
                 "_CoqProject",
-                "Everything.v",
+                f"Everything{lib_name}Requires.v",
                 f"Everything{lib_name}WithComments.v",
             ],
             cwd=output_dir,
@@ -189,7 +186,7 @@ def inline_imports_admitted(output_dir: Path, lib_name: str, quiet: bool):
                 "coq-bug-minimizer",
                 "-f",
                 "_CoqProject",
-                "Everything.v",
+                f"Everything{lib_name}Requires.v",
                 f"Everything{lib_name}Admitted.v",
                 "--no-error",
                 "--admit-opaque",
@@ -208,7 +205,7 @@ def inline_imports_robust(output_dir: Path, lib_name: str, quiet: bool):
                 "coq-bug-minimizer",
                 "-f",
                 "_CoqProject",
-                "Everything.v",
+                f"Everything{lib_name}Requires.v",
                 f"Everything{lib_name}.v",
                 "--no-error",
             ],
@@ -218,7 +215,12 @@ def inline_imports_robust(output_dir: Path, lib_name: str, quiet: bool):
         )
 
 
-def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
+def process(
+    *files: Path | str,
+    output_dir: Path | str,
+    quiet: bool = False,
+    robust: bool = False,
+):
     files = tuple(Path(f) for f in files)
     output_dir = Path(output_dir)
 
@@ -226,6 +228,9 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
 
     # Parse _CoqProject
     bindings, lib_name, shared_parent = parse_coqproject(*files)
+    for file in files:
+        if file.name.startswith(f"Everything{lib_name}") and file.name.endswith(".v"):
+            raise ValueError(f"File {file.name}(Everything{lib_name}*.v) is not allowed.")
 
     # Copy files to output directory
     known_files, unknown_files = copy_files_to_output(
@@ -235,8 +240,8 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
     everything_contents = create_everything_contents(
         unknown_files, known_files, shared_parent
     )
-    create_everything_file(output_dir, everything_contents)
-    create_makefile(output_dir, files, shared_parent)
+    create_everything_file(output_dir, lib_name, everything_contents)
+    create_makefile(output_dir, files, shared_parent, lib_name)
     update_gitignore(output_dir, lib_name)
 
     run_make(output_dir, quiet)
@@ -244,7 +249,8 @@ def process(*files: Path | str, output_dir: Path | str, quiet: bool = False):
     inline_imports_with_comments(output_dir, lib_name, quiet)
     build_single_file(output_dir, lib_name, quiet)
     inline_imports_admitted(output_dir, lib_name, quiet)
-    inline_imports_robust(output_dir, lib_name, quiet)
+    if robust:
+        inline_imports_robust(output_dir, lib_name, quiet)
 
 
 def main(argv: Sequence[str] | None = None):
@@ -260,9 +266,17 @@ def main(argv: Sequence[str] | None = None):
         default=False,
         help="Suppress timing information and stdout",
     )
+    parser.add_argument(
+        "--robust",
+        action="store_true",
+        default=False,
+        help="Include the inline_imports_robust pass",
+    )
     args = parser.parse_args(argv)
 
-    return process(*args.files, output_dir=args.output_dir, quiet=args.quiet)
+    return process(
+        *args.files, output_dir=args.output_dir, quiet=args.quiet, robust=args.robust
+    )
 
 
 if __name__ == "__main__":

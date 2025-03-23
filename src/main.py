@@ -1,39 +1,78 @@
 #!/usr/bin/env python
+import argparse
 from pathlib import Path
+
+from config import SOURCE_DIR
+from tasks.coq_to_lean import AnthropicModel, CachePolicy, coq_to_lean, eval
+from utils import logging, run_cmd
+
+
+def make_single_file(project_name: str, robust: bool = False):
+    logging.info(f"Making single file for {project_name}. This may take a while...")
+    project_config = {
+        "flocq": "./make_single_file.py raw_data/flocq/_CoqProject $(git ls-files --recurse-submodules 'raw_data/flocq/src/*.v' | grep -v _8_12) -o single_file_data/flocq/",
+        "CompCert": "(cd raw_data/CompCert && ./configure x86_64-linux -ignore-coq-version) && (cd raw_data/CompCert && make) && ./make_single_file.py raw_data/CompCert/_CoqProject $(git ls-files --recurse-submodules 'raw_data/CompCert/*.v') -o single_file_data/CompCert/",
+        "lf": "./make_single_file.py raw_data/lf/_CoqProject $(git ls-files 'raw_data/lf/*.v') -o single_file_data/lf/",
+    }
+    assert project_name in project_config, f"Project {project_name} not found"
+    config = project_config[project_name]
+    if robust:
+        config += " --robust"
+    command = f"cd {SOURCE_DIR}/src/dataset"
+    run_cmd(f"{command} && {config}")
 
 from tasks.coq_to_lean import AnthropicModel, CachePolicy, coq_to_lean, eval
 
 if __name__ == "__main__":
-    # Extract a list of Coq statements from the input file(s)
-    # @@Shiki @@Jacob: I expect this to take a filename (or maybe directory path) and return an ordered list of strings (Coq statements) to translate, for example
-    # []"""Definition binopDenote (b : binop) : nat -> nat -> nat :=
-    # match b with
-    #     | Plus => plus
-    #     | Times => mult
-    # end."""]
-    eval_log = eval(
-        coq_to_lean(
-            coq_filepath=Path(__file__).parent
-            / "simple-tests"
-            / "StackMachine-statements.v",
-            cache=CachePolicy(expiry=None, per_epoch=False),
-            agent="basic",
-            seed="",
-        ),
-        # model=OpenAIModel.BEST,
-        # model=OpenAIModel.O1PREVIEW,
-        model=AnthropicModel.BEST,
-        token_limit=256_000,
+    # Process arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--project", required=False, help="Name of the project to process", default="lf"
     )
-    # # If successful, extract statement pairs and add to training set
-    # if success:
-    #     # Need to decide how this actually works
-    #     # extract_and_add(coq_statements, lean_statements, cl_identifiers)
+    parser.add_argument(
+        "--rebuild",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Do project processing",
+    )
+    parser.add_argument(
+        "--robust",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Get all files, rather than just the ones with admits",
+    )
+    parser.add_argument(
+        "--skip-translation",
+        action="store_true",
+        default=False,
+        help="Skip project translation",
+    )
+    args = parser.parse_args()
+    project_name = args.project
 
-    #     # Return success or failure
-    #     logging.info("Success!")
-    #     sys.exit(0)
-    # else:
-    #     # TODO: Explain in more detail what needs fixing manually
-    #     logging.info("Could not translate and/or prove")
-    #     sys.exit(1)
+    # Make single file
+    if args.rebuild:
+        assert Path(f"src/dataset/raw_data/{project_name}").exists(), (
+            "Project raw_data does not exist"
+        )
+        make_single_file(project_name, robust=args.robust)
+    # Chunk the single file
+    # @@Shiki
+
+    if not args.skip_translation:
+        # Translate Coq files to Lean
+        eval_log = eval(
+            coq_to_lean(
+                coq_filepath=Path(__file__).parent
+                / "simple-tests"
+                / "incomplete_statements.v",
+                cache=CachePolicy(expiry=None, per_epoch=False),
+                agent="basic",
+                seed="",
+            ),
+            # model=OpenAIModel.BEST,
+            # model=OpenAIModel.O1PREVIEW,
+            model=AnthropicModel.BEST,
+            token_limit=256_000,
+        )
+    # If successful, extract statement pairs and add to training set
