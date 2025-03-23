@@ -27,18 +27,6 @@ def with_time(description=None, quiet: bool = False):
             logger.info(f"Elapsed time: {elapsed_time:.2f} seconds")
 
 
-def check_file_validity(*files: Path):
-    """Check that files are valid (_CoqProject or .v files, no Everything*Requires.v)."""
-    # Check file names
-    for file in files:
-        if not (file.name == "_CoqProject" or file.suffix == ".v"):
-            raise ValueError(f"Invalid file: {file}. Must be _CoqProject or .v files.")
-
-    # Ensure _CoqProject exists
-    if not any(f.name == "_CoqProject" for f in files):
-        raise ValueError("_CoqProject file is required.")
-
-
 def parse_coqproject(*files: Path):
     """Parse _CoqProject file to extract library bindings."""
     coqproject_file = next((f for f in files if f.name == "_CoqProject"), None)
@@ -60,6 +48,24 @@ def parse_coqproject(*files: Path):
 
     lib_name = list(bindings.values())[0]
     return bindings, lib_name, coqproject_file.parent
+
+
+def check_file_validity(*files: Path, lib_name: str):
+    """Check that files are valid (_CoqProject or .v files, no Everything*Requires.v)."""
+    # Check file names
+    for file in files:
+        if not (file.name == "_CoqProject" or file.suffix == ".v"):
+            raise ValueError(f"Invalid file: {file}. Must be _CoqProject or .v files.")
+
+    # Ensure _CoqProject exists
+    if not any(f.name == "_CoqProject" for f in files):
+        raise ValueError("_CoqProject file is required.")
+
+    for file in files:
+        if file.name.startswith(f"Everything{lib_name}") and file.name.endswith(".v"):
+            raise ValueError(
+                f"File {file.name}(Everything{lib_name}*.v) is not allowed."
+            )
 
 
 def copy_files_to_output(
@@ -224,13 +230,9 @@ def process(
     files = tuple(Path(f) for f in files)
     output_dir = Path(output_dir)
 
-    check_file_validity(*files)
-
     # Parse _CoqProject
     bindings, lib_name, shared_parent = parse_coqproject(*files)
-    for file in files:
-        if file.name.startswith(f"Everything{lib_name}") and file.name.endswith(".v"):
-            raise ValueError(f"File {file.name}(Everything{lib_name}*.v) is not allowed.")
+    check_file_validity(*files, lib_name=lib_name)
 
     # Copy files to output directory
     known_files, unknown_files = copy_files_to_output(
