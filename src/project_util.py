@@ -3,6 +3,7 @@ import contextlib
 import datetime
 import os
 import re
+import shlex
 import tempfile
 from collections import OrderedDict
 from copy import deepcopy
@@ -285,6 +286,11 @@ class Project:
         **kwargs,
     ) -> CompletedProcess[str]:
         with self.tempdir() as p:
+            logging.info(
+                "Running %s in %s",
+                args[0] if isinstance(args[0], str) else shlex.join(args[0]),
+                str(p),
+            )
             process = run_cmd(*args, **kwargs)
             if sanitize is not None:
                 logging.info("Sanitizing %s -> %s", str(p), sanitize)
