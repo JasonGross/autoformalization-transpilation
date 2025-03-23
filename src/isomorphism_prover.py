@@ -1,3 +1,4 @@
+import datetime
 import re
 from copy import deepcopy
 from functools import lru_cache
@@ -201,6 +202,83 @@ def block_index_of_error_line(
     return blocknum if blocknum != -1 else None
 
 
+def insert_iso_block(
+    cc_identifiers_blocks: list[str | IsoBlock],
+    new_block: IsoBlock,
+    before_source: str,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+) -> list[str | IsoBlock]:
+    cc_identifiers_blocks = deepcopy(cc_identifiers_blocks)
+    index = find_iso_index(
+        cc_identifiers_blocks,
+        before_source,
+        original_name=original_name,
+        imported_name=imported_name,
+    )
+
+    block = cc_identifiers_blocks[index]
+    assert isinstance(block, IsoBlock), block
+    logging.info(
+        f"Adding iso_statement {new_block.source}, {new_block.target} for {str(block.source)}, {str(block.target)}"
+    )
+    cc_identifiers_blocks_sources = [
+        (block.source if isinstance(block, IsoBlock) else None)
+        for block in cc_identifiers_blocks
+    ]
+    existing_index = None
+    try:
+        existing_index = cc_identifiers_blocks_sources.index(new_block.source)
+    except ValueError:
+        pass
+    if existing_index is not None:
+        if existing_index <= index:
+            raise IsoAlreadyExistsError(
+                IsoAlreadyExistsErrorArguments(
+                    str(new_block.source),
+                    str(new_block.target),
+                    str(block.source),
+                    str(block.target),
+                    index,
+                    existing_index,
+                )
+            )
+        else:
+            old_block = cc_identifiers_blocks.pop(existing_index)
+            assert isinstance(old_block, IsoBlock), old_block
+            new_block.proof = new_block.proof or old_block.proof
+            new_block.is_interface = new_block.is_interface or old_block.is_interface
+            new_block.is_original = new_block.is_original or old_block.is_original
+    cc_identifiers_blocks.insert(index, new_block)
+    return cc_identifiers_blocks
+
+
+def insert_iso(
+    cc_identifiers_blocks: list[str | IsoBlock],
+    source: str,
+    target: str,
+    before_source: str,
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    is_interface: bool = False,
+    # add_target_prefix: bool = True,
+) -> list[str | IsoBlock]:
+    new_source = CoqIdentifier(source)
+    new_target = CoqIdentifier(target)
+    # if add_target_prefix:
+    #     new_target = add_prefix(new_target, prefix=imported_name)
+    new_block = IsoBlock(new_source, new_target, is_interface=is_interface)
+    return insert_iso_block(
+        cc_identifiers_blocks,
+        new_block,
+        before_source,
+        original_name=original_name,
+        imported_name=imported_name,
+    )
+
+
 def repair_missing_type_iso(
     project: CoqProject,
     error: MissingTypeIso,
@@ -210,31 +288,17 @@ def repair_missing_type_iso(
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
     is_interface: bool = False,
-    errors: str,
 ) -> tuple[CoqProject, list[str | IsoBlock]]:
-    index = find_iso_index(
+    cc_identifiers_blocks = insert_iso(
         cc_identifiers_blocks,
-        error.orig_source,
+        error.source,
+        error.target,
         error.orig_target,
         original_name=original_name,
         imported_name=imported_name,
+        is_interface=is_interface,
     )
-    logging.info(
-        f"Adding iso_statement {error.source} {error.target} for {error.orig_source} {error.orig_target}"
-    )
-    assert not has_iso(cc_identifiers_blocks, error.source, error.target), (
-        error,
-        cc_identifiers_blocks,
-        errors,
-    )
-    cc_identifiers_blocks.insert(
-        index,
-        IsoBlock(
-            CoqIdentifier(error.source),
-            CoqIdentifier(error.target),
-            is_interface=is_interface,
-        ),
-    )
+
     project = generate_isos(
         project,
         cc_identifiers_blocks,
@@ -545,7 +609,7 @@ def parse_iso_errors(
 def make_isos(
     project: CoqProject, *targets: str
 ) -> tuple[CoqProject, bool, Optional[str]]:
-    result, project = project.make(*targets, check=False)
+    result, project = project.make(*targets, check=False, sanitize="/tmp/make_isos")
     if result.returncode != 0:
         # We log this and then feed it into our iso repair model
         error_message = f"{result.stdout}\n{result.stderr}".strip()
@@ -1117,7 +1181,30 @@ def generate_and_autorepair_isos(
 
     assert errors is not None, project
 
-    logging.info("Isomorphism proof failed to compile, attempting to repair...")
+    if write_to_directory_on_error is not None:
+        write_to_directory_on_error = Path(write_to_directory_on_error)
+
+    extra_write = ""
+    if write_to_directory_on_error:
+        key = str(hash(project))
+        (write_to_directory_on_error / key).mkdir(parents=True, exist_ok=True)
+        now = datetime.datetime.now()
+        iso_string = now.isoformat()
+        extra_write = f" (in {write_to_directory_on_error / key / iso_string})"
+        if len(list((write_to_directory_on_error / key).iterdir())) == 0:
+            project.write(
+                write_to_directory_on_error / key / iso_string, log=logging.error
+            )
+            (write_to_directory_on_error / key / iso_string / "errors.txt").write_text(
+                errors
+            )
+        else:
+            logging.error("Touching %s", write_to_directory_on_error / key / iso_string)
+            (write_to_directory_on_error / key / iso_string).touch()
+
+    logging.info(
+        "Isomorphism proof%s failed to compile, attempting to repair...", extra_write
+    )
 
     error = parse_iso_errors(
         errors,
@@ -1138,7 +1225,6 @@ def generate_and_autorepair_isos(
             original_name=original_name,
             imported_name=imported_name,
             iso_file=iso_file,
-            errors=errors,
         )
         return generate_and_autorepair_isos(
             project,
@@ -1354,86 +1440,3 @@ class IsoAlreadyExistsErrorArguments(NamedTuple):
 
 class IsoAlreadyExistsError(Exception):
     args: tuple[IsoAlreadyExistsErrorArguments]
-
-
-def insert_iso_block(
-    cc_identifiers_blocks: list[str | IsoBlock],
-    new_block: IsoBlock,
-    before_source: str,
-    *,
-    original_name: str = "Original",
-    imported_name: str = "Imported",
-) -> list[str | IsoBlock]:
-    def assert_blocks_compatible(block1: IsoBlock, block2: IsoBlock):
-        default_block = IsoBlock(block1.source, block1.target)
-        assert block1.source == block2.source, (block1.source, block2.source)
-        assert block1.target == block2.target, (block1.target, block2.target)
-        assert block1 == default_block or block1 == block2, (block1, block2)
-
-    cc_identifiers_blocks = deepcopy(cc_identifiers_blocks)
-    index = find_iso_index(
-        cc_identifiers_blocks,
-        before_source,
-        original_name=original_name,
-        imported_name=imported_name,
-    )
-
-    block = cc_identifiers_blocks[index]
-    assert isinstance(block, IsoBlock), block
-    logging.info(
-        f"Adding iso_statement {new_block.source}, {new_block.target} for {str(block.source)}, {str(block.target)}"
-    )
-    cc_identifiers_blocks_noproofs = [
-        ((block.source, block.target) if isinstance(block, IsoBlock) else (None, None))
-        for block in cc_identifiers_blocks
-    ]
-    existing_index = None
-    try:
-        existing_index = cc_identifiers_blocks_noproofs.index(
-            (new_block.source, new_block.target)
-        )
-    except ValueError:
-        pass
-    if existing_index is not None:
-        if existing_index <= index:
-            raise IsoAlreadyExistsError(
-                IsoAlreadyExistsErrorArguments(
-                    str(new_block.source),
-                    str(new_block.target),
-                    str(block.source),
-                    str(block.target),
-                    index,
-                    existing_index,
-                )
-            )
-        else:
-            new_block_val = cc_identifiers_blocks.pop(existing_index)
-            assert isinstance(new_block_val, IsoBlock), new_block_val
-            assert_blocks_compatible(new_block, new_block_val)
-            new_block = new_block_val
-    cc_identifiers_blocks.insert(index, new_block)
-    return cc_identifiers_blocks
-
-
-def insert_iso(
-    cc_identifiers_blocks: list[str | IsoBlock],
-    source: str,
-    target: str,
-    before_source: str,
-    *,
-    original_name: str = "Original",
-    imported_name: str = "Imported",
-    # add_target_prefix: bool = True,
-) -> list[str | IsoBlock]:
-    new_source = CoqIdentifier(source)
-    new_target = CoqIdentifier(target)
-    # if add_target_prefix:
-    #     new_target = add_prefix(new_target, prefix=imported_name)
-    new_block = IsoBlock(new_source, new_target)
-    return insert_iso_block(
-        cc_identifiers_blocks,
-        new_block,
-        before_source,
-        original_name=original_name,
-        imported_name=imported_name,
-    )
