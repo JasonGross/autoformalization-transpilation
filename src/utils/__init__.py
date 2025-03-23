@@ -42,11 +42,3 @@ def backup(filename: str | Path, ext: str = ".bak") -> Optional[Path]:
             filename.rename(backup_name)
             return backup_name
     return None
-
-
-T = TypeVar("T")
-
-
-def unique(iterable: list[T]) -> list[T]:
-    """Return a new iterable with duplicates removed"""
-    return iterable.__class__(dict.fromkeys(iterable))

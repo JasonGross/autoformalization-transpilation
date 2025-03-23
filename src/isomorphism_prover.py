@@ -30,7 +30,8 @@ from project_util import (
     has_identifier_prefix,
     remove_identifier_prefix,
 )
-from utils import logging, unique
+from utils import logging
+from utils.itertools_extra import unique
 
 ISO_TARGET_PATTERN = r"(?:[\w\.]+|\(@[\w\.]+\))"
 
@@ -293,7 +294,7 @@ def repair_missing_type_iso(
         cc_identifiers_blocks,
         error.source,
         error.target,
-        error.orig_target,
+        error.orig_source,
         original_name=original_name,
         imported_name=imported_name,
         is_interface=is_interface,
@@ -480,11 +481,13 @@ def parse_iso_errors(
             missing_reference_match.group(1),
         )
 
-    result = unique(
-        re.findall(
-            # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
-            rf"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ({ISO_TARGET_PATTERN}) (?:-> )?({ISO_TARGET_PATTERN})",
-            errors,
+    result = list(
+        unique(
+            re.findall(
+                # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
+                rf"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ({ISO_TARGET_PATTERN}) (?:-> )?({ISO_TARGET_PATTERN})",
+                errors,
+            )
         )
     )
     if result:
