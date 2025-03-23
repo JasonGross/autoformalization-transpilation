@@ -139,8 +139,8 @@ class Project:
     def __hash__(self) -> int:
         return hash((tuple(self.files.items()), tuple(sorted(self.debug_files))))
 
-    def write(self, directory: str | Path) -> None:
-        logging.debug("Writing %s to %s", self.__class__.__name__, directory)
+    def write(self, directory: str | Path, *, log=logging.debug) -> None:
+        log("Writing %s to %s", self.__class__.__name__, directory)
         directory = Path(directory)
         directory.mkdir(parents=True, exist_ok=True)
         dt_epoch = datetime.datetime.now().timestamp()
