@@ -230,7 +230,7 @@ def process(
     bindings, lib_name, shared_parent = parse_coqproject(*files)
     for file in files:
         if file.name.startswith(f"Everything{lib_name}") and file.name.endswith(".v"):
-            raise ValueError(f"File Everything{lib_name}*.v is not allowed.")
+            raise ValueError(f"File {file.name}(Everything{lib_name}*.v) is not allowed.")
 
     # Copy files to output directory
     known_files, unknown_files = copy_files_to_output(
