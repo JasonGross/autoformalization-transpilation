@@ -234,20 +234,29 @@ def insert_iso_block(
     except ValueError:
         pass
     if existing_index is not None:
+        old_block = cc_identifiers_blocks[existing_index]
+        assert isinstance(old_block, IsoBlock), old_block
         if existing_index <= index:
-            raise IsoAlreadyExistsError(
-                IsoAlreadyExistsErrorArguments(
-                    str(new_block.source),
-                    str(new_block.target),
-                    str(block.source),
-                    str(block.target),
-                    index,
-                    existing_index,
+            if old_block.target == new_block.target:
+                raise IsoAlreadyExistsError(
+                    IsoAlreadyExistsErrorArguments(
+                        str(new_block.source),
+                        str(new_block.target),
+                        str(block.source),
+                        str(block.target),
+                        index,
+                        existing_index,
+                    )
                 )
-            )
+            else:
+                logging.warning(
+                    f"Overwriting {old_block.source} -> {old_block.target} at index {existing_index} with {new_block.source} -> {new_block.target}"
+                )
+                old_block.target = new_block.target
+                cc_identifiers_blocks[existing_index] = old_block
+                return cc_identifiers_blocks
         else:
-            old_block = cc_identifiers_blocks.pop(existing_index)
-            assert isinstance(old_block, IsoBlock), old_block
+            cc_identifiers_blocks.pop(existing_index)
             new_block.proof = new_block.proof or old_block.proof
             new_block.is_interface = new_block.is_interface or old_block.is_interface
             new_block.is_original = new_block.is_original or old_block.is_original
@@ -367,6 +376,16 @@ def parse_iso_errors(
         errors,
     )
 
+    missing_iso_result = list(
+        unique(
+            re.findall(
+                # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
+                rf"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ({ISO_TARGET_PATTERN}) (?:-> )?({ISO_TARGET_PATTERN})",
+                errors,
+            )
+        )
+    )
+
     # First extract the block from the error message
     err_matches = re.findall(DEFAULT_ERROR_REG_STRING, errors)
     assert_or_error(err_matches)
@@ -405,7 +424,11 @@ def parse_iso_errors(
         interface_iso_index = compute_interface_iso_index(iso_index)
 
         # if there are no hints, return an IsoErrorWithoutHints
-        if "Proving iso_statement" not in errors and not missing_reference_match:
+        if (
+            "Proving iso_statement" not in errors
+            and not missing_reference_match
+            and not missing_iso_result
+        ):
             return IsoErrorWithoutHints(
                 orig_source,
                 orig_target,
@@ -434,9 +457,13 @@ def parse_iso_errors(
         orig_source = orig_source or labeled_iso_statement_orig_source
         orig_target = orig_target or labeled_iso_statement_orig_target
         if (
-            labeled_iso_statement_orig_source != orig_source
-            or labeled_iso_statement_orig_target != orig_target
-        ) and not missing_reference_match:
+            (
+                labeled_iso_statement_orig_source != orig_source
+                or labeled_iso_statement_orig_target != orig_target
+            )
+            and not missing_reference_match
+            and not missing_iso_result
+        ):
             pre_error = re.split(DEFAULT_PRE_ERROR_REG_STRING, errors)[0]
             assert_or_error(isinstance(error_msg, str), repr(error_msg))
             assert isinstance(error_msg, str)  # for the type checker
@@ -481,20 +508,15 @@ def parse_iso_errors(
             missing_reference_match.group(1),
         )
 
-    result = list(
-        unique(
-            re.findall(
-                # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
-                rf"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ({ISO_TARGET_PATTERN}) (?:-> )?({ISO_TARGET_PATTERN})",
-                errors,
-            )
+    if missing_iso_result:
+        logging.info(
+            f"Found missing isomorphisms: {set(missing_iso_result)} in {errors}"
         )
-    )
-    if result:
-        logging.info(f"Found missing isomorphisms: {set(result)}")
-        if len(result) > 1:
-            logging.warning(f"Found multiple missing isomorphisms: {result}")
-        source, target = result[0]
+        if len(missing_iso_result) > 1:
+            logging.warning(
+                f"Found multiple missing isomorphisms: {missing_iso_result}"
+            )
+        source, target = missing_iso_result[0]
         if (orig_source, orig_target) != (source, target):
             return MissingTypeIso(
                 orig_source,
@@ -1135,15 +1157,19 @@ def init_coq_project(
     return coq_project
 
 
+class IsoIsAlreadyAdmittedError(ValueError):
+    pass
+
+
 def admit_failing_iso(
-    project: CoqProject,
     cc_identifiers_blocks: list[str | IsoBlock],
     orig_source: str,
     orig_target: str | None = None,
     *,
     original_name: str = "Original",
     imported_name: str = "Imported",
-) -> tuple[CoqProject, list[str | IsoBlock]]:
+    remove_if_admitted: bool = True,
+) -> list[str | IsoBlock]:
     cc_identifiers_blocks = deepcopy(cc_identifiers_blocks)
     index, block = find_iso_and_index(
         cc_identifiers_blocks,
@@ -1152,10 +1178,22 @@ def admit_failing_iso(
         original_name=original_name,
         imported_name=imported_name,
     )
-    block.proof = "Admitted."
+    if remove_if_admitted and block.proof == "Admitted.":
+        if block.is_required:
+            raise IsoIsAlreadyAdmittedError(
+                f"Cannot admit required iso {orig_source} to {orig_target}"
+            )
+        else:
+            logging.warning(
+                f"Removing non-required iso {orig_source} to {orig_target} because it is already admitted"
+            )
+            del cc_identifiers_blocks[index]
+        return cc_identifiers_blocks
+    else:
+        block.proof = "Admitted."
     cc_identifiers_blocks[index] = block
     logging.info(f"Admitted iso proof for {orig_source} to {orig_target}")
-    return project, cc_identifiers_blocks
+    return cc_identifiers_blocks
 
 
 def generate_and_autorepair_isos(
@@ -1190,6 +1228,7 @@ def generate_and_autorepair_isos(
     assert errors is not None, project
 
     if write_to_directory_on_error is not None:
+        logging.info(f"Writing errors to {write_to_directory_on_error}")
         write_to_directory_on_error = Path(write_to_directory_on_error)
 
     extra_write = ""
@@ -1223,96 +1262,11 @@ def generate_and_autorepair_isos(
         iso_file=iso_file,
     )
     logging.info(f"Current error type is {type(error).__name__}")
-    extra_err = ""
 
-    if isinstance(error, MissingTypeIso):
-        try:
-            project, cc_identifiers_blocks = repair_missing_type_iso(
-                project,
-                error,
-                cc_identifiers_blocks,
-                original_name=original_name,
-                imported_name=imported_name,
-                iso_file=iso_file,
-            )
-        except (AssertionError, ValueError) as e:
-            e.args = (*e.args, error, errors)
-            raise e
-        return generate_and_autorepair_isos(
-            project,
-            cc_identifiers_blocks,
-            admit_failing_isos=admit_failing_isos,
-            original_name=original_name,
-            imported_name=imported_name,
-            iso_file=iso_file,
-            write_to_directory_on_error=write_to_directory_on_error,
-        )
-    elif isinstance(error, MissingImport):
-        if error.import_str in KNOWN_IMPORTS:
-            logging.info(
-                f"Adding import {KNOWN_IMPORTS[error.import_str]} for iso_statement {error.orig_source} {error.orig_target}"
-            )
-            cc_identifiers_blocks.insert(
-                0,
-                KNOWN_IMPORTS[error.import_str],
-            )
-        elif (
-            has_identifier_prefix(error.import_str, imported_name)
-            and error.iso_index is not None
-        ):
-            logging.info(
-                f"Removing import prefix {imported_name} from {error.import_str} for iso_statement {error.orig_source} {error.orig_target}"
-            )
-            block = cc_identifiers_blocks[error.iso_index]
-            assert isinstance(block, IsoBlock), (
-                f"Block {error.iso_index} is not an IsoBlock: {block}"
-            )
-            assert str(block.target) == error.import_str, (
-                f"Block {error.iso_index} has target {block.target} which does not match import {error.import_str}"
-            )
-            block.target = remove_identifier_prefix(block.target, imported_name)
-            cc_identifiers_blocks[error.iso_index] = block
-        else:
-            if (
-                has_identifier_prefix(error.import_str, imported_name)
-                and error.iso_index is None
-            ):
-                logging.info(
-                    f"Could not find iso_index for {error.import_str} for iso_statement {error.orig_source} {error.orig_target}"
-                )
-            if admit_failing_isos:
-                project, cc_identifiers_blocks = admit_failing_iso(
-                    project,
-                    cc_identifiers_blocks,
-                    error.orig_source,
-                    error.orig_target,
-                    original_name=original_name,
-                    imported_name=imported_name,
-                )
-            else:
-                if write_to_directory_on_error is not None:
-                    project.write(write_to_directory_on_error)
-                return project, cc_identifiers_blocks, False, error
-        return generate_and_autorepair_isos(
-            project,
-            cc_identifiers_blocks,
-            admit_failing_isos=admit_failing_isos,
-            original_name=original_name,
-            imported_name=imported_name,
-            iso_file=iso_file,
-            write_to_directory_on_error=write_to_directory_on_error,
-        )
-
-    elif isinstance(error, DisorderedConstr):
-        can_autofix = can_autofix_disordered_constr(
-            error,
-            cc_identifiers_blocks,
-            original_name=original_name,
-            imported_name=imported_name,
-        )
-        if can_autofix or admit_failing_isos:
-            if can_autofix:
-                project, cc_identifiers_blocks = autofix_disordered_constr(
+    try:
+        if isinstance(error, MissingTypeIso):
+            try:
+                project, cc_identifiers_blocks = repair_missing_type_iso(
                     project,
                     error,
                     cc_identifiers_blocks,
@@ -1320,125 +1274,185 @@ def generate_and_autorepair_isos(
                     imported_name=imported_name,
                     iso_file=iso_file,
                 )
-            else:
-                project, cc_identifiers_blocks = admit_failing_iso(
-                    project,
-                    cc_identifiers_blocks,
-                    error.orig_source,
-                    error.orig_target,
-                    original_name=original_name,
-                    imported_name=imported_name,
+            except (AssertionError, ValueError) as e:
+                e.args = (*e.args, error, errors)
+                raise e
+            return generate_and_autorepair_isos(
+                project,
+                cc_identifiers_blocks,
+                admit_failing_isos=admit_failing_isos,
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
+            )
+        elif isinstance(error, MissingImport):
+            if error.import_str in KNOWN_IMPORTS:
+                logging.info(
+                    f"Adding import {KNOWN_IMPORTS[error.import_str]} for iso_statement {error.orig_source} {error.orig_target}"
                 )
-            return generate_and_autorepair_isos(
-                project,
-                cc_identifiers_blocks,
-                admit_failing_isos=admit_failing_isos,
-                original_name=original_name,
-                imported_name=imported_name,
-                iso_file=iso_file,
-                write_to_directory_on_error=write_to_directory_on_error,
-            )
-        else:
-            if write_to_directory_on_error is not None:
-                project.write(write_to_directory_on_error)
-            return project, cc_identifiers_blocks, False, error
-    elif isinstance(error, GenericIsoError):
-        if admit_failing_isos:
-            project, cc_identifiers_blocks = admit_failing_iso(
-                project,
-                cc_identifiers_blocks,
-                error.orig_source,
-                error.orig_target,
-                original_name=original_name,
-                imported_name=imported_name,
-            )
-            return generate_and_autorepair_isos(
-                project,
-                cc_identifiers_blocks,
-                admit_failing_isos=admit_failing_isos,
-                original_name=original_name,
-                imported_name=imported_name,
-                iso_file=iso_file,
-                write_to_directory_on_error=write_to_directory_on_error,
-            )
-        else:
-            if write_to_directory_on_error is not None:
-                project.write(write_to_directory_on_error)
-            return project, cc_identifiers_blocks, False, error
-    elif isinstance(error, NonIsoBlockError):
-        if admit_failing_isos:
-            # remove the failing block
-            logging.info(f"Remove block {error.block_index}: {error.block}")
-            logging.debug(f"Error message: {error.error}")
-            del cc_identifiers_blocks[error.block_index]
-            return generate_and_autorepair_isos(
-                project,
-                cc_identifiers_blocks,
-                admit_failing_isos=admit_failing_isos,
-                original_name=original_name,
-                imported_name=imported_name,
-                iso_file=iso_file,
-                write_to_directory_on_error=write_to_directory_on_error,
-            )
-        else:
-            if write_to_directory_on_error is not None:
-                project.write(write_to_directory_on_error)
-            return project, cc_identifiers_blocks, False, error
-    elif isinstance(error, AmbiguousIsoError) or isinstance(
-        error, IsoErrorWithoutHints
-    ):
-        if admit_failing_isos:
-            # we can remove this failing iso if it's actually an iso and the block is a string or is not required
-            if error.iso_index is not None:
+                cc_identifiers_blocks.insert(
+                    0,
+                    KNOWN_IMPORTS[error.import_str],
+                )
+            elif (
+                has_identifier_prefix(error.import_str, imported_name)
+                and error.iso_index is not None
+            ):
+                logging.info(
+                    f"Removing import prefix {imported_name} from {error.import_str} for iso_statement {error.orig_source} {error.orig_target}"
+                )
                 block = cc_identifiers_blocks[error.iso_index]
-                if isinstance(block, IsoBlock) and block.proof != "Admitted.":
-                    project, cc_identifiers_blocks = admit_failing_iso(
-                        project,
+                assert isinstance(block, IsoBlock), (
+                    f"Block {error.iso_index} is not an IsoBlock: {block}"
+                )
+                assert str(block.target) == error.import_str, (
+                    f"Block {error.iso_index} has target {block.target} which does not match import {error.import_str}"
+                )
+                block.target = remove_identifier_prefix(block.target, imported_name)
+                cc_identifiers_blocks[error.iso_index] = block
+            else:
+                if (
+                    has_identifier_prefix(error.import_str, imported_name)
+                    and error.iso_index is None
+                ):
+                    logging.info(
+                        f"Could not find iso_index for {error.import_str} for iso_statement {error.orig_source} {error.orig_target}"
+                    )
+                if admit_failing_isos:
+                    cc_identifiers_blocks = admit_failing_iso(
                         cc_identifiers_blocks,
                         error.orig_source,
                         error.orig_target,
                         original_name=original_name,
                         imported_name=imported_name,
                     )
-                    return generate_and_autorepair_isos(
+                else:
+                    if write_to_directory_on_error is not None:
+                        project.write(write_to_directory_on_error)
+                    return project, cc_identifiers_blocks, False, error
+            return generate_and_autorepair_isos(
+                project,
+                cc_identifiers_blocks,
+                admit_failing_isos=admit_failing_isos,
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+                write_to_directory_on_error=write_to_directory_on_error,
+            )
+
+        elif isinstance(error, DisorderedConstr):
+            can_autofix = can_autofix_disordered_constr(
+                error,
+                cc_identifiers_blocks,
+                original_name=original_name,
+                imported_name=imported_name,
+            )
+            if can_autofix or admit_failing_isos:
+                if can_autofix:
+                    project, cc_identifiers_blocks = autofix_disordered_constr(
                         project,
+                        error,
                         cc_identifiers_blocks,
-                        admit_failing_isos=admit_failing_isos,
                         original_name=original_name,
                         imported_name=imported_name,
                         iso_file=iso_file,
-                        write_to_directory_on_error=write_to_directory_on_error,
-                    )
-                elif not isinstance(block, IsoBlock) or not block.is_required:
-                    logging.info(
-                        f"Removing iso #{error.iso_index}: {error.orig_source} {error.orig_target}"
-                    )
-                    if isinstance(block, str):
-                        # this should not happen, but we'll handle it anyway
-                        logging.error(
-                            f"Block {error.iso_index} is a string: {block} (from {error})"
-                        )
-                    del cc_identifiers_blocks[error.iso_index]
-                    return generate_and_autorepair_isos(
-                        project,
-                        cc_identifiers_blocks,
-                        admit_failing_isos=admit_failing_isos,
-                        original_name=original_name,
-                        imported_name=imported_name,
-                        iso_file=iso_file,
-                        write_to_directory_on_error=write_to_directory_on_error,
                     )
                 else:
-                    extra_err = f" because block {error.iso_index} is an iso block that is required: {block}"
-
+                    cc_identifiers_blocks = admit_failing_iso(
+                        cc_identifiers_blocks,
+                        error.orig_source,
+                        error.orig_target,
+                        original_name=original_name,
+                        imported_name=imported_name,
+                    )
+                return generate_and_autorepair_isos(
+                    project,
+                    cc_identifiers_blocks,
+                    admit_failing_isos=admit_failing_isos,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                    iso_file=iso_file,
+                    write_to_directory_on_error=write_to_directory_on_error,
+                )
+            else:
+                if write_to_directory_on_error is not None:
+                    project.write(write_to_directory_on_error)
+                return project, cc_identifiers_blocks, False, error
+        elif isinstance(error, GenericIsoError):
+            if admit_failing_isos:
+                cc_identifiers_blocks = admit_failing_iso(
+                    cc_identifiers_blocks,
+                    error.orig_source,
+                    error.orig_target,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                )
+                return generate_and_autorepair_isos(
+                    project,
+                    cc_identifiers_blocks,
+                    admit_failing_isos=admit_failing_isos,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                    iso_file=iso_file,
+                    write_to_directory_on_error=write_to_directory_on_error,
+                )
+            else:
+                if write_to_directory_on_error is not None:
+                    project.write(write_to_directory_on_error)
+                return project, cc_identifiers_blocks, False, error
+        elif isinstance(error, NonIsoBlockError):
+            if admit_failing_isos:
+                # remove the failing block
+                logging.info(f"Remove block {error.block_index}: {error.block}")
+                logging.debug(f"Error message: {error.error}")
+                del cc_identifiers_blocks[error.block_index]
+                return generate_and_autorepair_isos(
+                    project,
+                    cc_identifiers_blocks,
+                    admit_failing_isos=admit_failing_isos,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                    iso_file=iso_file,
+                    write_to_directory_on_error=write_to_directory_on_error,
+                )
+            else:
+                if write_to_directory_on_error is not None:
+                    project.write(write_to_directory_on_error)
+                return project, cc_identifiers_blocks, False, error
+        elif isinstance(error, AmbiguousIsoError) or isinstance(
+            error, IsoErrorWithoutHints
+        ):
+            if admit_failing_isos:
+                # we can remove this failing iso if it's actually an iso and the block is a string or is not required
+                cc_identifiers_blocks = admit_failing_iso(
+                    cc_identifiers_blocks,
+                    error.orig_source,
+                    error.orig_target,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                )
+                return generate_and_autorepair_isos(
+                    project,
+                    cc_identifiers_blocks,
+                    admit_failing_isos=admit_failing_isos,
+                    original_name=original_name,
+                    imported_name=imported_name,
+                    iso_file=iso_file,
+                    write_to_directory_on_error=write_to_directory_on_error,
+                )
+            if write_to_directory_on_error is not None:
+                project.write(write_to_directory_on_error)
+            return project, cc_identifiers_blocks, False, error
+        else:
+            assert False, f"Unknown error type {type(error)}: {error}"
+    except IsoIsAlreadyAdmittedError as e:
+        extra_err = f" because {str(e)}"
         if write_to_directory_on_error is not None:
             project.write(write_to_directory_on_error)
             extra_err += f" and written to {write_to_directory_on_error}"
-        if admit_failing_isos:
-            logging.error(f"Failed to admit iso proof for {error}{extra_err}")
+        logging.error(f"Failed to admit iso proof for {error}{extra_err}")
         return project, cc_identifiers_blocks, False, error
-    else:
-        assert False, f"Unknown error type {type(error)}: {error}"
 
 
 class IsoAlreadyExistsErrorArguments(NamedTuple):
