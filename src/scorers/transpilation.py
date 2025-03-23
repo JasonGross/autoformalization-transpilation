@@ -242,3 +242,46 @@ def isos_proven_scorer(
         )
 
     return score
+
+
+@scorer(metrics=[accuracy(), mean()])
+def strict_isos_proven_scorer(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: (
+        Path | str | None
+    ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+):
+    """score based on how many original isos were proven"""
+
+    return isos_proven_scorer(
+        original_name=original_name,
+        imported_name=imported_name,
+        iso_file=iso_file,
+        write_to_directory_on_error=write_to_directory_on_error,
+        only_required=True,
+        only_original=False,
+    )
+
+
+def relaxed_isos_proven_scorer(
+    *,
+    original_name: str = "Original",
+    imported_name: str = "Imported",
+    iso_file: str = "Isomorphisms.v",
+    write_to_directory_on_error: (
+        Path | str | None
+    ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+):
+    """score based on how many isos were proven overall"""
+
+    return isos_proven_scorer(
+        original_name=original_name,
+        imported_name=imported_name,
+        iso_file=iso_file,
+        write_to_directory_on_error=write_to_directory_on_error,
+        only_required=False,
+        only_original=False,
+    )

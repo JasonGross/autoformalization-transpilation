@@ -14,8 +14,9 @@ from prompts.transpilation import (
 )
 from scorers.transpilation import (
     checker_compiles_scorer,
-    isos_proven_scorer,
     lean_compiles_scorer,
+    relaxed_isos_proven_scorer,
+    strict_isos_proven_scorer,
 )
 from solvers.agent import multiphase_agent
 from solvers.workflows import SIMPLE_WORKFLOW
@@ -24,13 +25,13 @@ from tools.transpilation import (
     add_import_tool,
     add_iso_tool,
     add_lemma_tool,
-    edit_lemma_tool,
     edit_iso_proof_tool,
+    edit_lemma_tool,
+    make_submit_translation_tool,
     remove_import_tool,
     remove_iso_tool,
     remove_lemma_tool,
     repair_iso_by_reorder_constructors_tool,
-    make_submit_translation_tool,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,8 @@ def coq_to_lean(
         scorer=[
             lean_compiles_scorer(),
             checker_compiles_scorer(),
-            isos_proven_scorer(),
+            strict_isos_proven_scorer(),
+            relaxed_isos_proven_scorer(),
         ],
         token_limit=256_000,
     )
