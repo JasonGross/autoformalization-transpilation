@@ -54,6 +54,8 @@ def coq_to_lean(
     autofix_heuristics: Sequence[
         tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
     ] = ALL_HEURISTICS,
+    message_limit: int = 30,
+    token_limit: int = 256_000,
 ):
     # NOTE: This will need rewriting when the input coq file is not hardcoded
     coq_filepath = Path(coq_filepath)
@@ -89,7 +91,7 @@ def coq_to_lean(
                 init=system_message(REACT_SYSTEM_MESSAGE),
                 tools=common_tools,
                 max_attempts=1,
-                message_limit=30,
+                message_limit=message_limit,
                 cache=cache,
             )
         case "multiphase":
@@ -107,7 +109,8 @@ def coq_to_lean(
             strict_isos_proven_scorer(),
             relaxed_isos_proven_scorer(),
         ],
-        token_limit=256_000,
+        token_limit=token_limit,
+        message_limit=message_limit,
     )
 
 
@@ -115,6 +118,8 @@ if __name__ == "__main__":
     eval(
         coq_to_lean(
             cache=CachePolicy(expiry=None, per_epoch=False),
+            message_limit=60,
+            token_limit=256_000,
         ),
         # model=OpenAIModel.BEST,
         # model=OpenAIModel.O1PREVIEW,

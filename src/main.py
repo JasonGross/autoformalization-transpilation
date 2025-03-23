@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 
 from config import SOURCE_DIR
+from isomorphism_prover_heuristics import ALL_HEURISTICS
 from tasks.coq_to_lean import AnthropicModel, CachePolicy, coq_to_lean, eval
 from utils import logging, run_cmd
 
@@ -21,13 +22,17 @@ def make_single_file(project_name: str, robust: bool = False):
     command = f"cd {SOURCE_DIR}/src/dataset"
     run_cmd(f"{command} && {config}")
 
-from tasks.coq_to_lean import AnthropicModel, CachePolicy, coq_to_lean, eval
 
 if __name__ == "__main__":
     # Process arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--project", required=False, help="Name of the project to process", default="lf"
+    )
+    parser.add_argument(
+        "--file",
+        default="simple-tests/incomplete_statements.v",
+        help="Path to the file to translate",
     )
     parser.add_argument(
         "--rebuild",
@@ -42,10 +47,34 @@ if __name__ == "__main__":
         help="Get all files, rather than just the ones with admits",
     )
     parser.add_argument(
-        "--skip-translation",
-        action="store_true",
-        default=False,
-        help="Skip project translation",
+        "--translation",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Do project translation",
+    )
+    parser.add_argument(
+        "--message-limit",
+        type=int,
+        default=30,
+        help="Message limit for the model",
+    )
+    parser.add_argument(
+        "--token-limit",
+        type=int,
+        default=128_000,
+        help="Token limit for the model",
+    )
+    parser.add_argument(
+        "--heuristics",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use all heuristics",
+    )
+    parser.add_argument(
+        "--seed",
+        type=str,
+        default="",
+        help="Seed for the messages, to allow bypassing the cache in a controlled way",
     )
     args = parser.parse_args()
     project_name = args.project
@@ -59,20 +88,22 @@ if __name__ == "__main__":
     # Chunk the single file
     # @@Shiki
 
-    if not args.skip_translation:
+    if args.translation:
         # Translate Coq files to Lean
         eval_log = eval(
             coq_to_lean(
-                coq_filepath=Path(__file__).parent
-                / "simple-tests"
-                / "incomplete_statements.v",
+                coq_filepath=Path(__file__).parent / args.file,
                 cache=CachePolicy(expiry=None, per_epoch=False),
                 agent="basic",
-                seed="",
+                seed=args.seed,
+                autofix_heuristics=ALL_HEURISTICS if args.heuristics else (),
+                message_limit=args.message_limit,
+                token_limit=args.token_limit,
             ),
             # model=OpenAIModel.BEST,
             # model=OpenAIModel.O1PREVIEW,
             model=AnthropicModel.BEST,
-            token_limit=256_000,
+            token_limit=args.token_limit,
+            message_limit=args.message_limit,
         )
     # If successful, extract statement pairs and add to training set
