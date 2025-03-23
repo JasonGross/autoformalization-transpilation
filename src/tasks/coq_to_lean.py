@@ -1,13 +1,15 @@
 import logging
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal, Sequence
 
 from inspect_ai import Task, eval, task
 from inspect_ai.model import CachePolicy
 from inspect_ai.solver import basic_agent, system_message
 
 from dataset.prepare import format_translation_input, prepare_dataset
+from isomorphism_prover_heuristics import ALL_HEURISTICS
 from models import AnthropicModel, OpenAIModel
+from project_util import IsoError
 from prompts.transpilation import (
     REACT_SYSTEM_MESSAGE,
     TRANSLATION_STATE_TEMPLATE,
@@ -49,11 +51,15 @@ def coq_to_lean(
     coq_filepath: str | Path = EXAMPLE_COQ_FILEPATH,
     translation_state_template: str = TRANSLATION_STATE_TEMPLATE,
     seed: str = "",  # allows bypassing the cache in a more controlled way
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = ALL_HEURISTICS,
 ):
     # NOTE: This will need rewriting when the input coq file is not hardcoded
     coq_filepath = Path(coq_filepath)
     submit_translation_tool, coq_identifiers = make_submit_translation_tool(
         coq_statements=coq_filepath.read_text(),
+        autofix_heuristics=autofix_heuristics,
     )
     # dataset
     input_msg = seed + format_translation_input(
@@ -66,15 +72,15 @@ def coq_to_lean(
     common_tools = [
         lean_run_tool(),
         submit_translation_tool(),
-        add_import_tool(),
-        remove_import_tool(),
-        add_lemma_tool(),
-        remove_lemma_tool(),
-        edit_lemma_tool(),
-        add_iso_tool(),
-        remove_iso_tool(),
-        edit_iso_proof_tool(),
-        repair_iso_by_reorder_constructors_tool(),
+        add_import_tool(autofix_heuristics=autofix_heuristics),
+        remove_import_tool(autofix_heuristics=autofix_heuristics),
+        add_lemma_tool(autofix_heuristics=autofix_heuristics),
+        remove_lemma_tool(autofix_heuristics=autofix_heuristics),
+        edit_lemma_tool(autofix_heuristics=autofix_heuristics),
+        add_iso_tool(autofix_heuristics=autofix_heuristics),
+        remove_iso_tool(autofix_heuristics=autofix_heuristics),
+        edit_iso_proof_tool(autofix_heuristics=autofix_heuristics),
+        repair_iso_by_reorder_constructors_tool(autofix_heuristics=autofix_heuristics),
     ]
 
     match agent:

@@ -3,7 +3,7 @@ import re
 from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Iterable, NamedTuple, Optional, Sequence
+from typing import Any, Callable, Iterable, NamedTuple, Optional, Sequence
 
 from config import (
     ISO_CHECKER_HEADER,
@@ -1204,6 +1204,9 @@ def generate_and_autorepair_isos(
     iso_file: str = "Isomorphisms.v",
     write_to_directory_on_error: Path | str | None = Path(__file__).parent.parent
     / "generate_and_autorepair_isos_errors",
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> tuple[
     CoqProject,
     list[str | IsoBlock],
@@ -1378,6 +1381,30 @@ def generate_and_autorepair_isos(
                     project.write(write_to_directory_on_error)
                 return project, cc_identifiers_blocks, False, error
         elif isinstance(error, GenericIsoError):
+            for heuristic_name, can_autofix, autofix in autofix_heuristics:
+                if can_autofix(error):
+                    new_proof = autofix(error)
+                    index, block = find_iso_and_index(
+                        cc_identifiers_blocks,
+                        error.orig_source,
+                        error.orig_target,
+                        original_name=original_name,
+                        imported_name=imported_name,
+                    )
+                    logging.info(
+                        f"Autofixing iso proof for {error.orig_source} to {error.orig_target} using heuristic {heuristic_name}"
+                    )
+                    block.proof = new_proof
+                    cc_identifiers_blocks[index] = block
+                    return generate_and_autorepair_isos(
+                        project,
+                        cc_identifiers_blocks,
+                        admit_failing_isos=admit_failing_isos,
+                        original_name=original_name,
+                        imported_name=imported_name,
+                        iso_file=iso_file,
+                        write_to_directory_on_error=write_to_directory_on_error,
+                    )
             if admit_failing_isos:
                 cc_identifiers_blocks = admit_failing_iso(
                     cc_identifiers_blocks,

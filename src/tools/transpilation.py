@@ -136,6 +136,9 @@ def generate_and_autorepair_isos_tool(
     imported_name: str = "Imported",
     iso_file: str = "Isomorphisms.v",
     write_to_directory_on_error: Path | str | None,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> ToolResult:
     state: ProjectState = inspect_ai.util.store().get("translation_state")
     state["result"] = {
@@ -191,6 +194,7 @@ def generate_and_autorepair_isos_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
     except (AssertionError, ValueError) as e:
         new_exn = ToolError(str(e))
@@ -298,6 +302,9 @@ def add_import_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     async def add_import(import_str: str) -> ToolResult:
         """
@@ -313,6 +320,7 @@ def add_import_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
 
     return add_import
@@ -327,6 +335,9 @@ def remove_lemma_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     async def remove_lemma(code_str: str) -> ToolResult:
         """
@@ -346,6 +357,7 @@ def remove_lemma_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
 
     return remove_lemma
@@ -362,6 +374,9 @@ def edit_lemma_tool(
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
     permit_substring: bool = True,
     unique_substring_match: bool = True,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     async def edit_lemma(code_str: str, new_code_str: str) -> ToolResult:
         """
@@ -414,6 +429,7 @@ def edit_lemma_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
 
     return edit_lemma
@@ -428,6 +444,9 @@ def remove_import_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     """like remove_lemma_tool, but with a different docstring"""
     remove_code = remove_lemma_tool(
@@ -435,6 +454,7 @@ def remove_import_tool(
         imported_name=imported_name,
         iso_file=iso_file,
         write_to_directory_on_error=write_to_directory_on_error,
+        autofix_heuristics=autofix_heuristics,
     )
 
     async def remove_import(code_str: str) -> ToolResult:
@@ -487,6 +507,9 @@ def add_lemma_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     async def add_lemma(
         code_str: str, before_source: str, before_target: str | None = None
@@ -525,6 +548,7 @@ def add_lemma_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
 
     return add_lemma
@@ -539,6 +563,9 @@ def add_iso_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     async def add_iso(source: str, target: str, before_source: str) -> ToolResult:
         """
@@ -576,6 +603,7 @@ def add_iso_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
 
     return add_iso
@@ -590,6 +618,9 @@ def remove_iso_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     async def remove_iso(source: str, target: str | None = None) -> ToolResult:
         """
@@ -632,6 +663,7 @@ def remove_iso_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
 
     return remove_iso
@@ -648,6 +680,9 @@ async def edit_iso_proof_higher_order(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> ToolResult:
     state = inspect_ai.util.store().get("translation_state")
     try:
@@ -692,6 +727,7 @@ async def edit_iso_proof_higher_order(
         imported_name=imported_name,
         iso_file=iso_file,
         write_to_directory_on_error=write_to_directory_on_error,
+        autofix_heuristics=autofix_heuristics,
     )
 
 
@@ -704,6 +740,9 @@ def edit_iso_proof_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     async def edit_iso_proof(
         iso_source: str, new_proof: str, iso_target: str | None = None
@@ -725,6 +764,7 @@ def edit_iso_proof_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
 
     return edit_iso_proof
@@ -739,6 +779,9 @@ def repair_iso_by_reorder_constructors_tool(
     write_to_directory_on_error: (
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> Tool:
     async def repair_iso_by_reorder_constructors(
         permutation: list[int], source: str
@@ -780,6 +823,7 @@ def repair_iso_by_reorder_constructors_tool(
             imported_name=imported_name,
             iso_file=iso_file,
             write_to_directory_on_error=write_to_directory_on_error,
+            autofix_heuristics=autofix_heuristics,
         )
 
     return repair_iso_by_reorder_constructors
@@ -819,6 +863,9 @@ def make_submit_translation_tool(
         Path | str | None
     ) = _DEFAULT_WRITE_TO_DIRECTORY_ON_ERROR,
     admit_failing_isos: bool = False,
+    autofix_heuristics: Sequence[
+        tuple[str, Callable[[IsoError], bool], Callable[[IsoError], str]]
+    ] = (),
 ) -> tuple[Callable[[], Tool], list[str]]:
     (
         init_coq_project,
@@ -956,6 +1003,7 @@ def make_submit_translation_tool(
                 iso_file=iso_file,
                 write_to_directory_on_error=write_to_directory_on_error,
                 admit_failing_isos=admit_failing_isos,
+                autofix_heuristics=autofix_heuristics,
             )
 
         return submit_translation
