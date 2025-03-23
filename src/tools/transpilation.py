@@ -151,6 +151,32 @@ def generate_and_autorepair_isos_tool(
     result = state["result"]
     coq_project = get_coq_project()
 
+    if write_to_directory_on_error:
+        write_to_directory_on_error = Path(write_to_directory_on_error)
+
+    def finally_write(error):
+        assert isinstance(write_to_directory_on_error, Path)
+        if write_to_directory_on_error:
+            key = str(hash(coq_project))
+            (write_to_directory_on_error / key).mkdir(parents=True, exist_ok=True)
+            now = datetime.datetime.now()
+            iso_string = now.isoformat()
+            if len(list((write_to_directory_on_error / key).iterdir())) == 0:
+                coq_project.write(
+                    write_to_directory_on_error / key / iso_string, log=logging.error
+                )
+                (
+                    write_to_directory_on_error / key / iso_string / "errors.txt"
+                ).write_text(str(error))
+                (
+                    write_to_directory_on_error / key / iso_string / "result.txt"
+                ).write_text(repr(result))
+            else:
+                logging.error(
+                    "Touching %s", write_to_directory_on_error / key / iso_string
+                )
+                (write_to_directory_on_error / key / iso_string).touch()
+
     try:
         (
             coq_project,
@@ -170,6 +196,7 @@ def generate_and_autorepair_isos_tool(
         new_exn = ToolError(str(e))
         # Remove the error message from the assertion error, we are already printing it
         e.args = ()
+        finally_write(new_exn)
         raise new_exn from e
 
     set_coq_project(coq_project)
@@ -179,22 +206,7 @@ def generate_and_autorepair_isos_tool(
     result["failure_phase"] = CompilationPhase.PROVING_ISOS
     error = result["error"]
 
-    if write_to_directory_on_error:
-        write_to_directory_on_error = Path(write_to_directory_on_error)
-        key = str(hash(coq_project))
-        (write_to_directory_on_error / key).mkdir(parents=True, exist_ok=True)
-        now = datetime.datetime.now()
-        iso_string = now.isoformat()
-        if len(list((write_to_directory_on_error / key).iterdir())) == 0:
-            coq_project.write(write_to_directory_on_error / key / iso_string)
-            (write_to_directory_on_error / key / iso_string / "errors.txt").write_text(
-                str(error)
-            )
-            (write_to_directory_on_error / key / iso_string / "result.txt").write_text(
-                repr(result)
-            )
-        else:
-            (write_to_directory_on_error / key / iso_string).touch()
+    finally_write(error)
 
     assert not result["status"], state
     assert error is not None, state
