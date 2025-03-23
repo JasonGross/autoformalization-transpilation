@@ -1,8 +1,8 @@
-import subprocess
 import logging
+import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional, Sequence, TypeVar
 
 # Simple logging setup
 logging.basicConfig(
@@ -42,3 +42,11 @@ def backup(filename: str | Path, ext: str = ".bak") -> Optional[Path]:
             filename.rename(backup_name)
             return backup_name
     return None
+
+
+T = TypeVar("T")
+
+
+def unique(iterable: list[T]) -> list[T]:
+    """Return a new iterable with duplicates removed"""
+    return iterable.__class__(dict.fromkeys(iterable))

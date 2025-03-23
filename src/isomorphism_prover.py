@@ -30,7 +30,7 @@ from project_util import (
     has_identifier_prefix,
     remove_identifier_prefix,
 )
-from utils import logging
+from utils import logging, unique
 
 ISO_TARGET_PATTERN = r"(?:[\w\.]+|\(@[\w\.]+\))"
 
@@ -480,13 +480,18 @@ def parse_iso_errors(
             missing_reference_match.group(1),
         )
 
-    result = re.search(
-        # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
-        rf"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ({ISO_TARGET_PATTERN}) (?:-> )?({ISO_TARGET_PATTERN})",
-        errors,
+    result = unique(
+        re.findall(
+            # r"While proving iso_statement ([\w\.]+) ([\w\.]+):
+            rf"(?:Could not find iso for|could not find iso_statement|Consider adding iso_statement) ({ISO_TARGET_PATTERN}) (?:-> )?({ISO_TARGET_PATTERN})",
+            errors,
+        )
     )
     if result:
-        source, target = result.groups()
+        logging.info(f"Found missing isomorphisms: {set(result)}")
+        if len(result) > 1:
+            logging.warning(f"Found multiple missing isomorphisms: {result}")
+        source, target = result[0]
         if (orig_source, orig_target) != (source, target):
             return MissingTypeIso(
                 orig_source,
@@ -1218,14 +1223,18 @@ def generate_and_autorepair_isos(
     extra_err = ""
 
     if isinstance(error, MissingTypeIso):
-        project, cc_identifiers_blocks = repair_missing_type_iso(
-            project,
-            error,
-            cc_identifiers_blocks,
-            original_name=original_name,
-            imported_name=imported_name,
-            iso_file=iso_file,
-        )
+        try:
+            project, cc_identifiers_blocks = repair_missing_type_iso(
+                project,
+                error,
+                cc_identifiers_blocks,
+                original_name=original_name,
+                imported_name=imported_name,
+                iso_file=iso_file,
+            )
+        except (AssertionError, ValueError) as e:
+            e.args = (*e.args, error, errors)
+            raise e
         return generate_and_autorepair_isos(
             project,
             cc_identifiers_blocks,
