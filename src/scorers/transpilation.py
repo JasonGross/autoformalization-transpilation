@@ -266,6 +266,7 @@ def strict_isos_proven_scorer(
     )
 
 
+@scorer(metrics=[accuracy(), mean()])
 def relaxed_isos_proven_scorer(
     *,
     original_name: str = "Original",
