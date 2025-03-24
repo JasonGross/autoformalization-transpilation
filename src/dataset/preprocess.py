@@ -13,11 +13,7 @@ class DependencyGraphBuilder:
     Builds and reads the .dpd file, creating a directed graph.
     """
 
-    def __init__(
-        self,
-        coq_file: Path,
-        out_dpd_path: Optional[Path] = None
-    ) -> None:
+    def __init__(self, coq_file: Path, out_dpd_path: Optional[Path] = None) -> None:
         self.coq_file = coq_file
         self.base_name = self.coq_file.stem
 
@@ -60,9 +56,7 @@ class DependencyGraphBuilder:
 
         generated_dpd = coq_dir / dpd_filename
         if not generated_dpd.exists():
-            raise FileNotFoundError(
-                f"Could not find generated {generated_dpd} after coqc."
-            )
+            raise FileNotFoundError(f"Could not find generated {generated_dpd} after coqc.")
 
         self.out_dpd_path.parent.mkdir(parents=True, exist_ok=True)
         generated_dpd.rename(self.out_dpd_path)
@@ -73,9 +67,7 @@ class DependencyGraphBuilder:
         Parse the .dpd file into self.nodes and self.edges.
         """
         if not self.out_dpd_path.exists():
-            raise FileNotFoundError(
-                f"Cannot parse .dpd file. {self.out_dpd_path} does not exist."
-            )
+            raise FileNotFoundError(f"Cannot parse .dpd file. {self.out_dpd_path} does not exist.")
 
         with self.out_dpd_path.open('r', encoding='utf-8') as file:
             for line in file:
@@ -150,20 +142,20 @@ class CoqDataProcessor:
         blocks = CoqBlockParser.get_coq_blocks(coq_content)
         df = pd.DataFrame(blocks)
 
+        # Create a 'Label' column for merging with the dpd graph info.
+        df["Label"] = df["Chunk"].apply(self.get_label)
+
         dp_builder.parse_dpd_file()
         graph = dp_builder.create_graph()
 
-        df["Label"] = df["Chunk"].apply(self.get_label)
-
-        graph_data = []
-        for node, attrs in graph.nodes(data=True):
-            graph_data.append({
-                "GraphNodeId": node,
-                "GraphLabel": attrs.get("label", "")
-            })
-
+        # Build a dataframe of graph nodes and labels.
+        graph_data = [
+            {"GraphNodeId": node, "GraphLabel": attrs.get("label", "")}
+            for node, attrs in graph.nodes(data=True)
+        ]
         df_graph = pd.DataFrame(graph_data)
 
+        # Merge by matching Coq block 'Label' with graph 'GraphLabel'
         merged_df = df.merge(
             df_graph,
             left_on="Label",
@@ -179,24 +171,13 @@ class CoqDataProcessor:
                 return None
             return [graph.nodes[s]["label"] for s in successors]
 
-        merged_df["Dependencies"] = merged_df["GraphNodeId"].apply(
-            get_dependencies
-        )
+        merged_df["Dependencies"] = merged_df["GraphNodeId"].apply(get_dependencies)
+        merged_df.rename(columns={"Label": "Name"}, inplace=True)
+        merged_df.drop(columns=["GraphNodeId", "GraphLabel"], inplace=True)
 
-        merged_df.drop(
-            columns=["Label", "GraphNodeId", "GraphLabel"],
-            inplace=True
-        )
+        merged_df.loc[merged_df["Type"] == "Other", "Name"] = None
 
-        merged_df.rename(
-            columns={
-                "Type": "Tyoe",
-                "Chunk": "Chunk",
-                "Statement": "Statement"
-            },
-            inplace=True
-        )
-
+        # Output to JSON.
         merged_df.to_json(
             self.out_json_file,
             orient="records",

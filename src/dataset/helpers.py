@@ -11,15 +11,12 @@ class CoqBlockParser:
     """
 
     KEYWORD_TYPE_MAP = {
-        # Theoremish
         "Lemma": "Theoremish",
         "Theorem": "Theoremish",
         "Corollary": "Theoremish",
         "Proposition": "Theoremish",
         "Example": "Theoremish",
         "Fact": "Theoremish",
-
-        # Definitionish
         "Definition": "Definitionish",
         "Fixpoint": "Definitionish",
         "Inductive": "Definitionish",
@@ -54,13 +51,10 @@ class CoqBlockParser:
     def extract_statement(block_text: str, block_type: str) -> Any:
         """
         If the block is Theoremish or Definitionish, return everything
-        before the first '.' in the chunk. Otherwise, return None,
-        which becomes 'null' in JSON.
+        before the first '.' in the chunk. Otherwise, return None.
         """
         if block_type not in ("Theoremish", "Definitionish"):
             return None
-
-        # Grab everything up to the first '.' (if any), then strip whitespace.
         return block_text.split('.', 1)[0].strip()
 
     @staticmethod
@@ -68,14 +62,13 @@ class CoqBlockParser:
         """
         1. Split file content using 'split_coq_file_contents_with_comments'.
         2. Classify each chunk as 'Theoremish', 'Definitionish', or 'Other'.
-        3. Extract a 'Statement' for Theoremish/Definitionish chunks; return
-           None if 'Other'.
+        3. Extract a 'Statement' for Theoremish/Definitionish chunks.
         4. Return a list of dicts with keys:
-               {
-                 "Type": <block_type>,
-                 "Chunk": <chunk_text>,
-                 "Statement": <str or None>
-               }
+           {
+             "Type": <block_type>,
+             "Chunk": <chunk_text>,
+             "Statement": <str or None>
+           }
         """
         statements = split_coq_file_contents_with_comments(file_content)
         blocks = []
