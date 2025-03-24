@@ -1,21 +1,17 @@
 import re
-from typing import List, Dict
+from typing import List, Dict, Any
 
 from coq_tools.split_file import split_coq_file_contents_with_comments
 
 
 class CoqBlockParser:
     """
-    A parser class that splits Coq file contents into chunks and classifies
-    each chunk as 'Theoremish', 'Definitionish', or 'Other' using a
-    keyword-to-type map.
+    A parser class that splits Coq file contents into chunks, classifies them,
+    and extracts a statement if the chunk is Theoremish or Definitionish.
     """
 
-    # Dictionary for coarse classification by the FIRST word of the chunk.
-    # If the first word matches a key, we assign the corresponding type.
-    # Otherwise, default to "Other".
     KEYWORD_TYPE_MAP = {
-        # Theoremish keywords
+        # Theoremish
         "Lemma": "Theoremish",
         "Theorem": "Theoremish",
         "Corollary": "Theoremish",
@@ -23,7 +19,7 @@ class CoqBlockParser:
         "Example": "Theoremish",
         "Fact": "Theoremish",
 
-        # Definitionish keywords
+        # Definitionish
         "Definition": "Definitionish",
         "Fixpoint": "Definitionish",
         "Inductive": "Definitionish",
@@ -35,16 +31,13 @@ class CoqBlockParser:
     def classify_block(block_text: str) -> str:
         """
         Classify a block based on:
-          1) If it contains "Proof." → always "Theoremish".
-          2) Otherwise, check the first word. If it appears in KEYWORD_TYPE_MAP,
-             return that map's value.
-          3) Fallback to "Other" if no keyword match.
+          1) If it contains 'Proof.' → always 'Theoremish'.
+          2) Otherwise, check the first word in KEYWORD_TYPE_MAP.
+          3) Fallback to 'Other'.
         """
-        # 1) Check for "Proof."
         if "Proof." in block_text:
             return "Theoremish"
 
-        # 2) Identify the first word of the first non-whitespace line
         stripped_block = block_text.lstrip()
         if not stripped_block:
             return "Other"
@@ -58,28 +51,42 @@ class CoqBlockParser:
         return CoqBlockParser.KEYWORD_TYPE_MAP.get(first_word, "Other")
 
     @staticmethod
-    def get_coq_blocks(file_content: str) -> List[Dict[str, str]]:
+    def extract_statement(block_text: str, block_type: str) -> Any:
         """
-        1. Split file content using split_coq_file_contents_with_comments.
+        If the block is Theoremish or Definitionish, return everything
+        before the first '.' in the chunk. Otherwise, return None,
+        which becomes 'null' in JSON.
+        """
+        if block_type not in ("Theoremish", "Definitionish"):
+            return None
+
+        # Grab everything up to the first '.' (if any), then strip whitespace.
+        return block_text.split('.', 1)[0].strip()
+
+    @staticmethod
+    def get_coq_blocks(file_content: str) -> List[Dict[str, Any]]:
+        """
+        1. Split file content using 'split_coq_file_contents_with_comments'.
         2. Classify each chunk as 'Theoremish', 'Definitionish', or 'Other'.
-        3. Return a list of dicts like:
-               [
-                   {
-                     "type": <block_type>,
-                     "raw": <the chunk's text>
-                   },
-                   ...
-               ]
+        3. Extract a 'Statement' for Theoremish/Definitionish chunks; return
+           None if 'Other'.
+        4. Return a list of dicts with keys:
+               {
+                 "type": <block_type>,
+                 "raw": <chunk_text>,
+                 "statement": <str or None>
+               }
         """
         statements = split_coq_file_contents_with_comments(file_content)
         blocks = []
 
-        for statement in statements:
-            raw_statement = statement.strip()
-            block_type = CoqBlockParser.classify_block(raw_statement)
+        for chunk in statements:
+            block_type = CoqBlockParser.classify_block(chunk)
+            statement_text = CoqBlockParser.extract_statement(chunk, block_type)
             blocks.append({
                 "type": block_type,
-                "raw": raw_statement
+                "raw": chunk,
+                "statement": statement_text
             })
 
         return blocks
