@@ -153,7 +153,7 @@ class CoqDataProcessor:
         dp_builder.parse_dpd_file()
         graph = dp_builder.create_graph()
 
-        df["Label"] = df["raw"].apply(self.get_label)
+        df["Label"] = df["Chunk"].apply(self.get_label)
 
         graph_data = []
         for node, attrs in graph.nodes(data=True):
@@ -190,9 +190,9 @@ class CoqDataProcessor:
 
         merged_df.rename(
             columns={
-                "type": "Tyoe",
-                "raw": "Chunk",
-                "statement": "Statement"
+                "Type": "Tyoe",
+                "Chunk": "Chunk",
+                "Statement": "Statement"
             },
             inplace=True
         )

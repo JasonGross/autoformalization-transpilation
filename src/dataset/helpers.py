@@ -72,9 +72,9 @@ class CoqBlockParser:
            None if 'Other'.
         4. Return a list of dicts with keys:
                {
-                 "type": <block_type>,
-                 "raw": <chunk_text>,
-                 "statement": <str or None>
+                 "Type": <block_type>,
+                 "Chunk": <chunk_text>,
+                 "Statement": <str or None>
                }
         """
         statements = split_coq_file_contents_with_comments(file_content)
@@ -84,9 +84,9 @@ class CoqBlockParser:
             block_type = CoqBlockParser.classify_block(chunk)
             statement_text = CoqBlockParser.extract_statement(chunk, block_type)
             blocks.append({
-                "type": block_type,
-                "raw": chunk,
-                "statement": statement_text
+                "Type": block_type,
+                "Chunk": chunk,
+                "Statement": statement_text
             })
 
         return blocks
