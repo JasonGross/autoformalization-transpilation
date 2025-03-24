@@ -1,6 +1,8 @@
 import re
 from typing import List, Dict
 
+from coq_tools.split_file import split_coq_file_contents_with_comments
+
 
 class CoqBlockParser:
     """
@@ -8,7 +10,7 @@ class CoqBlockParser:
     Coq text blocks.
     """
 
-    # Added "Compute" to the list of known Coq starters
+    # Keep your existing list of block starters
     blockStarters = [
         "Fixpoint", "Definition", "Lemma", "Theorem", "Inductive",
         "Corollary", "Proposition", "Example", "Record", "CoFixpoint",
@@ -27,6 +29,7 @@ class CoqBlockParser:
         """
         stripped_line = line.lstrip()
         for starter in CoqBlockParser.blockStarters:
+            # The pattern enforces that the line starts with the block keyword
             pattern = r"^" + re.escape(starter) + r"(\b|\s|\()"
             if re.match(pattern, stripped_line):
                 return True
@@ -59,7 +62,7 @@ class CoqBlockParser:
             "End": "End",
             "Compute": "Compute",
             "Notation": "Notation",
-            "Intros": "Intros"
+            "Intros": "Intros",
         }
 
         lines = block_text.strip().split('\n')
@@ -68,8 +71,7 @@ class CoqBlockParser:
 
         first_line = lines[0].strip()
 
-        # Check dictionary-based approach: see if the block starts
-        # with a recognized keyword.
+        # Use the dictionary-based approach
         for key, value in block_type_map.items():
             if first_line.startswith(key):
                 return value
@@ -79,55 +81,23 @@ class CoqBlockParser:
     @staticmethod
     def get_coq_blocks(file_content: str) -> List[Dict[str, str]]:
         """
-        Remove (* ... *) comments, split into logical blocks, and classify each
-        block. Return a list of dicts like [{"type": ..., "raw": ...}, ...].
+        Split the file content into Coq statements using split_coq_file_contents_with_comments,
+        then classify each block. Return a list of dicts like:
+            [
+                {"type": <block_type>, "raw": <the block text>},
+                ...
+            ]
         """
-        comment_pattern = re.compile(r'\(\*.*?\*\)', re.DOTALL)
-        content_no_comments = re.sub(comment_pattern, '', file_content)
-
-        lines = [line.rstrip() for line in content_no_comments.split('\n')]
+        # Use the new function to get Coq statements
+        statements = split_coq_file_contents_with_comments(file_content)
 
         blocks = []
-        current_block = []
-        collecting_proof = False
+        for statement in statements:
+            # Trim and classify
+            block_type = CoqBlockParser.classify_block(statement)
+            blocks.append({
+                "type": block_type,
+                "raw": statement.strip()
+            })
 
-        def flush_block() -> None:
-            """
-            Finalize the current block, classify it, and add it to blocks
-            if non-empty.
-            """
-            nonlocal current_block
-            # Trim empty lines from start/end
-            while current_block and not current_block[0].strip():
-                current_block.pop(0)
-            while current_block and not current_block[-1].strip():
-                current_block.pop()
-
-            if current_block:
-                block_text = "\n".join(current_block)
-                block_type = CoqBlockParser.classify_block(block_text)
-                blocks.append({
-                    "type": block_type,
-                    "raw": block_text.strip()
-                })
-            current_block = []
-
-        for line in lines:
-            stripped_line = line.strip()
-            if collecting_proof:
-                current_block.append(line)
-                if stripped_line in CoqBlockParser.proofEndings:
-                    flush_block()
-                    collecting_proof = False
-            else:
-                if CoqBlockParser.is_block_starter(line):
-                    flush_block()
-                    current_block.append(line)
-                elif stripped_line == "Proof.":
-                    current_block.append(line)
-                    collecting_proof = True
-                else:
-                    current_block.append(line)
-
-        flush_block()
         return blocks
