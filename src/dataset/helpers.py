@@ -1,5 +1,6 @@
 import re
 from typing import List, Dict, Any
+import json
 
 from coq_tools.split_file import split_coq_file_contents_with_comments
 
@@ -83,3 +84,41 @@ class CoqBlockParser:
             })
 
         return blocks
+
+
+
+def load_json(json_path):
+    with open(json_path, 'r') as f:
+        return json.load(f)
+    
+def chunk_df(data, chunksize, statement_only=True):
+    """
+    Takes parsed JSON data and returns chunks of specified size.
+
+    Args:
+        data (list): List of dicts (parsed JSON).
+        chunksize (int): Number of items per chunk.
+        statement_only (bool): If True, return only non-null statements.
+
+    Returns:
+        List[List[Any]]: Chunked list of data (full entries or just statements).
+    """
+    if statement_only:
+        items = [entry["Statement"] for entry in data if entry["Statement"] is not None]
+    else:
+        items = data
+
+    return [items[i:i + chunksize] for i in range(0, len(items), chunksize)]
+
+
+def main():
+    
+    path = r'/root/autoformalization/src/dataset/processed_data/df.json'
+    data = load_json(path)
+
+    chunks = chunk_df(data, 2)
+
+    print(chunks[20])
+
+if __name__ == "__main__":
+    main()
