@@ -17,6 +17,7 @@ dependencies = [
     "pandas>=2.2.3",
     "coq-tools>=0.0.8",
     "inspect-ai>=0.3.75",
+    "itp-interface>=1.1.9",
 ]
 
 [tool.uv]
