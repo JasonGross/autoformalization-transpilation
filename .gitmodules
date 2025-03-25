@@ -7,5 +7,3 @@
 [submodule "inspiration/itp-interface"]
 	path = inspiration/itp-interface
 	url = https://github.com/trishullab/itp-interface.git
-[submodule "src/dataset/coq_tools"]
-	path = src/dataset/coq_tools
