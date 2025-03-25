@@ -187,17 +187,17 @@ class CoqDataProcessor:
         print(f"Done. Final JSON saved to: {self.out_json_file}")
 
 
-def main() -> None:
-    """
-    Example main entry point.
-    """
-    script_dir = Path(__file__).parent.resolve()
-    coq_file = script_dir / "single_file_data" / "lf" / "EverythingLF.v"
-    out_json_file = script_dir / "processed_data" / "df.json"
+# def main() -> None:
+#     """
+#     Example main entry point.
+#     """
+#     script_dir = Path(__file__).parent.resolve()
+#     coq_file = script_dir / "single_file_data" / "lf" / "EverythingLF.v"
+#     out_json_file = script_dir / "processed_data" / "df.json"
 
-    processor = CoqDataProcessor(coq_file, out_json_file)
-    processor.process()
+#     processor = CoqDataProcessor(coq_file, out_json_file)
+#     processor.process()
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
