@@ -102,6 +102,7 @@ if __name__ == "__main__":
             ),
             # model=OpenAIModel.BEST,
             # model=OpenAIModel.O1PREVIEW,
+            # model=AnthropicModel.DEBUG,
             model=AnthropicModel.BEST,
             token_limit=args.token_limit,
             message_limit=args.message_limit,

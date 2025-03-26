@@ -229,6 +229,8 @@ The tactic `find_related_head_iso` can be used to do this.
 The `iso` tactic is a general-purpose tactic for making progress on isomorphism proofs.
 
 Pay more attention to the left-hand-side of the isomorphism goal, which is the Coq source, rather than the right-hand-side, which is mangled by the Lean elaborator and re-import.
+
+Once a success message is returned from any tool call for isomorphism repair, you can consider that the translation is correct and complete. You should only call the `submit_translation_tool` for distinct lean code and mapping of identifiers. A particular submission's isomorphism state is lost when the submission tool is called again.
 """
 
 

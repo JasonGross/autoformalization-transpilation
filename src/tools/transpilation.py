@@ -205,6 +205,11 @@ def generate_and_autorepair_isos_tool(
 
     set_coq_project(coq_project)
     if result["status"]:
+        current_submission = str(state["lean_statements"])
+        previous_submissions = inspect_ai.util.store().get("previous_submissions", {})
+        if current_submission not in previous_submissions:
+            previous_submissions.update({current_submission: ContentText(text="Success!")})
+            inspect_ai.util.store().set("previous_submissions", previous_submissions)
         return ContentText(text="Success!")
 
     result["failure_phase"] = CompilationPhase.PROVING_ISOS
@@ -231,6 +236,9 @@ def generate_and_autorepair_isos_tool(
 This might be because we are missing an isomorphism between some identifier that we unfolded on the left and some identifier we unfolded on the right.  If this is the case, you can invoke `add_iso_tool` with the pair of identifiers, indicating that it should come before the isomorphism for {error.orig_source}. The candidates for missing isomorphisms are:
 left: {error.unknown_lhs}
 right: {error.unknown_rhs}
+
+
+Ensure that you only invoke the `add_iso_tool` with one identifier from the left list and one identifier from the right list. The identifiers should be written exactly as they appear above.
 """
         return ContentText(
             text=f"""Failed to prove isomorphism between {error.orig_source} and {error.orig_target}.
@@ -920,6 +928,11 @@ def make_submit_translation_tool(
                 raise ToolError("coq_lean_identifiers must not be empty")
 
             state["lean_statements"] = LeanFile(lean_code)
+            current_submission = str(state["lean_statements"])
+            previous_submissions = inspect_ai.util.store().get("previous_submissions", {})
+            if current_submission in previous_submissions:
+                logging.info("Returning previous submission result")
+                return previous_submissions[current_submission]
             # Verify that the Lean code compiles
             lean_project, result["status"], result["stderr"] = check_compilation(
                 state["lean_statements"], project=None
