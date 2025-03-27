@@ -14,6 +14,11 @@ def make_single_file(project_name: str, robust: bool = False):
         "flocq": "./make_single_file.py raw_data/flocq/_CoqProject $(git ls-files --recurse-submodules 'raw_data/flocq/src/*.v' | grep -v _8_12) -o single_file_data/flocq/",
         "CompCert": "(cd raw_data/CompCert && ./configure x86_64-linux -ignore-coq-version) && (cd raw_data/CompCert && make) && ./make_single_file.py raw_data/CompCert/_CoqProject $(git ls-files --recurse-submodules 'raw_data/CompCert/*.v') -o single_file_data/CompCert/",
         "lf": "./make_single_file.py raw_data/lf/_CoqProject $(git ls-files 'raw_data/lf/*.v') -o single_file_data/lf/",
+        "plf": "./make_single_file.py raw_data/plf/_CoqProject $(git ls-files 'raw_data/plf/*.v') -o single_file_data/plf/",
+        "vfa": "./make_single_file.py raw_data/vfa/_CoqProject $(git ls-files 'raw_data/vfa/*.v') -o single_file_data/vfa/",
+        "qc": "./make_single_file.py raw_data/qc/_CoqProject $(git ls-files 'raw_data/qc/*.v') -o single_file_data/qc/",
+        "vc": "./make_single_file.py raw_data/vc/_CoqProject $(git ls-files 'raw_data/vc/*.v') -o single_file_data/vc/",
+        "slf": "./make_single_file.py raw_data/slf/_CoqProject $(git ls-files 'raw_data/slf/*.v') -o single_file_data/slf/",
     }
     assert project_name in project_config, f"Project {project_name} not found"
     config = project_config[project_name]
