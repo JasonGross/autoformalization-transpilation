@@ -153,6 +153,8 @@ def update_gitignore(output_dir: Path, lib_name: str):
     (output_dir / ".gitignore").write_text(
         f"""*
 !Everything{lib_name}*.v
+Everything{lib_name}Requires.v
+Everything{lib_name}*PartialProgress.v
 !.gitignore
 """
     )
