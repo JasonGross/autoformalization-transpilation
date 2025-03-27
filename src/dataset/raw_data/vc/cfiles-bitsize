@@ -1,0 +1,37 @@
+#!/bin/bash
+
+if [ $# -eq 1 ]
+then
+ B=$1
+ if [ $B != 32 ] && [ $B != 64 ]
+ then
+  echo "Use command-line argument 32 or 64"
+  exit 1
+ fi
+else  
+  echo "Use command-line argument 32 or 64"
+  exit 1
+fi
+
+echo cp sumarray"$B".v sumarray.v
+cp sumarray"$B".v sumarray.v
+echo cp reverse"$B".v reverse.v
+cp reverse"$B".v reverse.v
+echo cp append"$B".v append.v
+cp append"$B".v append.v
+echo cp stack"$B".v stack.v
+cp stack"$B".v stack.v
+echo cp strlib"$B".v strlib.v
+cp strlib"$B".v strlib.v
+echo cp hash"$B".v hash.v
+cp hash"$B".v hash.v
+echo cp stdlib"$B".v stdlib.v
+cp stdlib"$B".v stdlib.v
+echo cp stdlib2"$B".v stdlib2.v
+cp stdlib2"$B".v stdlib2.v
+echo cp stack2"$B".v stack2.v
+cp stack2"$B".v stack2.v
+echo cp triang2"$B".v triang2.v
+cp triang2"$B".v triang2.v
+echo cp main2"$B".v main2.v
+cp main2"$B".v main2.v

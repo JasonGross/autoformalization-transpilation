@@ -1,0 +1,4 @@
+-Q . SLF
+-arg -w
+-arg -implicit-core-hint-db,-ambiguous-paths,-notation-incompatible-prefix,-automatic-prop-lowering
+

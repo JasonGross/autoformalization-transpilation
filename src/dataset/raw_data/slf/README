@@ -1,0 +1,25 @@
+#########################################################################
+                           SOFTWARE FOUNDATIONS
+#########################################################################
+
+This directory contains both Coq scripts (.v files) and more readable
+HTML files for the Software Foundations electronic textbook,
+covering volume 6, entitled "Separation Logic Foundations".
+
+  - index.html
+    The book's cover page and navigation starting point
+
+  - deps.html
+    Overview of the ordering of chapters
+
+  - LICENSE
+    Explanation of how these files may be redistributed
+
+  - Files SLF*.v
+    Contents of the course
+
+  - Files Lib*.v
+    Contents of the TLC library
+
+  - Other *.v files
+    Implementation of CFML
