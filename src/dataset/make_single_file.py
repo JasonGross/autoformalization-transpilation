@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import logging
+import os.path
 import shutil
 import subprocess
 import time
@@ -9,6 +10,12 @@ from pathlib import Path
 from typing import Sequence
 
 logger = logging.getLogger(__name__)
+
+
+def do_backup(source: Path, target: Path):
+    if target.exists():
+        do_backup(target, target.with_suffix(target.suffix + ".bak"))
+    source.rename(target)
 
 
 @contextmanager
@@ -68,6 +75,13 @@ def check_file_validity(*files: Path, lib_name: str):
             )
 
 
+def copy_if_different(source: Path, target: Path):
+    if not target.exists():
+        shutil.copy(source, target)
+    elif source.read_bytes() != target.read_bytes():
+        shutil.copy(source, target)
+
+
 def copy_files_to_output(
     files: tuple[Path, ...], shared_parent: Path, output_dir: Path, bindings: dict
 ):
@@ -79,7 +93,7 @@ def copy_files_to_output(
         relative_path = file.relative_to(shared_parent)
         destination = output_dir / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(file, destination)
+        copy_if_different(file, destination)
         for dirname, libname in bindings.items():
             dirname = Path(dirname)
             if relative_path.is_relative_to(dirname):
@@ -155,7 +169,7 @@ def run_make(output_dir: Path, quiet: bool):
         )
 
 
-def inline_imports_with_comments(output_dir: Path, lib_name: str, quiet: bool):
+def inline_imports_with_comments(output_dir: Path, lib_name: str, *, quiet: bool):
     """Inline imports with comments preserved."""
     with with_time("inlining imports", quiet=quiet):
         subprocess.run(
@@ -172,7 +186,7 @@ def inline_imports_with_comments(output_dir: Path, lib_name: str, quiet: bool):
         )
 
 
-def build_single_file(output_dir: Path, lib_name: str, quiet: bool):
+def build_single_file(output_dir: Path, lib_name: str, *, quiet: bool):
     """Build the single file version."""
     with with_time("single file build", quiet=quiet):
         subprocess.run(
@@ -184,41 +198,91 @@ def build_single_file(output_dir: Path, lib_name: str, quiet: bool):
         )
 
 
-def inline_imports_admitted(output_dir: Path, lib_name: str, quiet: bool):
+def run_bug_minimizer(
+    description: str,
+    output_dir: Path,
+    input_fname: str,
+    output_fname: str,
+    *extra_args: str,
+    quiet: bool,
+    yes: bool,
+    resume: bool,
+    backup: bool,
+):
+    """Run bug minimizer."""
+    with with_time(description, quiet=quiet):
+        args = [
+            "coq-bug-minimizer",
+            "-f",
+            "_CoqProject",
+            *extra_args,
+        ]
+        if yes:
+            args.append("-y")
+        if resume and (output_dir / output_fname).exists():
+            logger.info(f"Resuming from {output_fname}")
+            output_stem, output_suffix = os.path.splitext(output_fname)
+            input_fname = output_stem + "PartialProgress" + output_suffix
+            if backup:
+                do_backup(output_dir / output_fname, output_dir / input_fname)
+            else:
+                if os.path.exists(input_fname):
+                    os.remove(input_fname)
+                os.rename(output_dir / output_fname, output_dir / input_fname)
+        args.extend([input_fname, output_fname])
+        return subprocess.run(
+            args,
+            cwd=output_dir,
+            check=True,
+            stdout=subprocess.DEVNULL if quiet else None,
+        )
+
+
+def inline_imports_admitted(
+    output_dir: Path,
+    lib_name: str,
+    *,
+    quiet: bool,
+    yes: bool,
+    resume: bool,
+    backup: bool,
+):
     """Inline imports with admitted proofs."""
-    with with_time("inlining imports more robust admitted", quiet=quiet):
-        subprocess.run(
-            [
-                "coq-bug-minimizer",
-                "-f",
-                "_CoqProject",
-                f"Everything{lib_name}Requires.v",
-                f"Everything{lib_name}Admitted.v",
-                "--no-error",
-                "--admit-opaque",
-            ],
-            cwd=output_dir,
-            check=True,
-            stdout=subprocess.DEVNULL if quiet else None,
-        )
+    run_bug_minimizer(
+        "inlining imports more robust admitted",
+        output_dir,
+        f"Everything{lib_name}Requires.v",
+        f"Everything{lib_name}Admitted.v",
+        "--no-error",
+        "--admit-opaque",
+        quiet=quiet,
+        yes=yes,
+        resume=resume,
+        backup=backup,
+    )
 
 
-def inline_imports_robust(output_dir: Path, lib_name: str, quiet: bool):
+def inline_imports_robust(
+    output_dir: Path,
+    lib_name: str,
+    *,
+    quiet: bool,
+    yes: bool,
+    resume: bool,
+    backup: bool,
+):
     """Inline imports with robust handling."""
-    with with_time("inlining imports more robust", quiet=quiet):
-        subprocess.run(
-            [
-                "coq-bug-minimizer",
-                "-f",
-                "_CoqProject",
-                f"Everything{lib_name}Requires.v",
-                f"Everything{lib_name}.v",
-                "--no-error",
-            ],
-            cwd=output_dir,
-            check=True,
-            stdout=subprocess.DEVNULL if quiet else None,
-        )
+    run_bug_minimizer(
+        "inlining imports more robust",
+        output_dir,
+        f"Everything{lib_name}Requires.v",
+        f"Everything{lib_name}.v",
+        "--no-error",
+        quiet=quiet,
+        yes=yes,
+        resume=resume,
+        backup=backup,
+    )
 
 
 def process(
@@ -226,6 +290,9 @@ def process(
     output_dir: Path | str,
     quiet: bool = False,
     robust: bool = False,
+    resume: bool = False,
+    yes: bool = False,
+    backup: bool = True,
 ):
     files = tuple(Path(f) for f in files)
     output_dir = Path(output_dir)
@@ -248,11 +315,16 @@ def process(
 
     run_make(output_dir, quiet)
 
-    inline_imports_with_comments(output_dir, lib_name, quiet)
-    build_single_file(output_dir, lib_name, quiet)
-    inline_imports_admitted(output_dir, lib_name, quiet)
+    # inline_imports_with_comments(output_dir, lib_name, quiet=quiet)
+    # build_single_file(output_dir, lib_name, quiet=quiet)
+    # input(f"inline_imports_admitted({output_dir}, {lib_name}, quiet={quiet}, yes={yes}, resume={resume}, backup={backup})")
+    inline_imports_admitted(
+        output_dir, lib_name, quiet=quiet, yes=yes, resume=resume, backup=backup
+    )
     if robust:
-        inline_imports_robust(output_dir, lib_name, quiet)
+        inline_imports_robust(
+            output_dir, lib_name, quiet=quiet, yes=yes, resume=resume, backup=backup
+        )
 
 
 def main(argv: Sequence[str] | None = None):
@@ -269,15 +341,40 @@ def main(argv: Sequence[str] | None = None):
         help="Suppress timing information and stdout",
     )
     parser.add_argument(
+        "--resume",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Resume the build",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        default=False,
+        help="Skip confirmation prompts",
+    )
+    parser.add_argument(
         "--robust",
         action="store_true",
         default=False,
         help="Include the inline_imports_robust pass",
     )
+    parser.add_argument(
+        "--backup",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Backup the original files",
+    )
     args = parser.parse_args(argv)
 
     return process(
-        *args.files, output_dir=args.output_dir, quiet=args.quiet, robust=args.robust
+        *args.files,
+        output_dir=args.output_dir,
+        quiet=args.quiet,
+        robust=args.robust,
+        resume=args.resume,
+        yes=args.yes,
+        backup=args.backup,
     )
 
 

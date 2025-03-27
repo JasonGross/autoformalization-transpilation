@@ -210,7 +210,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.49.0" },
-    { name = "coq-tools", specifier = ">=0.0.8" },
+    { name = "coq-tools", specifier = ">=0.0.9" },
     { name = "dill", specifier = ">=0.3.9" },
     { name = "frozendict", specifier = ">=2.4.6" },
     { name = "inspect-ai", specifier = ">=0.3.75" },
@@ -391,11 +391,11 @@ wheels = [
 
 [[package]]
 name = "coq-tools"
-version = "0.0.8"
+version = "0.0.9"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/30/b2/cb1cf4be94c42dfc9880fe00aec8f9df9d2d8b397e58bea61cd451211780/coq_tools-0.0.8.tar.gz", hash = "sha256:2ed39e4e1d174b515c072814ae7a96ac97c29c319c201b455fd4d6f642d660ac", size = 107580 }
+sdist = { url = "https://files.pythonhosted.org/packages/78/de/3f407ac35cd652db287c973126242c7fc485aaac96b1582a1854a1c48871/coq_tools-0.0.9.tar.gz", hash = "sha256:0002d1d73953667e19f014f11d0fd98718cd0cf776a029f5e66a28cfde2d47a2", size = 107352 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c7/e9/8ef9ca4ddefeb4b99499ede7c5677f185107a8728af261b5d75673598bf1/coq_tools-0.0.8-py3-none-any.whl", hash = "sha256:a19bd797f02115eca8f54d6528737bce5fa4c7249b6eccf93ff9f34378957fa3", size = 120165 },
+    { url = "https://files.pythonhosted.org/packages/1a/b8/967ab63d4ab2d26179b0168075d2226ee035ffa6568a09b56474755c26c8/coq_tools-0.0.9-py3-none-any.whl", hash = "sha256:126a7527c43fc2c51691575f42f6457ceea06a499e6375bce990519ec3bec7d9", size = 120341 },
 ]
 
 [[package]]

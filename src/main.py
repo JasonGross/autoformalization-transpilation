@@ -8,7 +8,13 @@ from tasks.coq_to_lean import AnthropicModel, CachePolicy, coq_to_lean, eval
 from utils import logging, run_cmd
 
 
-def make_single_file(project_name: str, robust: bool = False):
+def make_single_file(
+    project_name: str,
+    robust: bool = False,
+    quiet: bool = False,
+    resume: bool = False,
+    yes: bool = False,
+):
     logging.info(f"Making single file for {project_name}. This may take a while...")
     project_config = {
         "flocq": "./make_single_file.py raw_data/flocq/_CoqProject $(git ls-files --recurse-submodules 'raw_data/flocq/src/*.v' | grep -v _8_12) -o single_file_data/flocq/",
@@ -24,8 +30,14 @@ def make_single_file(project_name: str, robust: bool = False):
     config = project_config[project_name]
     if robust:
         config += " --robust"
+    if resume:
+        config += " --resume"
+    if yes or quiet:
+        config += " --yes"
+    if quiet:
+        config += " --quiet"
     command = f"cd {SOURCE_DIR}/src/dataset"
-    run_cmd(f"{command} && {config}")
+    run_cmd(f"{command} && {config}", streaming=not quiet)
 
 
 if __name__ == "__main__":
@@ -81,6 +93,26 @@ if __name__ == "__main__":
         default="",
         help="Seed for the messages, to allow bypassing the cache in a controlled way",
     )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="Quiet mode",
+    )
+    parser.add_argument(
+        "--resume",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Resume the build",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        default=False,
+        help="Skip confirmation prompts",
+    )
     args = parser.parse_args()
     project_name = args.project
 
@@ -89,7 +121,13 @@ if __name__ == "__main__":
         assert Path(f"src/dataset/raw_data/{project_name}").exists(), (
             "Project raw_data does not exist"
         )
-        make_single_file(project_name, robust=args.robust)
+        make_single_file(
+            project_name,
+            robust=args.robust,
+            quiet=args.quiet,
+            resume=args.resume,
+            yes=args.yes,
+        )
     # Chunk the single file
     # @@Shiki
 
