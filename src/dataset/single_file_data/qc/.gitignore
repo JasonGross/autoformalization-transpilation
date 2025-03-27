@@ -1,0 +1,5 @@
+*
+!EverythingQC*.v
+EverythingQCRequires.v
+EverythingQC*PartialProgress.v
+!.gitignore

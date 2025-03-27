@@ -1,0 +1,5 @@
+*
+!EverythingVFA*.v
+EverythingVFARequires.v
+EverythingVFA*PartialProgress.v
+!.gitignore

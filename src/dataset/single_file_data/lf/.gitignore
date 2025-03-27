@@ -1,3 +1,5 @@
 *
 !EverythingLF*.v
+EverythingLFRequires.v
+EverythingLF*PartialProgress.v
 !.gitignore
